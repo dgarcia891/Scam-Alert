@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scam Alert - Options</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      color: #1f2937;
+      margin-bottom: 30px;
+    }
+
+    .section {
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .section h2 {
+      margin-top: 0;
+      color: #374151;
+      font-size: 18px;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 8px;
+    }
+
+    .status {
+      padding: 12px;
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 6px;
+      color: #1E40AF;
+      margin-top: 20px;
+    }
+
+    .option {
+      margin: 12px 0;
+    }
+
+    .option-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .help-toggle {
+      background: transparent;
+      border: 1px solid #d1d5db;
+      color: #374151;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .help-toggle:hover {
+      background: #f9fafb;
+    }
+
+    .help-toggle .caret {
+      transition: transform 0.2s ease;
+      font-size: 10px;
+    }
+
+    .help-toggle[aria-expanded="true"] .caret {
+      transform: rotate(90deg);
+    }
+
+    .help-content {
+      display: none;
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .help-content.show {
+      display: block;
+    }
+
+    .help-content ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .help-content li {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>⚙️ Scam Alert Settings</h1>
+
+  <div class="section">
+    <h2>Scanning Options</h2>
+    <div class="option">
+      <div class="option-label-row">
+        <label style="margin: 0;">
+          <input type="checkbox" id="scanningEnabled" checked>
+          Enable real-time scanning
+        </label>
+        <button type="button" class="help-toggle" data-help-target="help-scanningEnabled" aria-expanded="false">
+          <span class="caret">▶</span>
+          What does this do?
+        </button>
+      </div>
+      <div class="help-content" id="help-scanningEnabled">
+        When enabled, Scam Alert scans the website you visit and shows a warning if it finds serious concerns.
+        <ul>
+          <li>Checks each main page you navigate to (not background tabs).</li>
+          <li>Looks at the website address (the URL) and any enabled reputation checks.</li>
+          <li>Does not read or upload the words on the page itself.</li>
+          <li>Skips internal browser pages and localhost for safety/performance.</li>
+          <li>You can also run a manual scan from the extension popup.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="option">
+      <div class="option-label-row">
+        <label style="margin: 0;">
+          <input type="checkbox" id="useGoogleSafeBrowsing" checked>
+          Use Google Safe Browsing API
+        </label>
+        <button type="button" class="help-toggle" data-help-target="help-useGoogleSafeBrowsing" aria-expanded="false">
+          <span class="caret">▶</span>
+          What does this do?
+        </button>
+      </div>
+      <div class="help-content" id="help-useGoogleSafeBrowsing">
+        Uses Google’s Safe Browsing service to check whether a website address is known for phishing or malware.
+        <ul>
+          <li>Sends the current page URL to Google Safe Browsing (URL reputation check).</li>
+          <li>Requires your own API key to be entered below.</li>
+          <li>Does not upload page text, passwords, or form entries.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="option">
+      <div class="option-label-row">
+        <label style="margin: 0;">
+          <input type="checkbox" id="usePhishTank">
+          Use PhishTank detection
+        </label>
+        <button type="button" class="help-toggle" data-help-target="help-usePhishTank" aria-expanded="false">
+          <span class="caret">▶</span>
+          What does this do?
+        </button>
+      </div>
+      <div class="help-content" id="help-usePhishTank">
+        Checks the website address against the PhishTank community database.
+        <ul>
+          <li>This option is currently not recommended unless you have a working PhishTank setup.</li>
+          <li>May require an API key depending on configuration.</li>
+          <li>Does not read or upload the words on the page itself.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="option">
+      <div class="option-label-row">
+        <label style="margin: 0;">
+          <input type="checkbox" id="usePatternDetection" checked>
+          Use pattern-based detection
+        </label>
+        <button type="button" class="help-toggle" data-help-target="help-usePatternDetection" aria-expanded="false">
+          <span class="caret">▶</span>
+          What does this do?
+        </button>
+      </div>
+      <div class="help-content" id="help-usePatternDetection">
+        Runs local, offline checks against common scam and phishing patterns in the website address (the URL).
+        <ul>
+          <li>Suspicious domain endings (TLDs).</li>
+          <li>Brand impersonation (typosquatting).</li>
+          <li>Hidden/disguised links and URL obfuscation.</li>
+          <li>Too many subdomains or unusual URL structure.</li>
+          <li>Concerning words in the URL like “verify”, “login”, “urgent”, etc.</li>
+          <li>Does not scan the page’s text/content (only the address).</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="option">
+      <div class="option-label-row">
+        <label style="margin: 0;">
+          <input type="checkbox" id="notificationsEnabled" checked>
+          Show notifications for critical threats
+        </label>
+        <button type="button" class="help-toggle" data-help-target="help-notificationsEnabled" aria-expanded="false">
+          <span class="caret">▶</span>
+          What does this do?
+        </button>
+      </div>
+      <div class="help-content" id="help-notificationsEnabled">
+        Shows a system notification when Scam Alert finds a high-confidence threat.
+        <ul>
+          <li>Notifications appear only for the highest severity results.</li>
+          <li>You can still review details in the extension popup.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>API Configuration</h2>
+    <p style="font-size: 14px; color: #6b7280; margin-bottom: 20px;">
+      To enable full protection, please provide your own API keys.
+      These are stored locally on your device.
+    </p>
+
+    <label for="gsbApiKey">
+      Google Safe Browsing Key
+      <small style="display: block; color: #6b7280;">Get it from <a
+          href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a></small>
+    </label>
+    <input type="password" id="gsbApiKey"
+      style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+
+    <label for="phishTankApiKey" style="margin-top: 20px;">
+      PhishTank API Key (Optional)
+      <small style="display: block; color: #6b7280;">Get it from <a href="https://www.phishtank.com/register.php"
+          target="_blank">PhishTank</a></small>
+    </label>
+    <input type="password" id="phishTankApiKey"
+      style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px;">
+  </div>
+
+  <div class="section">
+    <h2>About</h2>
+    <p><strong>Version:</strong> 1.0.0</p>
+    <p><strong>Status:</strong> Protection active</p>
+    <p>Scam Alert protects you from phishing and scam websites in real-time.</p>
+  </div>
+
+  <div class="status" id="status" style="display: none;"></div>
+
+  <script type="module" src="options.js"></script>
+</body>
+
+</html>

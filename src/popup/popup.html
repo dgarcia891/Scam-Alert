@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scam Alert</title>
+    <style>
+        body {
+            width: 320px;
+            min-height: 200px;
+            margin: 0;
+            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 16px 0;
+            color: #1f2937;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status.safe {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .status.warning {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .status.danger {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #3B82F6;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        button:hover {
+            background: #2563EB;
+        }
+
+        .settings-link {
+            display: block;
+            text-align: center;
+            color: #6B7280;
+            text-decoration: none;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .settings-link:hover {
+            color: #374151;
+        }
+
+        /* Report Styles */
+        .report-section {
+            margin-top: 20px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: visible;
+            display: none;
+        }
+
+        .report-header {
+            background: #f9fafb;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 16px;
+        }
+
+        .report-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .category-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .status-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 12px;
+        }
+
+        .status-safe {
+            color: #10b981;
+        }
+
+        .status-caution {
+            color: #f59e0b;
+        }
+
+        .status-critical {
+            color: #ef4444;
+        }
+
+        .report-explanation {
+            padding: 12px;
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.5;
+            background: #fafafa;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .indicators-list {
+            padding: 0 12px 12px 12px;
+            background: #fafafa;
+            font-size: 11px;
+            color: #475569;
+        }
+
+        .indicator-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .indicator-bullet {
+            color: #94a3b8;
+        }
+
+        .report-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 10px;
+            color: #94a3b8;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .sources-section {
+            padding: 10px 12px;
+            background: #f0f9ff;
+            border-top: 1px solid #e0f2fe;
+            font-size: 11px;
+        }
+
+        .sources-header {
+            font-weight: 600;
+            color: #0369a1;
+            margin-bottom: 6px;
+        }
+
+        .source-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 0;
+            color: #475569;
+        }
+
+        .source-icon {
+            font-size: 10px;
+        }
+
+        .source-used {
+            color: #16a34a;
+        }
+
+        .source-skipped {
+            color: #94a3b8;
+        }
+
+        .source-error {
+            color: #dc2626;
+        }
+
+        .collapsible-toggle {
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 8px 12px;
+            width: 100%;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 0;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .collapsible-toggle:hover {
+            background: #f9fafb;
+            color: #374151;
+        }
+
+        .collapsible-toggle .arrow {
+            transition: transform 0.2s ease;
+            font-size: 10px;
+        }
+
+        .collapsible-toggle.expanded .arrow {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            display: none;
+        }
+
+        .collapsible-content.show {
+            display: block;
+        }
+
+        .pattern-checks {
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .pattern-check-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            color: #64748b;
+            font-size: 11px;
+        }
+
+        .pattern-check-item .check-result {
+            font-weight: 500;
+        }
+
+        .check-ok {
+            color: #16a34a;
+        }
+
+        .check-flagged {
+            color: #dc2626;
+        }
+
+        .keyword-highlights {
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .keyword-note {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .keyword-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .keyword-chip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            font-size: 11px;
+            cursor: default;
+            outline: none;
+        }
+
+        .keyword-chip:focus {
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+        }
+
+        .keyword-tooltip {
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translate(-50%, 8px);
+            width: 220px;
+            max-width: 260px;
+            background: #111827;
+            color: #f9fafb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.4;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+        }
+
+        .keyword-tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 6px solid #111827;
+        }
+
+        .keyword-chip:hover .keyword-tooltip,
+        .keyword-chip:focus .keyword-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 10px);
+        }
+
+        .category-tooltip {
+            position: relative;
+            cursor: help;
+            display: inline-block;
+        }
+
+        .category-tooltip .tooltip {
+            display: none;
+        }
+
+        #floatingTooltip {
+            position: fixed;
+            left: 0;
+            top: 0;
+            display: none;
+            width: 220px;
+            max-width: 260px;
+            background: #111827;
+            color: #f9fafb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.4;
+            z-index: 9999;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+        }
+
+        #floatingTooltip::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: -6px;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-right: 6px solid #111827;
+        }
+
+        #floatingTooltip.left::before {
+            left: auto;
+            right: -6px;
+            border-right: none;
+            border-left: 6px solid #111827;
+        }
+
+        .whitelist-btn {
+            background: none;
+            border: none;
+            color: #3b82f6;
+            cursor: pointer;
+            padding: 0;
+            font-size: 10px;
+            text-decoration: underline;
+            width: auto;
+            margin-bottom: 0;
+        }
+
+        .whitelist-btn:hover {
+            color: #2563eb;
+            background: none;
+        }
+
+        .api-key-warning {
+            display: none;
+            background: #FFFBEB;
+            border: 1px solid #FEF3C7;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 11px;
+            color: #92400E;
+            text-align: center;
+        }
+
+        .api-key-warning a {
+            color: #B45309;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🛡️ Scam Alert</h1>
+
+    <div class="status safe" id="status">
+        ✓ This page is safe
+    </div>
+
+    <div id="apiKeyWarning" class="api-key-warning">
+        ⚠️ <strong>Setup Required:</strong> Add API keys in <a href="#" id="setupLink">Settings</a> for full protection.
+    </div>
+
+    <div id="progressContainer" style="display: none; margin-bottom: 16px;">
+        <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;" id="progressText">Starting scan...</div>
+        <div style="width: 100%; height: 8px; background: #E5E7EB; border-radius: 4px; overflow: hidden;">
+            <div id="progressBar" style="width: 0%; height: 100%; background: #3B82F6; transition: width 0.3s ease;">
+            </div>
+        </div>
+    </div>
+
+    <div class="report-section" id="reportSection">
+        <div class="report-header">Safety Report</div>
+        
+        <div class="report-explanation" id="reportExplanation">
+            We checked this website and it appears to be safe.
+        </div>
+
+        <!-- Collapsible: What did we check for? -->
+        <button class="collapsible-toggle" id="checksToggle">
+            <span class="arrow">▶</span>
+            <span>What did we check for?</span>
+        </button>
+        <div class="collapsible-content" id="checksContent">
+            <div class="report-grid">
+                <div class="report-item">
+                    <span class="category-label category-tooltip"><span tabindex="0">Trustworthy:</span>
+                        <span class="tooltip">Checks for common signs of scams and impersonation (example: phishing warnings from trusted sources).</span>
+                    </span>
+                    <span id="fraudStatus" class="status-icon">✓</span>
+                </div>
+                <div class="report-item">
+                    <span class="category-label category-tooltip"><span tabindex="0">Privacy:</span>
+                        <span class="tooltip">Checks for signs the site may try to collect sensitive personal information in suspicious ways.</span>
+                    </span>
+                    <span id="identityStatus" class="status-icon">✓</span>
+                </div>
+                <div class="report-item">
+                    <span class="category-label category-tooltip"><span tabindex="0">Security:</span>
+                        <span class="tooltip">Checks for known malware or dangerous behavior reported by trusted sources.</span>
+                    </span>
+                    <span id="malwareStatus" class="status-icon">✓</span>
+                </div>
+                <div class="report-item">
+                    <span class="category-label category-tooltip"><span tabindex="0">Honesty:</span>
+                        <span class="tooltip">Checks for signs the site may be misleading (example: disguised links or suspicious URL tricks).</span>
+                    </span>
+                    <span id="deceptiveStatus" class="status-icon">✓</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collapsible: Advanced Details -->
+        <button class="collapsible-toggle" id="advancedToggle">
+            <span class="arrow">▶</span>
+            <span>Advanced Details</span>
+        </button>
+        <div class="collapsible-content" id="advancedContent">
+            <div class="sources-section" id="sourcesSection">
+                <div class="sources-header">Detection Sources</div>
+                <div id="sourcesList"></div>
+            </div>
+
+            <div class="indicators-list" id="indicatorsList" style="display: none;">
+                <!-- Specific concerns go here -->
+            </div>
+
+            <div class="keyword-highlights" id="keywordHighlightsSection" style="display: none;">
+                <div class="sources-header">Highlighted Words</div>
+                <div class="keyword-note" id="keywordHighlightsNote"></div>
+                <div class="keyword-chips" id="keywordHighlightsChips"></div>
+            </div>
+
+            <div class="pattern-checks" id="patternChecksSection" style="display: none;">
+                <div class="sources-header">Pattern Analysis Breakdown</div>
+                <div id="patternChecksList"></div>
+            </div>
+        </div>
+
+        <div class="report-footer">
+            <button id="whitelistBtn" class="whitelist-btn" style="display: none;">I trust this site</button>
+            <span id="reportTimestamp">Checked: --</span>
+        </div>
+    </div>
+
+    <button id="scanBtn">Scan Current Page</button>
+    <button id="toggleBtn">Disable Protection</button>
+
+    <a href="#" id="settingsLink" class="settings-link">⚙️ Settings</a>
+
+    <div id="floatingTooltip" role="tooltip"></div>
+
+    <script type="module" src="popup.js"></script>
+</body>
+
+</html>

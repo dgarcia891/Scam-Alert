@@ -1,0 +1,27 @@
+# .gitignore
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+*.tmp
+.cache/
