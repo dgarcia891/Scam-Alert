@@ -237,6 +237,10 @@ function generateCategorizedReport(detections, overallSeverity) {
 
     // 4. Pattern Analysis (Suspicious Content/TLD) -> Deceptive
     if (p) {
+        if (p.checks.nonHttps?.flagged) {
+            report.deceptive.status = 'CAUTION';
+            report.indicators.push('Connection not secure (HTTP)');
+        }
         if (p.checks.suspiciousTLD.flagged) {
             report.deceptive.status = 'CAUTION';
             report.indicators.push(`Suspicious top-level domain: ${p.checks.suspiciousTLD.details}`);

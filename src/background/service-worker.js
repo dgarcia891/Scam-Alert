@@ -286,11 +286,11 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             threat: result.overallThreat
         });
 
-        // Handle threat
-        if (result.overallThreat || result.overallSeverity !== 'SAFE') {
+        // Handle threat (avoid alert fatigue: LOW is informational/caution-only)
+        if (result.overallThreat || (result.overallSeverity !== 'SAFE' && result.overallSeverity !== 'LOW')) {
             await handleThreat(tabId, url, result, settings);
         } else {
-            // Clear badge if no threat
+            // Clear badge if no threat (or only LOW severity)
             chrome.action.setBadgeText({ tabId, text: '' });
         }
 

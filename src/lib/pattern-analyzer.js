@@ -20,6 +20,7 @@
  */
 function analyzeUrl(url, pageContent = null) {
     const checks = {
+        nonHttps: checkNonHttps(url),
         suspiciousTLD: checkSuspiciousTLD(url),
         typosquatting: checkTyposquatting(url),
         urlObfuscation: checkUrlObfuscation(url),
@@ -44,6 +45,34 @@ function analyzeUrl(url, pageContent = null) {
         recommendation: getRecommendation(riskScore),
         timestamp: new Date().toISOString()
     };
+}
+
+/**
+ * Check whether the connection is encrypted (HTTPS)
+ * @param {string} url - URL to check
+ * @returns {Object} - Check result
+ */
+function checkNonHttps(url) {
+    try {
+        const urlObj = new URL(url);
+        const isHttp = urlObj.protocol.toLowerCase() === 'http:';
+
+        return {
+            flagged: isHttp,
+            severity: isHttp ? 'LOW' : 'NONE',
+            details: isHttp ? 'Connection is not secure (HTTP)' : 'Secure connection (HTTPS)',
+            // Set to the LOW threshold so HTTP reliably shows as a caution state.
+            score: isHttp ? 15 : 0
+        };
+    } catch {
+        // If parsing fails, do not flag based on protocol.
+        return {
+            flagged: false,
+            severity: 'NONE',
+            details: 'Unknown connection security',
+            score: 0
+        };
+    }
 }
 
 /**

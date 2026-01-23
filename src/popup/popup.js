@@ -113,6 +113,7 @@ function clamp(value, min, max) {
 async function initializePopup() {
     await updateStatus();
     await updateToggleButton();
+    await updateScanButtonLabel();
     await checkApiKeys();
 
     // BUG-003: Auto-scan if no status found and scanning is enabled
@@ -122,6 +123,17 @@ async function initializePopup() {
         console.log('[Scam Alert] Auto-triggering scan for BUG-003');
         scanCurrentPage();
     }
+}
+
+async function updateScanButtonLabel() {
+    const btn = document.getElementById('scanBtn');
+    if (!btn) return;
+
+    const settings = await getSettings();
+    const labelEnabled = btn.dataset.labelEnabled || 'Scan Again';
+    const labelDisabled = btn.dataset.labelDisabled || 'Scan Current Page';
+
+    btn.textContent = settings.scanningEnabled ? labelEnabled : labelDisabled;
 }
 
 async function updateStatus() {
@@ -135,7 +147,13 @@ async function updateStatus() {
 
         if (result) {
             statusDiv.className = 'status ' + getClassNameForSeverity(result.overallSeverity);
-            statusDiv.textContent = getStatusTextForSeverity(result.overallSeverity);
+
+            const nonHttpsFlagged = !!result?.detections?.pattern?.checks?.nonHttps?.flagged;
+            if (result.overallSeverity === 'LOW' && nonHttpsFlagged) {
+                statusDiv.textContent = '⚠️ Connection not secure';
+            } else {
+                statusDiv.textContent = getStatusTextForSeverity(result.overallSeverity);
+            }
 
             if (result.report) {
                 renderReport(result.report, result.timestamp);
@@ -311,6 +329,7 @@ function renderPatternChecks(patternDetection) {
 
     const checks = patternDetection.checks;
     const checkLabels = {
+        nonHttps: 'Connection security (HTTP/HTTPS)',
         suspiciousTLD: 'Suspicious domain ending',
         typosquatting: 'Brand impersonation',
         urlObfuscation: 'Hidden or disguised links',
@@ -408,7 +427,7 @@ async function scanCurrentPage() {
     } catch (error) {
         console.error('Scan failed:', error);
     } finally {
-        btn.textContent = 'Scan Current Page';
+        await updateScanButtonLabel();
         btn.disabled = false;
         setTimeout(() => {
             progContainer.style.display = 'none';
@@ -429,6 +448,7 @@ async function toggleProtection() {
 
     await updateSettings({ scanningEnabled: newState });
     await updateToggleButton();
+    await updateScanButtonLabel();
 }
 
 async function updateToggleButton() {

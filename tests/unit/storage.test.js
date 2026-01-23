@@ -26,9 +26,9 @@ describe('Storage Service', () => {
                 scanningEnabled: true,
                 notificationsEnabled: true,
                 useGoogleSafeBrowsing: true,
-                usePhishTank: true,
+                usePhishTank: false,
                 usePatternDetection: true,
-                preferOffline: true,
+                preferOffline: false,
                 gsbApiKey: '',
                 phishTankApiKey: ''
             });
