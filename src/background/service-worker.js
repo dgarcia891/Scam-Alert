@@ -297,10 +297,27 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                 }
             };
 
-            result = await scanUrl(url, settings, onProgress);
+            let pageContent = null;
+            if (settings.collectPageSignals) {
+                try {
+                    const response = await sendMessageToTab(
+                        tabId,
+                        createMessage(MessageTypes.ANALYZE_PAGE, {})
+                    );
+                    if (response?.data) {
+                        pageContent = response.data;
+                    }
+                } catch (error) {
+                    console.warn('[Scam Alert] Page signal collection failed:', error.message || error);
+                }
+            }
 
-            // Cache result
-            await cacheScan(url, result);
+            const scanOptions = {
+                ...settings,
+                pageContent
+            };
+
+            result = await scanUrl(url, scanOptions, onProgress);
         } else {
             console.log('[Scam Alert] Using cached result for:', url);
             // Even if cached, send a quick completion message

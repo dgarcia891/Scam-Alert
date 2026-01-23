@@ -26,6 +26,7 @@ describe('Storage Service', () => {
                 scanningEnabled: true,
                 notificationsEnabled: true,
                 notifyOnHttpWarning: false,
+                collectPageSignals: false,
                 useGoogleSafeBrowsing: true,
                 usePhishTank: false,
                 usePatternDetection: true,
@@ -47,7 +48,12 @@ describe('Storage Service', () => {
 
     describe('updateSettings', () => {
         it('should merge new settings with existing', async () => {
-            const existing = { scanningEnabled: true, notificationsEnabled: true, notifyOnHttpWarning: false };
+            const existing = {
+                scanningEnabled: true,
+                notificationsEnabled: true,
+                notifyOnHttpWarning: false,
+                collectPageSignals: false
+            };
             const updates = { scanningEnabled: false };
 
             chrome.storage.local.get.mockResolvedValue({ settings: existing });

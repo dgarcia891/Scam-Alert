@@ -58,6 +58,7 @@ async function loadSettings() {
         'usePatternDetection',
         'notificationsEnabled',
         'notifyOnHttpWarning',
+        'collectPageSignals',
         'gsbApiKey',
         'phishTankApiKey'
     ];
@@ -83,6 +84,7 @@ async function saveSettings() {
         usePatternDetection: document.getElementById('usePatternDetection').checked,
         notificationsEnabled: document.getElementById('notificationsEnabled').checked,
         notifyOnHttpWarning: document.getElementById('notifyOnHttpWarning').checked,
+        collectPageSignals: document.getElementById('collectPageSignals').checked,
         gsbApiKey: document.getElementById('gsbApiKey').value,
         phishTankApiKey: document.getElementById('phishTankApiKey').value
     };

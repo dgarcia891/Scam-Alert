@@ -541,6 +541,10 @@ If we need an even softer version, use:
   - No collection of typed values
   - No uploading of page text
 - Exit criteria:
+  - Setting defaults off and help text explains exactly what is collected
+  - Popup indicates when page signals are enabled/disabled
+  - New signals feed into pattern analyzer and UI
+- Exit criteria:
   - If enabled, HTTP + password/payment signals escalate severity
   - Clear Settings text and PRD Privacy section remain accurate
   - Performance budget met (bounded DOM scanning)

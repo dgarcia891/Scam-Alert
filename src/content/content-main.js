@@ -68,6 +68,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
 
+    case MessageTypes.ANALYZE_PAGE:
+      sendResponse({ success: true, data: collectPageSignals() });
+      break;
+
     default:
       console.warn('[Scam Alert Content] Unknown message:', type);
   }
@@ -180,3 +184,67 @@ function hideWarningOverlay() {
 }
 
 console.log('[Scam Alert Content] Monitoring active');
+
+function collectPageSignals() {
+  const isHttps = window.location.protocol === 'https:';
+
+  const forms = Array.from(document.querySelectorAll('form'))
+    .slice(0, 5)
+    .map((form) => {
+      const hasPassword = !!form.querySelector('input[type="password"]');
+      const hasCreditCard = !!form.querySelector('input[autocomplete*="cc" i], input[name*="card" i]');
+      const method = (form.method || 'GET').toUpperCase();
+      let action = '';
+      try {
+        const actionUrl = new URL(form.action || window.location.href, window.location.href);
+        action = actionUrl.origin;
+      } catch {
+        action = '';
+      }
+
+      return { hasPassword, hasCreditCard, method, action };
+    })
+    .filter(form => form.hasPassword || form.hasCreditCard);
+
+  const linkMismatches = [];
+  const anchors = Array.from(document.querySelectorAll('a[href^="http"]')).slice(0, 100);
+  anchors.forEach((anchor) => {
+    if (linkMismatches.length >= 5) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href) return;
+
+    let host;
+    try {
+      host = new URL(href, window.location.href).hostname;
+    } catch {
+      return;
+    }
+
+    const normalizedHost = normalizeHost(host);
+    const text = (anchor.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+
+    const domainMatch = text.match(/([A-Za-z0-9-]+\.)+[A-Za-z]{2,}/);
+    if (!domainMatch) return;
+
+    const displayedHost = normalizeHost(domainMatch[0]);
+    if (!displayedHost || displayedHost === normalizedHost) return;
+
+    linkMismatches.push({
+      displayedHost,
+      linkHost: normalizedHost,
+      text: text.slice(0, 120)
+    });
+  });
+
+  return {
+    isHttps,
+    forms,
+    linkMismatches
+  };
+}
+
+function normalizeHost(host) {
+  return (host || '').replace(/^www\./i, '').toLowerCase();
+}

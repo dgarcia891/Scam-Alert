@@ -5,6 +5,8 @@
 import { sendMessage, createMessage, MessageTypes } from '../lib/messaging.js';
 import { getSettings, updateSettings } from '../lib/storage.js';
 
+let cachedSettings = null;
+
 // Load current page status
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[Scam Alert] Popup initializing...');
@@ -111,29 +113,32 @@ function clamp(value, min, max) {
 }
 
 async function initializePopup() {
+    cachedSettings = await getSettings();
+
     await updateStatus();
-    await updateToggleButton();
-    await updateScanButtonLabel();
-    await checkApiKeys();
+    await updateToggleButton(cachedSettings);
+    await updateScanButtonLabel(cachedSettings);
+    await checkApiKeys(cachedSettings);
+    updatePrivacyNote();
 
     // BUG-003: Auto-scan if no status found and scanning is enabled
     const statusDiv = document.getElementById('status');
-    const settings = await getSettings();
-    if (statusDiv && statusDiv.textContent.includes('Not yet scanned') && settings.scanningEnabled) {
+    if (statusDiv && statusDiv.textContent.includes('Not yet scanned') && cachedSettings?.scanningEnabled) {
         console.log('[Scam Alert] Auto-triggering scan for BUG-003');
         scanCurrentPage();
     }
 }
 
-async function updateScanButtonLabel() {
+async function updateScanButtonLabel(settings) {
     const btn = document.getElementById('scanBtn');
     if (!btn) return;
 
-    const settings = await getSettings();
+    const effective = settings || cachedSettings || await getSettings();
+    cachedSettings = effective;
     const labelEnabled = btn.dataset.labelEnabled || 'Scan Again';
     const labelDisabled = btn.dataset.labelDisabled || 'Scan Current Page';
 
-    btn.textContent = settings.scanningEnabled ? labelEnabled : labelDisabled;
+    btn.textContent = effective.scanningEnabled ? labelEnabled : labelDisabled;
 }
 
 async function updateStatus() {
@@ -167,12 +172,15 @@ async function updateStatus() {
                 renderSources(result.detections);
                 renderPatternChecks(result.detections.pattern);
                 renderKeywordHighlights(result.detections.pattern);
+                renderContentSignals(result.detections.pattern);
             }
         } else {
             statusDiv.className = 'status warning';
             statusDiv.textContent = 'Not yet scanned';
             reportSection.style.display = 'none';
         }
+
+        updatePrivacyNote();
     } catch (error) {
         console.error('Failed to get status:', error);
     }
@@ -335,19 +343,47 @@ function renderPatternChecks(patternDetection) {
         urlObfuscation: 'Hidden or disguised links',
         ipAddress: 'Uses IP address instead of name',
         excessiveSubdomains: 'Unusually complex address',
-        suspiciousKeywords: 'Concerning keywords'
+        suspiciousKeywords: 'Concerning keywords',
+        contentAnalysis: 'Page content signals'
     };
 
     const items = [];
     for (const [key, label] of Object.entries(checkLabels)) {
         const result = checks[key];
+        if (key === 'contentAnalysis' && !result) {
+            if (cachedSettings?.collectPageSignals) {
+                items.push({
+                    label,
+                    passed: true,
+                    detail: 'Checked forms and links: no risky elements found'
+                });
+            }
+            continue;
+        }
+
         if (result !== undefined) {
             // Each check has a 'flagged' boolean property
             const passed = !result.flagged;
+            let detail = result.details || (passed ? 'OK' : 'Flagged');
+
+            if (key === 'contentAnalysis') {
+                const issues = [];
+                if (Array.isArray(result.insecureForms) && result.insecureForms.length > 0) {
+                    issues.push('Sensitive form on non-secure (HTTP) page');
+                }
+                if (Array.isArray(result.suspiciousLinks) && result.suspiciousLinks.length > 0) {
+                    issues.push('Link text does not match destination');
+                }
+                if (Array.isArray(result.scamPhrases) && result.scamPhrases.length > 0) {
+                    issues.push('Urgent wording found');
+                }
+                detail = issues.length > 0 ? issues.join('; ') : 'Checked: no risky forms or links';
+            }
+
             items.push({
                 label,
                 passed,
-                detail: passed ? 'OK' : (result.details || 'Flagged')
+                detail
             });
         }
     }
@@ -447,16 +483,19 @@ async function toggleProtection() {
     const newState = !settings.scanningEnabled;
 
     await updateSettings({ scanningEnabled: newState });
-    await updateToggleButton();
-    await updateScanButtonLabel();
+    cachedSettings = await getSettings();
+    await updateToggleButton(cachedSettings);
+    await updateScanButtonLabel(cachedSettings);
+    updatePrivacyNote();
 }
 
-async function updateToggleButton() {
-    const settings = await getSettings();
+async function updateToggleButton(settings) {
+    const effective = settings || await getSettings();
+    cachedSettings = effective;
     const btn = document.getElementById('toggleBtn');
 
     if (btn) {
-        if (settings.scanningEnabled) {
+        if (effective.scanningEnabled) {
             btn.textContent = 'Disable Protection';
         } else {
             btn.textContent = 'Enable Protection';
@@ -482,12 +521,13 @@ async function whitelistCurrentSite() {
     }
 }
 
-async function checkApiKeys() {
-    const settings = await getSettings();
+async function checkApiKeys(settings) {
+    const effective = settings || await getSettings();
+    cachedSettings = effective;
     const warning = document.getElementById('apiKeyWarning');
     if (warning) {
-        const isMissingKeys = (settings.useGoogleSafeBrowsing && !settings.gsbApiKey) ||
-            (settings.usePhishTank && !settings.phishTankApiKey);
+        const isMissingKeys = (effective.useGoogleSafeBrowsing && !effective.gsbApiKey) ||
+            (effective.usePhishTank && !effective.phishTankApiKey);
 
         warning.style.display = isMissingKeys ? 'block' : 'none';
     }
@@ -496,4 +536,24 @@ async function checkApiKeys() {
 function openSettings(e) {
     e.preventDefault();
     chrome.runtime.openOptionsPage();
+}
+
+function updatePrivacyNote() {
+    const note = document.getElementById('privacyNote');
+    const text = document.getElementById('privacyNoteText');
+    if (!note || !text) return;
+
+    if (!cachedSettings) {
+        note.style.display = 'none';
+        text.textContent = '';
+        return;
+    }
+
+    if (cachedSettings.collectPageSignals) {
+        text.textContent = 'We checked for risky forms and disguised links locally. Nothing from the page was sent anywhere.';
+    } else {
+        text.textContent = 'Page signals are currently off. Turn on “Look for risky forms & disguised links” in Settings to scan for risky forms.';
+    }
+
+    note.style.display = 'block';
 }

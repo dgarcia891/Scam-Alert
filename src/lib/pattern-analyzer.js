@@ -335,7 +335,13 @@ function checkSuspiciousKeywords(url) {
  * @returns {Object} - Analysis result
  */
 function analyzePageContent(pageContent) {
-    const { title = '', bodyText = '', forms = [] } = pageContent;
+    const {
+        title = '',
+        bodyText = '',
+        forms = [],
+        linkMismatches = [],
+        isHttps = true
+    } = pageContent || {};
 
     const scamPhrases = [
         'you have won', 'claim your prize', 'act now', 'limited time',
@@ -348,18 +354,79 @@ function analyzePageContent(pageContent) {
     const text = (title + ' ' + bodyText).toLowerCase();
     const foundPhrases = scamPhrases.filter(phrase => text.includes(phrase));
 
-    // Check for password/credit card input on non-HTTPS
-    const hasPasswordInput = forms.some(form =>
-        form.hasPassword || form.hasCreditCard
-    );
+    const sensitiveForms = Array.isArray(forms)
+        ? forms.filter(form => (form.hasPassword || form.hasCreditCard))
+        : [];
+
+    const insecureForms = !isHttps
+        ? sensitiveForms
+        : [];
+
+    const suspiciousLinks = Array.isArray(linkMismatches)
+        ? linkMismatches.slice(0, 5)
+        : [];
+
+    let score = foundPhrases.length * 10;
+    let severity = 'NONE';
+
+    if (foundPhrases.length >= 2) {
+        severity = 'HIGH';
+    } else if (foundPhrases.length > 0) {
+        severity = 'MEDIUM';
+    }
+
+    if (insecureForms.length > 0) {
+        score += 40;
+        severity = elevateSeverity(severity, 'HIGH');
+    }
+
+    if (suspiciousLinks.length > 0) {
+        score += 20;
+        severity = elevateSeverity(severity, 'MEDIUM');
+    }
+
+    const flagged =
+        foundPhrases.length > 0 ||
+        insecureForms.length > 0 ||
+        suspiciousLinks.length > 0;
+
+    const detailSegments = [];
+    if (foundPhrases.length > 0) {
+        detailSegments.push(`Urgent wording: ${foundPhrases.join(', ')}`);
+    }
+    if (insecureForms.length > 0) {
+        detailSegments.push('Sensitive form on non-secure (HTTP) page');
+    }
+    if (suspiciousLinks.length > 0) {
+        detailSegments.push('Links where the text does not match the destination');
+    }
+
+    let details = '';
+    if (detailSegments.length > 0) {
+        details = detailSegments.join('; ');
+    } else if (sensitiveForms.length > 0) {
+        details = 'Sensitive form present (connection appears secure).';
+    } else {
+        details = 'No risky forms or disguised links found.';
+    }
 
     return {
-        flagged: foundPhrases.length > 0 || hasPasswordInput,
-        severity: foundPhrases.length >= 2 ? 'HIGH' : (foundPhrases.length > 0 ? 'MEDIUM' : 'NONE'),
+        flagged,
+        severity,
         scamPhrases: foundPhrases,
-        hasPasswordInput,
-        score: (foundPhrases.length * 10) + (hasPasswordInput ? 20 : 0)
+        hasPasswordInput: sensitiveForms.length > 0,
+        insecureForms,
+        suspiciousLinks,
+        details,
+        score
     };
+}
+
+function elevateSeverity(current, incoming) {
+    const order = ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+    const currentIndex = order.indexOf(current);
+    const incomingIndex = order.indexOf(incoming);
+    return incomingIndex > currentIndex ? incoming : current;
 }
 
 /**

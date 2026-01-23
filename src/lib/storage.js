@@ -48,6 +48,7 @@ export async function getSettings() {
         scanningEnabled: true,
         notificationsEnabled: true,
         notifyOnHttpWarning: false,
+        collectPageSignals: false,
         useGoogleSafeBrowsing: true,
         usePhishTank: false,
         usePatternDetection: true,
