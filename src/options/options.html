@@ -229,6 +229,27 @@
         </ul>
       </div>
     </div>
+
+    <div class="option">
+      <div class="option-label-row">
+        <label style="margin: 0;">
+          <input type="checkbox" id="notifyOnHttpWarning">
+          Also notify me about non-secure (HTTP) pages
+        </label>
+        <button type="button" class="help-toggle" data-help-target="help-notifyOnHttpWarning" aria-expanded="false">
+          <span class="caret">▶</span>
+          What does this do?
+        </button>
+      </div>
+      <div class="help-content" id="help-notifyOnHttpWarning">
+        Sends a gentle notification when Scam Alert detects that a page is using an unencrypted (HTTP) connection.
+        <ul>
+          <li>Combines with the main notification setting above.</li>
+          <li>Triggered only when the address is HTTP and no other warning is present.</li>
+          <li>Does not send page content or form data—only the URL is used.</li>
+        </ul>
+      </div>
+    </div>
   </div>
 
   <div class="section">

@@ -36,6 +36,9 @@ const ICON_TINTS = {
 
 const tintedIconCache = new Map();
 
+const httpNotificationCache = new Map();
+const HTTP_NOTIFICATION_TTL = 5 * 60 * 1000; // 5 minutes
+
 function severityToIconState(severity) {
     switch (severity) {
         case 'CRITICAL':
@@ -46,6 +49,36 @@ function severityToIconState(severity) {
             return 'WARNING';
         default:
             return 'SAFE';
+    }
+}
+
+function shouldShowHttpNotification(url) {
+    const lastShown = httpNotificationCache.get(url);
+    if (lastShown && (Date.now() - lastShown) < HTTP_NOTIFICATION_TTL) {
+        return false;
+    }
+    httpNotificationCache.set(url, Date.now());
+    return true;
+}
+
+async function maybeShowHttpNotification(url, result, settings) {
+    if (!settings.notificationsEnabled || !settings.notifyOnHttpWarning) return;
+    if (!result || result.overallSeverity !== 'LOW') return;
+
+    const httpCheck = result?.detections?.pattern?.checks?.nonHttps;
+    if (!httpCheck?.flagged) return;
+    if (!shouldShowHttpNotification(url)) return;
+
+    try {
+        await chrome.notifications.create({
+            type: 'basic',
+            iconUrl: '/icons/icon48.png',
+            title: '⚠️ Connection not secure',
+            message: 'This page is using HTTP. Avoid entering passwords or payment information here.',
+            priority: 0
+        });
+    } catch (error) {
+        console.warn('[Scam Alert] Failed to show HTTP notification:', error);
     }
 }
 
@@ -292,6 +325,7 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         } else {
             // Clear badge if no threat (or only LOW severity)
             chrome.action.setBadgeText({ tabId, text: '' });
+            await maybeShowHttpNotification(url, result, settings);
         }
 
         // Update toolbar icon color based on latest scan

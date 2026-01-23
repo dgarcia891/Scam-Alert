@@ -47,6 +47,7 @@ export async function getSettings() {
     return result[STORAGE_KEYS.SETTINGS] || {
         scanningEnabled: true,
         notificationsEnabled: true,
+        notifyOnHttpWarning: false,
         useGoogleSafeBrowsing: true,
         usePhishTank: false,
         usePatternDetection: true,

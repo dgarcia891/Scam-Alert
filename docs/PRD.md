@@ -525,10 +525,11 @@ If we need an even softer version, use:
   - Define and document alert thresholds:
     - overlay threshold
     - notification threshold
-  - Add a setting (if desired) to control HTTP warning behavior (popup-only vs notify)
+  - Add a setting to control HTTP warning behavior (popup-only vs optional notification)
 - Exit criteria:
   - Notifications occur only for high-confidence scenarios
   - User can explain "why did I get notified" from popup transparency
+  - Optional HTTP notification toggle defaults off and respects main notification setting
 
 ### Phase 3: V2 privacy-gated page signals (optional)
 

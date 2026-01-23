@@ -25,6 +25,7 @@ describe('Storage Service', () => {
             expect(settings).toEqual({
                 scanningEnabled: true,
                 notificationsEnabled: true,
+                notifyOnHttpWarning: false,
                 useGoogleSafeBrowsing: true,
                 usePhishTank: false,
                 usePatternDetection: true,
@@ -46,7 +47,7 @@ describe('Storage Service', () => {
 
     describe('updateSettings', () => {
         it('should merge new settings with existing', async () => {
-            const existing = { scanningEnabled: true, notificationsEnabled: true };
+            const existing = { scanningEnabled: true, notificationsEnabled: true, notifyOnHttpWarning: false };
             const updates = { scanningEnabled: false };
 
             chrome.storage.local.get.mockResolvedValue({ settings: existing });
