@@ -62,11 +62,15 @@ export const MessageTypes = {
     // From service worker to content script
     SHOW_WARNING: 'show_warning',
     HIDE_WARNING: 'hide_warning',
+    SCAN_RESULT: 'scan_result',
+    EXECUTE_SCAN: 'execute_scan', // NEW
 
     // From content script to service worker
     ANALYZE_PAGE: 'analyze_page',
     REPORT_SUSPICIOUS: 'report_suspicious',
     FORM_SUBMISSION: 'form_submission',
+    CONTEXT_DETECTED: 'context_detected', // NEW
+    SCAN_PROGRESS: 'scan_progress', // NEW
 
     // From popup to service worker
     GET_TAB_STATUS: 'get_tab_status',
@@ -74,11 +78,19 @@ export const MessageTypes = {
     GET_STATS: 'get_stats',
     UPDATE_SETTINGS: 'update_settings',
     ADD_TO_WHITELIST: 'add_to_whitelist',
+    RESET_STATS: 'reset_stats',
+    ADD_TO_BLOCKLIST: 'add_to_blocklist',
+    REMOVE_FROM_BLOCKLIST: 'remove_from_blocklist',
+    GET_BLOCKLIST: 'get_blocklist',
+    GET_SCAN_RESULTS: 'get_scan_results', // NEW
 
     // Responses
     STATUS_RESPONSE: 'status_response',
     SCAN_COMPLETE: 'scan_complete',
-    ERROR: 'error'
+    ERROR: 'error',
+
+    // Reporting
+    REPORT_SCAM: 'report_scam'
 };
 
 /**

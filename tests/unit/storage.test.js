@@ -6,7 +6,7 @@ import { jest, describe, beforeEach, it, expect } from '@jest/globals';
  * Tests chrome.storage.local wrapper functions
  */
 
-import { getSettings, updateSettings, getCachedScan, cacheScan, isWhitelisted, normalizeUrl } from '../../src/lib/storage';
+import { getSettings, updateSettings, updateStats, getCachedScan, cacheScan, isWhitelisted, normalizeUrl } from '../../src/lib/storage';
 
 describe('Storage Service', () => {
 
@@ -32,17 +32,36 @@ describe('Storage Service', () => {
                 usePatternDetection: true,
                 preferOffline: false,
                 gsbApiKey: '',
-                phishTankApiKey: ''
+                phishTankApiKey: '',
+                licenseKey: '',
+                planType: 'free',
+                emailScanningEnabled: true,
+                emailPromptDisabled: false
             });
         });
 
-        it('should return stored settings', async () => {
+        it('should return stored settings merged with defaults', async () => {
             const mockSettings = { scanningEnabled: false };
             chrome.storage.local.get.mockResolvedValue({ settings: mockSettings });
 
             const settings = await getSettings();
 
-            expect(settings).toEqual(mockSettings);
+            expect(settings).toEqual({
+                scanningEnabled: false, // overridden
+                notificationsEnabled: true,
+                notifyOnHttpWarning: false,
+                collectPageSignals: false,
+                useGoogleSafeBrowsing: true,
+                usePhishTank: false,
+                usePatternDetection: true,
+                preferOffline: false,
+                gsbApiKey: '',
+                phishTankApiKey: '',
+                licenseKey: '',
+                planType: 'free',
+                emailScanningEnabled: true,
+                emailPromptDisabled: false
+            });
         });
     });
 
@@ -62,8 +81,28 @@ describe('Storage Service', () => {
             await updateSettings(updates);
 
             expect(chrome.storage.local.set).toHaveBeenCalledWith({
-                settings: { ...existing, ...updates }
+                settings: expect.objectContaining({ ...existing, ...updates })
             });
+        });
+    });
+
+    describe('updateStats with Metadata', () => {
+        it('should store metadata in recentActivity', async () => {
+            const update = {
+                scan: true,
+                activity: {
+                    domain: 'mail.google.com',
+                    action: 'scanned',
+                    metadata: { subject: 'Test' }
+                }
+            };
+            chrome.storage.local.get.mockResolvedValue({ statistics: { recentActivity: [] } });
+            chrome.storage.local.set.mockResolvedValue(undefined);
+
+            await updateStats(update);
+
+            const call = chrome.storage.local.set.mock.calls[0][0];
+            expect(call.statistics.recentActivity[0].metadata).toEqual({ subject: 'Test' });
         });
     });
 
@@ -79,7 +118,7 @@ describe('Storage Service', () => {
             const normalized = normalizeUrl(url);
             expect(chrome.storage.local.set).toHaveBeenCalledWith({
                 [`scan_cache_${normalized}`]: {
-                    data,
+                    result: data,
                     timestamp: expect.any(Number)
                 }
             });
@@ -94,7 +133,7 @@ describe('Storage Service', () => {
 
             const normalized = normalizeUrl(url);
             chrome.storage.local.get.mockResolvedValue({
-                [`scan_cache_${normalized}`]: { data, timestamp }
+                [`scan_cache_${normalized}`]: { result: data, timestamp }
             });
 
             const result = await getCachedScan(url);
@@ -139,6 +178,26 @@ describe('Storage Service', () => {
             const result = await isWhitelisted('https://malicious.com');
 
             expect(result).toBe(false);
+        });
+
+        it('should return true for whitelisted email address', async () => {
+            chrome.storage.local.get.mockResolvedValue({
+                whitelist: ['trusted@example.com']
+            });
+
+            const result = await isWhitelisted('trusted@example.com');
+
+            expect(result).toBe(true);
+        });
+
+        it('should return true if email domain is whitelisted', async () => {
+            chrome.storage.local.get.mockResolvedValue({
+                whitelist: ['example.com']
+            });
+
+            const result = await isWhitelisted('anyone@example.com');
+
+            expect(result).toBe(true);
         });
     });
 });

@@ -1,12 +1,20 @@
 ---
 name: plan
-description: Research and architectural planning. NO code changes.
+description: Architectural blueprint with Impact Report. READ ONLY.
 ---
-steps:
+1. Load Context
+   node scripts/consult.cjs
+   // turbo
 
-- name: Consult Memory
-    command: node scripts/consult.js
-- name: Analyze Architecture
-    command: cat docs/architecture.md
-- name: Output Plan
-    command: echo "Drafting implementation plan..."
+2. Drift Check
+   node scripts/drift_check.cjs
+   // turbo
+
+3. Blueprint Generation
+   echo "📝 Drafting Implementation Plan..."
+   echo "⚠️ CONSTRAINT: Output Markdown ONLY. Do not write files."
+   // turbo
+
+4. Stop
+   echo "🛑 PLAN COMPLETE. Run /build to execute."
+   // turbo

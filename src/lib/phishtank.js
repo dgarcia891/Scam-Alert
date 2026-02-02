@@ -133,14 +133,9 @@ async function checkUrlOffline(url) {
             'lastUpdated'
         ]);
 
-        // Update database if older than 1 hour
-        const ONE_HOUR = 60 * 60 * 1000;
-        if (!phishTankDatabase || !lastUpdated || Date.now() - lastUpdated > ONE_HOUR) {
-            // We need settings here to get the key
-            const { getSettings } = await import('./storage.js');
-            const settings = await getSettings();
-            await downloadPhishTankDatabase(settings.phishTankApiKey);
-            return checkUrlOffline(url); // Retry with fresh database
+        if (!phishTankDatabase) {
+            console.warn('[PhishTank] Offline database missing. Use settings to download.');
+            return { isPhishing: false, severity: 'SAFE', unknown: true };
         }
 
         // Normalize URL for comparison

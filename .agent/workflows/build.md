@@ -1,12 +1,20 @@
 ---
 name: build
-description: Spawns parallel agents to build features + tests.
+description: Spawns Swarm (Test + Code) based on Spec.
 ---
-steps:
+1. Architecture Load
+   cat docs/architecture.md
+   // turbo
 
-- name: Verify Architecture
-    command: cat docs/architecture.md
-- name: Spawn Builders
-    command: echo "Spawning Mock-Writer and Developer Agents..."
-- name: Run Tests
-    command: npm test
+2. Swarm Init
+   echo "🚀 Spawning Mock-Writer (tests/unit) and Builder (src/)..."
+   // turbo
+
+3. Parallel Execution
+   echo "Writing tests to tests/unit/ (using jest-chrome)..." 
+   echo "Writing code to src/..."
+   // turbo
+
+4. Verification
+   npm run test:unit
+   // turbo

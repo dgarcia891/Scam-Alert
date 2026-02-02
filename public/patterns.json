@@ -1,0 +1,52 @@
+[
+    {
+        "phrase": "purchase a gift card",
+        "severity": "HIGH",
+        "category": "financial"
+    },
+    {
+        "phrase": "send me the a picture of the code",
+        "severity": "CRITICAL",
+        "category": "social_engineering"
+    },
+    {
+        "phrase": "do not share this code",
+        "severity": "MEDIUM",
+        "category": "security"
+    },
+    {
+        "phrase": "verify your wallet",
+        "severity": "HIGH",
+        "category": "crypto"
+    },
+    {
+        "phrase": "compromised account",
+        "severity": "MEDIUM",
+        "category": "security"
+    },
+    {
+        "phrase": "legal action",
+        "severity": "MEDIUM",
+        "category": "intimidation"
+    },
+    {
+        "phrase": "final notice",
+        "severity": "MEDIUM",
+        "category": "intimidation"
+    },
+    {
+        "phrase": "money order",
+        "severity": "HIGH",
+        "category": "financial"
+    },
+    {
+        "phrase": "crypto transfer",
+        "severity": "HIGH",
+        "category": "crypto"
+    },
+    {
+        "phrase": "scratch the back",
+        "severity": "HIGH",
+        "category": "gift_card"
+    }
+]

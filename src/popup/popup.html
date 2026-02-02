@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scam Alert</title>
+    <link rel="stylesheet" href="../styles/scan-summary.css">
     <style>
         body {
             width: 320px;
@@ -453,9 +454,11 @@
         </div>
     </div>
 
+    <div id="scanSummary" style="display: none;"></div>
+
     <div class="report-section" id="reportSection">
         <div class="report-header">Safety Report</div>
-        
+
         <div class="report-explanation" id="reportExplanation">
             We checked this website and it appears to be safe.
         </div>
@@ -469,25 +472,29 @@
             <div class="report-grid">
                 <div class="report-item">
                     <span class="category-label category-tooltip"><span tabindex="0">Trustworthy:</span>
-                        <span class="tooltip">Checks for common signs of scams and impersonation (example: phishing warnings from trusted sources).</span>
+                        <span class="tooltip">Checks for common signs of scams and impersonation (example: phishing
+                            warnings from trusted sources).</span>
                     </span>
                     <span id="fraudStatus" class="status-icon">✓</span>
                 </div>
                 <div class="report-item">
                     <span class="category-label category-tooltip"><span tabindex="0">Privacy:</span>
-                        <span class="tooltip">Checks for signs the site may try to collect sensitive personal information in suspicious ways.</span>
+                        <span class="tooltip">Checks for signs the site may try to collect sensitive personal
+                            information in suspicious ways.</span>
                     </span>
                     <span id="identityStatus" class="status-icon">✓</span>
                 </div>
                 <div class="report-item">
                     <span class="category-label category-tooltip"><span tabindex="0">Security:</span>
-                        <span class="tooltip">Checks for known malware or dangerous behavior reported by trusted sources.</span>
+                        <span class="tooltip">Checks for known malware or dangerous behavior reported by trusted
+                            sources.</span>
                     </span>
                     <span id="malwareStatus" class="status-icon">✓</span>
                 </div>
                 <div class="report-item">
                     <span class="category-label category-tooltip"><span tabindex="0">Honesty:</span>
-                        <span class="tooltip">Checks for signs the site may be misleading (example: disguised links or suspicious URL tricks).</span>
+                        <span class="tooltip">Checks for signs the site may be misleading (example: disguised links or
+                            suspicious URL tricks).</span>
                     </span>
                     <span id="deceptiveStatus" class="status-icon">✓</span>
                 </div>
@@ -522,6 +529,16 @@
 
             <div class="keyword-highlights" id="privacyNote" style="display: none;">
                 <div class="keyword-note" id="privacyNoteText" style="font-size: 11px; color: #64748b;"></div>
+            </div>
+        </div>
+
+        <!-- Collapsible: Blocklist -->
+        <button class="collapsible-toggle" id="blocklistToggle">
+            <span class="arrow">▶</span>
+            <span>Manage Blocklist</span>
+        </button>
+        <div class="collapsible-content" id="blocklistContent">
+            <div id="blocklistContainer" style="padding: 12px; background: #f8fafc; border-top: 1px solid #e5e7eb;">
             </div>
         </div>
 

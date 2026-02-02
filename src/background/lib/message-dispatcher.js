@@ -1,0 +1,134 @@
+/**
+ * Message Dispatcher for Service Worker
+ */
+import { MessageTypes } from '../../lib/messaging.js';
+import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, addToBlocklist, removeFromBlocklist, getBlocklist } from '../../lib/storage.js';
+import { submitReport } from '../../lib/supabase.js';
+
+/**
+ * Creates a message handler that delegates to specialized functions
+ * @param {Object} context - Execution context (e.g., functions from service-worker)
+ */
+export function handleIncomingMessage(message, sender, context) {
+    const { type, data } = message;
+    const { scanAndHandle, getWhitelist } = context;
+
+    switch (type) {
+        case MessageTypes.GET_TAB_STATUS:
+            return handleGetTabStatus();
+
+        case MessageTypes.SCAN_CURRENT_TAB:
+            return handleScanCurrentTab(sender, data, scanAndHandle);
+
+        case MessageTypes.GET_STATS:
+            return getStats();
+
+        case MessageTypes.UPDATE_SETTINGS:
+            return handleUpdateSettings(data);
+
+        case MessageTypes.ADD_TO_WHITELIST:
+            return handleAddToWhitelist(data, getWhitelist);
+
+        case MessageTypes.RESET_STATS:
+            return handleResetStats();
+
+        case MessageTypes.REPORT_SCAM:
+            return handleReportScam(data);
+
+        case MessageTypes.ADD_TO_BLOCKLIST:
+            return handleAddToBlocklist(data);
+
+        case MessageTypes.REMOVE_FROM_BLOCKLIST:
+            return handleRemoveFromBlocklist(data);
+
+        case MessageTypes.GET_BLOCKLIST:
+            return getBlocklist();
+
+        default:
+            console.warn('[Scam Alert] Unknown message type:', type);
+            return { error: 'Unknown message type' };
+    }
+}
+
+async function handleGetTabStatus() {
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const tab = tabs[0];
+    if (!tab || !tab.url) return { error: 'No active tab' };
+
+    const result = await getCachedScan(tab.url);
+    return { url: tab.url, result };
+}
+
+async function handleScanCurrentTab(sender, data, scanAndHandle) {
+    const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (tab) {
+        console.log('[Scam Alert] Triggering scan from message for:', tab.url);
+        await scanAndHandle(tab.id, tab.url, {
+            forceRefresh: Boolean(data?.forceRefresh),
+            pageContent: data?.pageContent
+        });
+    } else {
+        console.warn('[Scam Alert] SCAN_CURRENT_TAB received but no tab found');
+    }
+    return { success: true };
+}
+
+async function handleUpdateSettings(data) {
+    await updateSettings(data);
+    return { success: true };
+}
+
+async function handleAddToWhitelist(data, getWhitelist) {
+    let identity = data.domain.toLowerCase();
+    if (!identity.includes('@')) {
+        identity = identity.replace(/^www\./, '');
+    }
+
+    const list = await getWhitelist();
+    if (!list.includes(identity)) {
+        await addToWhitelist(identity);
+        // Also clear badge if scan was warning
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab) {
+            chrome.action.setBadgeText({ tabId: activeTab.id, text: '' });
+        }
+    }
+    return { success: true };
+}
+
+async function handleResetStats() {
+    console.log('[Scam Alert] Manual stats reset requested');
+    await chrome.storage.local.remove('statistics');
+    await repairStatistics();
+    await repairStatistics(); // Double repair to ensure consistency
+    return { success: true };
+}
+
+async function handleReportScam(data) {
+    console.log('[Scam Alert] Processing report from content script:', data);
+    try {
+        const { url, type, description, metadata } = data;
+        const reportResult = await submitReport(url, type, description, metadata);
+        return { success: reportResult.success, error: reportResult.error };
+    } catch (error) {
+        console.error('[Scam Alert] Report submission failed:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+
+async function handleAddToBlocklist(data) {
+    const domain = data.domain.toLowerCase().trim();
+    if (domain) {
+        await addToBlocklist(domain);
+    }
+    return { success: true };
+}
+
+async function handleRemoveFromBlocklist(data) {
+    const domain = data.domain.toLowerCase().trim();
+    if (domain) {
+        await removeFromBlocklist(domain);
+    }
+    return { success: true };
+}

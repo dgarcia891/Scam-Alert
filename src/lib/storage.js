@@ -11,7 +11,12 @@ const STORAGE_KEYS = {
     PHISHTANK_DB: 'phishTankDatabase',
     PHISHTANK_UPDATED: 'phishTankLastUpdated',
     STATS: 'statistics',
-    WHITELIST: 'whitelist'
+    WHITELIST: 'whitelist',
+    BLOCKLIST: 'blocklist',
+    LICENSE_KEY: 'license_key',
+    PLAN_TYPE: 'plan_type',
+    REMOTE_PATTERNS: 'remoteScamPatterns',
+    LAST_SYNC: 'lastPatternSync'
 };
 
 /**
@@ -43,8 +48,7 @@ export function normalizeUrl(url) {
  */
 export async function getSettings() {
     const result = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
-
-    return result[STORAGE_KEYS.SETTINGS] || {
+    const defaults = {
         scanningEnabled: true,
         notificationsEnabled: true,
         notifyOnHttpWarning: false,
@@ -54,8 +58,23 @@ export async function getSettings() {
         usePatternDetection: true,
         preferOffline: false,
         gsbApiKey: '',
-        phishTankApiKey: ''
+        phishTankApiKey: '',
+        licenseKey: '',
+        planType: 'free', // 'free' | 'pro'
+        emailScanningEnabled: true,
+        emailPromptDisabled: false
     };
+
+    return { ...defaults, ...(result[STORAGE_KEYS.SETTINGS] || {}) };
+}
+
+/**
+ * Check if the user has a Pro plan
+ * @returns {Promise<boolean>} True if Pro
+ */
+export async function isPro() {
+    const settings = await getSettings();
+    return settings.planType === 'pro';
 }
 
 /**
@@ -80,7 +99,7 @@ export async function getCachedScan(url) {
     const result = await chrome.storage.local.get(key);
 
     if (result[key]) {
-        const { data, timestamp } = result[key];
+        const { result: data, timestamp } = result[key];
         const age = Date.now() - timestamp;
         const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -106,7 +125,7 @@ export async function cacheScan(url, data) {
     const key = `${STORAGE_KEYS.CACHE_PREFIX}${normalized}`;
     await chrome.storage.local.set({
         [key]: {
-            data,
+            result: data,
             timestamp: Date.now()
         }
     });
@@ -146,8 +165,7 @@ export async function updatePhishTankDB(database) {
  */
 export async function getStats() {
     const result = await chrome.storage.local.get(STORAGE_KEYS.STATS);
-
-    return result[STORAGE_KEYS.STATS] || {
+    const defaults = {
         totalScans: 0,
         threatsBlocked: 0,
         lastThreatDate: null,
@@ -155,28 +173,68 @@ export async function getStats() {
             pattern: 0,
             phishTank: 0,
             googleSafeBrowsing: 0
-        }
+        },
+        recentActivity: []
     };
+
+    return { ...defaults, ...(result[STORAGE_KEYS.STATS] || {}) };
 }
 
 /**
- * Update statistics
+ * Update statistics (Resilient, atomic-like update)
  * @param {Object} update - Stats update
  * @returns {Promise<void>}
  */
 export async function updateStats(update) {
-    const current = await getStats();
+    // Sanitize and read current state
+    const result = await chrome.storage.local.get(STORAGE_KEYS.STATS);
+    const current = result[STORAGE_KEYS.STATS] || {};
+
+    // Ensure structure is sound (Repair on the fly if needed)
+    const recentActivity = Array.isArray(current.recentActivity) ? current.recentActivity : [];
+    const totalScans = typeof current.totalScans === 'number' ? current.totalScans : 0;
+    const threatsBlocked = typeof current.threatsBlocked === 'number' ? current.threatsBlocked : 0;
+    const scansBySource = current.scansBySource || { pattern: 0, phishTank: 0, googleSafeBrowsing: 0 };
+
+    if (update.activity) {
+        recentActivity.unshift(update.activity);
+        if (recentActivity.length > 50) recentActivity.pop();
+    }
+
     const updated = {
-        totalScans: current.totalScans + (update.scan ? 1 : 0),
-        threatsBlocked: current.threatsBlocked + (update.threat ? 1 : 0),
-        lastThreatDate: update.threat ? Date.now() : current.lastThreatDate,
+        totalScans: totalScans + (update.scan ? 1 : 0),
+        threatsBlocked: threatsBlocked + (update.threat ? 1 : 0),
+        lastThreatDate: update.threat ? Date.now() : (current.lastThreatDate || null),
         scansBySource: {
-            ...current.scansBySource,
-            ...update.scansBySource
-        }
+            ...scansBySource,
+            ...(update.scansBySource || {})
+        },
+        recentActivity
     };
 
+    console.log(`[Storage] Updating totalScans from ${totalScans} to ${updated.totalScans}`);
     await chrome.storage.local.set({ [STORAGE_KEYS.STATS]: updated });
+}
+
+/**
+ * Sanitize and repair statistics if they are corrupted
+ */
+export async function repairStatistics() {
+    console.log('[Storage] Performing statistics repair/sanitization...');
+    const result = await chrome.storage.local.get(STORAGE_KEYS.STATS);
+    const stats = result[STORAGE_KEYS.STATS];
+
+    if (!stats || typeof stats !== 'object' || !Array.isArray(stats.recentActivity)) {
+        console.warn('[Storage] Statistics corrupted or missing. Resetting to healthy state.');
+        const healthy = {
+            totalScans: stats?.totalScans || 0,
+            threatsBlocked: stats?.threatsBlocked || 0,
+            lastThreatDate: stats?.lastThreatDate || null,
+            scansBySource: stats?.scansBySource || { pattern: 0, phishTank: 0, googleSafeBrowsing: 0 },
+            recentActivity: []
+        };
+        await chrome.storage.local.set({ [STORAGE_KEYS.STATS]: healthy });
+    }
 }
 
 /**
@@ -217,16 +275,94 @@ export async function removeFromWhitelist(domain) {
  * @param {string} url - URL to check
  * @returns {Promise<boolean>} True if whitelisted
  */
-export async function isWhitelisted(url) {
+export async function isWhitelisted(urlOrEmail) {
+    if (!urlOrEmail) return false;
+
     try {
-        const urlObj = new URL(url);
-        const domain = urlObj.hostname.replace(/^www\./, '');
         const whitelist = await getWhitelist();
+
+        // Handle Email Addresses or raw domains directly
+        if (!urlOrEmail.includes('://')) {
+            const identity = urlOrEmail.toLowerCase().trim();
+            return whitelist.some(whitelisted =>
+                identity === whitelisted || identity.endsWith(`@${whitelisted}`)
+            );
+        }
+
+        // Handle URLs
+        const urlObj = new URL(urlOrEmail);
+        const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
 
         return whitelist.some(whitelisted =>
             domain === whitelisted || domain.endsWith(`.${whitelisted}`)
         );
-    } catch {
+    } catch (e) {
+        console.warn('[Storage] isWhitelisted check failed:', e);
+        return false;
+    }
+}
+
+/**
+ * Get blocklist
+ * @returns {Promise<Array>} Blocklisted domains
+ */
+export async function getBlocklist() {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.BLOCKLIST);
+    return result[STORAGE_KEYS.BLOCKLIST] || [];
+}
+
+/**
+ * Add domain to blocklist
+ * @param {string} domain - Domain to blocklist
+ * @returns {Promise<void>}
+ */
+export async function addToBlocklist(domain) {
+    const blocklist = await getBlocklist();
+    if (!blocklist.includes(domain)) {
+        blocklist.push(domain);
+        await chrome.storage.local.set({ [STORAGE_KEYS.BLOCKLIST]: blocklist });
+    }
+}
+
+/**
+ * Remove domain from blocklist
+ * @param {string} domain - Domain to remove
+ * @returns {Promise<void>}
+ */
+export async function removeFromBlocklist(domain) {
+    const blocklist = await getBlocklist();
+    const filtered = blocklist.filter(d => d !== domain);
+    await chrome.storage.local.set({ [STORAGE_KEYS.BLOCKLIST]: filtered });
+}
+
+/**
+ * Check if domain is blocked
+ * @param {string} urlOrEmail - URL or Email to check
+ * @returns {Promise<boolean>} True if blocked
+ */
+export async function isBlocked(urlOrEmail) {
+    if (!urlOrEmail) return false;
+
+    try {
+        const blocklist = await getBlocklist();
+
+        // Handle Email Addresses or raw domains directly
+        if (!urlOrEmail.includes('://')) {
+            const identity = urlOrEmail.toLowerCase().trim();
+            return blocklist.some(blocked =>
+                identity === blocked || identity.endsWith(`@${blocked}`)
+            );
+        }
+
+        // Handle URLs
+        const urlObj = new URL(urlOrEmail);
+        const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
+
+        return blocklist.some(blocked =>
+            domain === blocked || domain.endsWith(`.${blocked}`)
+        );
+    } catch (e) {
+        console.warn('[Storage] isBlocked check failed:', e);
         return false;
     }
 }

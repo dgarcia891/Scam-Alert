@@ -1,12 +1,24 @@
 ---
 name: fix
-description: Test-Driven Bug Fixing Loop.
+description: Two-Strike Repair with Test-First Debugging.
 ---
-steps:
+1. Recall
+   node scripts/consult.cjs
+   // turbo
 
-- name: Active Recall
-    command: node scripts/consult.js
-- name: Reproduce Failure
-    command: npm run test:regression -- --watch
-- name: Log Bug
-    command: echo "Update docs/BUG_LOG.md before coding."
+2. Reproduction (Strike 0)
+   echo "🧪 Writing failing regression test..."
+   npm run test:unit
+   // turbo
+
+3. Attempt 1 (Strike 1)
+   echo "🛠️ Applying fix..."
+   // turbo
+
+4. Verification
+   npm run test:unit
+   // Instruction: If fails, try Attempt 2. If Attempt 2 fails, STOP.
+
+5. Close Loop
+   echo "✅ Fix Verified. Updating Bug Log..."
+   // turbo

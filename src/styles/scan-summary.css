@@ -1,0 +1,75 @@
+/* Scan Summary Transparency Styles */
+
+.scan-summary-container {
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    animation: slideUp 0.4s ease-out;
+}
+
+.verified-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.verified-icon {
+    width: 24px;
+    height: 24px;
+    color: #10B981; /* emerald-500 */
+    animation: checkmarkPop 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.verified-text {
+    font-weight: 700;
+    color: #064E3B; /* emerald-900 */
+    font-size: 1.125rem;
+}
+
+.scanned-criteria-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.scanned-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: #F9FAFB;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: #374151;
+    animation: fadeInStaggered 0.2s ease-out forwards;
+    opacity: 0;
+}
+
+.scanned-item .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-passed { background-color: #10B981; }
+.status-warning { background-color: #F59E0B; }
+.status-failed { background-color: #EF4444; }
+
+@keyframes checkmarkPop {
+    0% { transform: scale(0); }
+    70% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+@keyframes fadeInStaggered {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

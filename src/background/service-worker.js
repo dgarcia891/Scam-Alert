@@ -11,362 +11,144 @@
  * - Handles message routing
  */
 
-import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cacheScan, isWhitelisted, addToWhitelist, clearCache } from '../lib/storage.js';
+import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cacheScan, isWhitelisted, addToWhitelist, getWhitelist, clearCache, isPro, repairStatistics, normalizeUrl } from '../lib/storage.js';
 import { MessageTypes, createMessageHandler, sendMessageToTab, createMessage } from '../lib/messaging.js';
 import { scanUrl } from '../lib/detector.js';
 import { downloadPhishTankDatabase } from '../lib/phishtank.js';
+import { syncPatterns } from '../lib/database.js';
+import { submitReport } from '../lib/supabase.js';
 
-console.log('[Scam Alert] Service worker initializing...');
+// Decentralized Modules (v19.2)
+import { handleIncomingMessage } from './messages/handler.js';
+import { onInstalled, onStartup } from './events/lifecycle.js';
+import { checkProStatus } from './services/auth.js';
+import { maybeShowHttpNotification, setActionIconForTab, syncIconForTabFromCache, ignoreTabError } from './lib/icon-manager.js';
+import { createNavigationHandler } from './lib/navigation-handler.js';
+import { tabStateManager } from '../lib/tab-state-manager.js';
 
-// ============================================================================
-// Action Icon State (per-tab)
-// ============================================================================
-
-const DEFAULT_ACTION_ICON_PATHS = {
-    16: 'icons/icon16.png',
-    32: 'icons/icon32.png',
-    48: 'icons/icon48.png'
-};
-
-const ICON_TINTS = {
-    SAFE: '#16a34a',
-    WARNING: '#f59e0b',
-    DANGER: '#dc2626'
-};
-
-const tintedIconCache = new Map();
-
-const httpNotificationCache = new Map();
-const HTTP_NOTIFICATION_TTL = 5 * 60 * 1000; // 5 minutes
-
-function severityToIconState(severity) {
-    switch (severity) {
-        case 'CRITICAL':
-            return 'DANGER';
-        case 'HIGH':
-        case 'MEDIUM':
-        case 'LOW':
-            return 'WARNING';
-        default:
-            return 'SAFE';
-    }
-}
-
-function shouldShowHttpNotification(url) {
-    const lastShown = httpNotificationCache.get(url);
-    if (lastShown && (Date.now() - lastShown) < HTTP_NOTIFICATION_TTL) {
-        return false;
-    }
-    httpNotificationCache.set(url, Date.now());
-    return true;
-}
-
-async function maybeShowHttpNotification(url, result, settings) {
-    if (!settings.notificationsEnabled || !settings.notifyOnHttpWarning) return;
-    if (!result || result.overallSeverity !== 'LOW') return;
-
-    const httpCheck = result?.detections?.pattern?.checks?.nonHttps;
-    if (!httpCheck?.flagged) return;
-    if (!shouldShowHttpNotification(url)) return;
-
-    try {
-        await chrome.notifications.create({
-            type: 'basic',
-            iconUrl: '/icons/icon48.png',
-            title: '⚠️ Connection not secure',
-            message: 'This page is using HTTP. Avoid entering passwords or payment information here.',
-            priority: 0
-        });
-    } catch (error) {
-        console.warn('[Scam Alert] Failed to show HTTP notification:', error);
-    }
-}
-
-async function getTintedIconImageData(state) {
-    if (tintedIconCache.has(state)) return tintedIconCache.get(state);
-
-    const tint = ICON_TINTS[state];
-    if (!tint) return null;
-
-    const sizes = [16, 32, 48];
-    const result = {};
-
-    for (const size of sizes) {
-        const url = chrome.runtime.getURL(DEFAULT_ACTION_ICON_PATHS[size]);
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const bitmap = await createImageBitmap(blob);
-
-        const canvas = new OffscreenCanvas(size, size);
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, size, size);
-        ctx.drawImage(bitmap, 0, 0, size, size);
-
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = tint;
-        ctx.fillRect(0, 0, size, size);
-        ctx.globalCompositeOperation = 'source-over';
-
-        result[size] = ctx.getImageData(0, 0, size, size);
-    }
-
-    tintedIconCache.set(state, result);
-    return result;
-}
-
-async function setActionIconForTab(tabId, severity) {
-    try {
-        if (!tabId) return;
-        if (!severity) {
-            await chrome.action.setIcon({ tabId, path: DEFAULT_ACTION_ICON_PATHS });
-            return;
-        }
-
-        const state = severityToIconState(severity);
-        const imageData = await getTintedIconImageData(state);
-        if (!imageData) {
-            await chrome.action.setIcon({ tabId, path: DEFAULT_ACTION_ICON_PATHS });
-            return;
-        }
-
-        await chrome.action.setIcon({ tabId, imageData });
-    } catch (error) {
-        console.warn('[Scam Alert] Failed to set action icon:', error);
-    }
-}
-
-async function syncIconForTabFromCache(tabId, url) {
-    try {
-        if (!tabId || !url) return;
-        if (!shouldScanUrl(url)) {
-            await setActionIconForTab(tabId, null);
-            return;
-        }
-        const cached = await getCachedScan(url);
-        await setActionIconForTab(tabId, cached?.overallSeverity || null);
-    } catch (error) {
-        console.warn('[Scam Alert] Failed to sync action icon from cache:', error);
-    }
-}
+console.log('[Scam Alert] Service worker v1.0.59 initializing (Hydra Hub)...');
 
 // ============================================================================
 // Installation & Updates
 // ============================================================================
 
-chrome.runtime.onInstalled.addListener(async (details) => {
-    console.log('[Scam Alert] Extension installed:', details.reason);
-
-    const settings = await getSettings();
-
-    // Deactivate PhishTank by default (no longer onboarding users)
-    if (settings.usePhishTank) {
-        await updateSettings({ usePhishTank: false, preferOffline: false });
-    }
-
-    if (details.reason === 'install') {
-        // First-time setup
-        if (settings.usePhishTank) {
-            console.log('[Scam Alert] Downloading PhishTank database...');
-            await downloadPhishTankDatabase(settings.phishTankApiKey);
-        }
-
-        // Show welcome notification
-        chrome.notifications.create({
-            type: 'basic',
-            iconUrl: 'icons/icon48.png',
-            title: 'Scam Alert Installed',
-            message: 'You\'re now protected from scams. The extension runs silently in the background.',
-            priority: 2
-        });
-
-        // Initial scan of active tabs
-        await scanActiveTabs();
-    } else if (details.reason === 'update') {
-        await clearCache();
-        // Scan on update too
-        await scanActiveTabs();
-    }
-});
+chrome.runtime.onInstalled.addListener((details) => onInstalled(details, scanActiveTabs));
+chrome.runtime.onStartup.addListener(onStartup);
 
 // ============================================================================
 // Periodic Tasks
 // ============================================================================
 
-// Defensive guard for alarms API (common crash point if permission is transient)
 if (typeof chrome.alarms !== 'undefined') {
     chrome.alarms.onAlarm.addListener(async (alarm) => {
-        if (alarm.name === 'updatePhishTankDB') {
-            const settings = await getSettings();
-            if (!settings.usePhishTank) return;
-
-            console.log('[Scam Alert] Updating PhishTank database...');
-            await downloadPhishTankDatabase(settings.phishTankApiKey);
-        }
+        if (alarm.name === 'syncScamPatterns') await syncPatterns();
     });
-
-    // Create/clear PhishTank alarm based on settings
-    const initializeAlarms = async () => {
-        try {
-            const settings = await getSettings();
-            if (settings.usePhishTank) {
-                chrome.alarms.create('updatePhishTankDB', { periodInMinutes: 60 });
-            } else {
-                chrome.alarms.clear('updatePhishTankDB');
-            }
-        } catch (error) {
-            console.warn('[Scam Alert] Failed to initialize alarms:', error);
-        }
-    };
-
-    initializeAlarms();
-} else {
-    console.warn('[Scam Alert] Alarms API not available. Periodic updates disabled.');
+    chrome.alarms.create('syncScamPatterns', { periodInMinutes: 24 * 60 });
 }
 
 // ============================================================================
 // URL Scanning
 // ============================================================================
 
-/**
- * Check if URL should be scanned
- * @param {string} url - URL to check
- * @returns {boolean} True if should scan
- */
 function shouldScanUrl(url) {
     try {
         const urlObj = new URL(url);
-
-        // Skip internal URLs
-        if (urlObj.protocol === 'chrome:' ||
-            urlObj.protocol === 'chrome-extension:' ||
-            urlObj.protocol === 'about:') {
-            return false;
-        }
-
-        // Skip localhost
-        if (urlObj.hostname === 'localhost' ||
-            urlObj.hostname === '127.0.0.1') {
-            return false;
-        }
-
+        if (['chrome:', 'chrome-extension:', 'about:'].includes(urlObj.protocol)) return false;
+        if (['localhost', '127.0.0.1'].includes(urlObj.hostname)) return false;
         return true;
-    } catch {
-        return false;
-    }
+    } catch { return false; }
 }
 
-/**
- * Scan URL and handle results
- * @param {number} tabId - Tab ID
- * @param {string} url - URL to scan
- * @param {Object} scanOptions - Options for scan behavior (e.g., forceRefresh)
- */
 async function scanAndHandle(tabId, url, scanOptions = {}) {
     try {
-        // Get settings
         const settings = await getSettings();
+        if (!settings.scanningEnabled) return;
+        if (await isWhitelisted(url)) return;
 
-        if (!settings.scanningEnabled) {
-            console.log('[Scam Alert] Scanning disabled');
-            return;
-        }
-
-        // Check whitelist
-        if (await isWhitelisted(url)) {
-            console.log('[Scam Alert] URL whitelisted:', url);
+        if (scanOptions.pageContent?.senderEmail && await isWhitelisted(scanOptions.pageContent.senderEmail)) {
             return;
         }
 
         const { forceRefresh = false } = scanOptions;
-
-        // Check cache first (unless forced)
         let result = forceRefresh ? null : await getCachedScan(url);
 
         if (!result) {
-            // Perform scan with progress updates
-            console.log('[Scam Alert] Scanning:', url);
-
             const onProgress = (progress) => {
                 try {
                     chrome.runtime.sendMessage(createMessage('scan_progress', progress), () => {
-                        // Ignore errors (e.g., popup closed)
                         void chrome.runtime.lastError;
                     });
-                } catch {
-                    // Ignore errors
-                }
+                } catch { /* Ignore */ }
             };
 
-            let pageContent = null;
-            if (settings.collectPageSignals) {
+            let pageContent = scanOptions.pageContent || null;
+            if (!pageContent && settings.collectPageSignals) {
                 try {
-                    const response = await sendMessageToTab(
-                        tabId,
-                        createMessage(MessageTypes.ANALYZE_PAGE, {})
-                    );
-                    if (response?.data) {
-                        pageContent = response.data;
-                    }
-                } catch (error) {
-                    console.warn('[Scam Alert] Page signal collection failed:', error.message || error);
+                    const response = await sendMessageToTab(tabId, createMessage(MessageTypes.ANALYZE_PAGE, {}));
+                    if (response?.data) pageContent = response.data;
+                } catch (err) {
+                    console.warn('[Scam Alert] Page signal collection failed:', err.message);
                 }
             }
 
-            const scanOptions = {
-                ...settings,
-                pageContent
-            };
+            let isProUser = false;
+            try { isProUser = await isPro(); } catch (err) { /* fallback */ }
 
-            result = await scanUrl(url, scanOptions, onProgress);
-        } else {
-            console.log('[Scam Alert] Using cached result for:', url);
-            // Even if cached, send a quick completion message
-            try {
-                chrome.runtime.sendMessage(createMessage('scan_progress', { percent: 100, message: 'Using cached results' }), () => {
-                    void chrome.runtime.lastError;
-                });
-            } catch {
-                // Ignore errors
-            }
+            const metadata = {};
+            if (pageContent?.subject) metadata.subject = pageContent.subject;
+            if (pageContent?.senderName) metadata.sender = pageContent.senderName;
+            if (pageContent?.senderEmail && !metadata.sender) metadata.sender = pageContent.senderEmail;
+
+            result = await scanUrl(url, { ...settings, ...scanOptions, pageContent, isPro: isProUser, metadata }, onProgress);
+            await cacheScan(url, result);
         }
 
-        // Update stats
         await updateStats({
             scan: true,
-            threat: result.overallThreat
+            threat: result.overallThreat,
+            activity: {
+                domain: normalizeUrl(url),
+                action: result.overallThreat ? 'blocked' : 'scanned',
+                time: Date.now(),
+                severity: result.overallSeverity,
+                performedChecks: {
+                    ...(result.checks || {}),
+                    ...Object.entries(result.detections || {}).reduce((acc, [key, val]) => {
+                        if (key !== 'pattern' && val?.title) acc[key] = val;
+                        return acc;
+                    }, {})
+                },
+                indicators: result.report?.indicators || [],
+                metadata: result.metadata || {}
+            }
         });
 
-        // Handle threat (avoid alert fatigue: LOW is informational/caution-only)
-        if (result.overallThreat || (result.overallSeverity !== 'SAFE' && result.overallSeverity !== 'LOW')) {
+        if (result.overallThreat || result.overallSeverity !== 'SAFE') {
             await handleThreat(tabId, url, result, settings);
         } else {
-            // Clear badge if no threat (or only LOW severity)
             chrome.action.setBadgeText({ tabId, text: '' });
             await maybeShowHttpNotification(url, result, settings);
         }
-
-        // Update toolbar icon color based on latest scan
         await setActionIconForTab(tabId, result.overallSeverity);
 
     } catch (error) {
-        console.error('[Scam Alert] Scan error:', error);
+        console.error('[Scam Alert] Critical Scan Error:', error);
+        try {
+            const domain = (url && typeof url === 'string') ? new URL(url).hostname : 'unknown';
+            await updateStats({
+                scan: true, threat: false,
+                activity: { domain, action: 'error', time: Date.now(), severity: 'UNKNOWN', metadata: { error: error.message } }
+            });
+        } catch (statsError) { /* Ignore */ }
     }
 }
 
-/**
- * Scan all active tabs in all windows
- */
 async function scanActiveTabs() {
-    console.log('[Scam Alert] Starting startup scan sweep...');
     try {
         const tabs = await chrome.tabs.query({ active: true });
         for (const tab of tabs) {
             if (tab.url && shouldScanUrl(tab.url)) {
-                console.log(`[Scam Alert] Auto-scanning tab ${tab.id}: ${tab.url}`);
-                // Fire and forget to avoid blocking
-                scanAndHandle(tab.id, tab.url).catch(err =>
-                    console.error(`[Scam Alert] Failed to auto-scan tab ${tab.id}:`, err)
-                );
+                scanAndHandle(tab.id, tab.url).catch(err => console.error(`[Scam Alert] Failed to auto-scan tab ${tab.id}:`, err));
             }
         }
     } catch (error) {
@@ -374,25 +156,20 @@ async function scanActiveTabs() {
     }
 }
 
-/**
- * Handle detected threat
- * @param {number} tabId - Tab ID
- * @param {string} url - URL with threat
- * @param {Object} result - Scan result
- * @param {Object} settings - User settings
- */
 async function handleThreat(tabId, url, result, settings) {
-    console.warn('[Scam Alert] THREAT DETECTED:', url, result);
+    const severity = result.overallSeverity;
+    const isDanger = severity === 'CRITICAL' || severity === 'HIGH';
+    const badgeColor = isDanger ? '#DC2626' : '#f59e0b';
 
-    // Set badge
-    chrome.action.setBadgeText({ tabId, text: '!' });
-    chrome.action.setBadgeBackgroundColor({ tabId, color: '#DC2626' });
+    try {
+        chrome.action.setBadgeText({ tabId, text: '!' });
+        chrome.action.setBadgeBackgroundColor({ tabId, color: badgeColor });
+    } catch (error) { ignoreTabError(error); }
 
-    // Show notification for critical threats
-    if (settings.notificationsEnabled && result.overallSeverity === 'CRITICAL') {
+    if (settings.notificationsEnabled && severity === 'CRITICAL') {
         chrome.notifications.create({
             type: 'basic',
-            iconUrl: '/icons/icon48.png',
+            iconUrl: chrome.runtime.getURL('icons/icon48.png'),
             title: '⚠️ SCAM WARNING',
             message: result.recommendations[0] || 'Dangerous website detected!',
             priority: 2,
@@ -400,97 +177,40 @@ async function handleThreat(tabId, url, result, settings) {
         });
     }
 
-    // Inject warning overlay ONLY for critical threats.
-    // Browser interstitials (when present) are authoritative and can't be reliably replaced.
-    if (result.overallSeverity === 'CRITICAL') {
-        try {
-            await sendMessageToTab(
-                tabId,
-                createMessage(MessageTypes.SHOW_WARNING, { result })
-            );
-        } catch (error) {
-            console.error('[Scam Alert] Failed to show warning:', error);
-        }
+    const type = severity === 'CRITICAL' ? MessageTypes.SHOW_WARNING :
+        (severity === 'HIGH' || severity === 'MEDIUM') ? MessageTypes.SCAN_RESULT : null;
+
+    if (type) {
+        try { await sendMessageToTab(tabId, createMessage(type, { result })); }
+        catch (error) { console.error(`[Scam Alert] Failed to send ${type}:`, error); }
     }
 }
 
-// Listen for navigation
-chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
-    // Only scan main frame
-    if (details.frameId !== 0) return;
-
-    const url = details.url;
-
-    if (!shouldScanUrl(url)) return;
-
-    await scanAndHandle(details.tabId, url);
-});
-
-// Keep icon in sync when user switches tabs
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-    try {
-        const tab = await chrome.tabs.get(tabId);
-        if (!tab?.url) return;
-        await syncIconForTabFromCache(tabId, tab.url);
-    } catch {
-        // Ignore
-    }
-});
-
-// Reset/sync icon when a tab finishes navigating
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status !== 'complete') return;
-    if (!tab?.url) return;
-    syncIconForTabFromCache(tabId, tab.url);
-});
-
 // ============================================================================
-// Message Handling
+// Listeners
 // ============================================================================
 
-chrome.runtime.onMessage.addListener(createMessageHandler(async (message, sender) => {
-    const { type, data } = message;
-
-    switch (type) {
-        case MessageTypes.GET_TAB_STATUS: {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab) return { error: 'No active tab' };
-            const result = await getCachedScan(tab.url);
-            return { url: tab.url, result };
-        }
-
-        case MessageTypes.SCAN_CURRENT_TAB: {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab) {
-                await scanAndHandle(tab.id, tab.url, { forceRefresh: Boolean(data?.forceRefresh) });
-            }
-            return { success: true };
-        }
-
-        case MessageTypes.GET_STATS: {
-            const stats = await getStats();
-            return stats;
-        }
-
-        case MessageTypes.UPDATE_SETTINGS: {
-            await updateSettings(data);
-            return { success: true };
-        }
-
-        case MessageTypes.ADD_TO_WHITELIST: {
-            await addToWhitelist(data.domain);
-            // Clear badge for current tab if it matches
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab) {
-                chrome.action.setBadgeText({ tabId: tab.id, text: '' });
-            }
-            return { success: true };
-        }
-
-        default:
-            console.warn('[Scam Alert] Unknown message type:', type);
-            return { error: 'Unknown message type' };
-    }
+chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
+    shouldScanUrl,
+    scanAndHandle,
+    syncIconForTabFromCache
 }));
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const context = {
+        scanAndHandle,
+        getStats,
+        updateSettings,
+        getCachedScan,
+        isWhitelisted,
+        addToWhitelist,
+        getWhitelist,
+        repairStatistics,
+        submitReport,
+        tabStateManager
+    };
+    handleIncomingMessage(message, sender, context).then(sendResponse);
+    return true; // Keep channel open for async
+});
 
 console.log('[Scam Alert] Service worker ready');

@@ -45,6 +45,9 @@ async function checkUrlsWithSafeBrowsing(urls, apiKey) {
       }
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const response = await fetch(
       `${SAFE_BROWSING_API_URL}?key=${apiKey}`,
       {
@@ -52,9 +55,11 @@ async function checkUrlsWithSafeBrowsing(urls, apiKey) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
       }
     );
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Safe Browsing API error: ${response.status}`);

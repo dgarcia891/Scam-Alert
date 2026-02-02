@@ -1,0 +1,74 @@
+/* 
+ * Scam Alert - Content Styles
+ * Scoped for Shadow DOM or Injected directly for highlights
+ */
+
+/* Highlighting Engine */
+.scam-alert-highlight {
+    background-color: rgba(245, 158, 11, 0.4) !important;
+    border-bottom: 2px solid rgba(245, 158, 11, 0.8) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2) !important;
+    transition: all 0.3s ease !important;
+    cursor: help !important;
+    position: relative !important;
+    padding: 2px 0 !important;
+}
+
+.scam-alert-highlight-critical {
+    background-color: rgba(225, 29, 72, 0.45) !important;
+    border-bottom: 2px solid rgba(225, 29, 72, 0.9) !important;
+    box-shadow: 0 0 15px rgba(225, 29, 72, 0.3) !important;
+    animation: sa-pulse-red 1.5s infinite !important;
+}
+
+@keyframes sa-pulse-red {
+    0% {
+        background-color: rgba(225, 29, 72, 0.2);
+    }
+
+    50% {
+        background-color: rgba(225, 29, 72, 0.4);
+    }
+
+    100% {
+        background-color: rgba(225, 29, 72, 0.2);
+    }
+}
+
+@keyframes sa-pulse-amber {
+    0% {
+        background-color: rgba(245, 158, 11, 0.2);
+    }
+
+    50% {
+        background-color: rgba(245, 158, 11, 0.4);
+    }
+
+    100% {
+        background-color: rgba(245, 158, 11, 0.2);
+    }
+}
+
+/* Dashboard UI */
+.scam-alert-dashboard {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* Custom Scrollbar for the dashboard */
+.sa-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sa-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sa-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.sa-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
