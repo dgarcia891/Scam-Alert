@@ -8,10 +8,11 @@ const copyManifest = () => {
     return {
         name: 'copy-manifest',
         closeBundle: () => {
-            fs.copyFileSync('manifest.json', 'dist/manifest.json');
+            const rootDir = __dirname;
+            fs.copyFileSync(resolve(rootDir, 'manifest.json'), resolve(rootDir, 'dist/manifest.json'));
             // Copy icons if they exist
-            if (fs.existsSync('icons')) {
-                fs.cpSync('icons', 'dist/icons', { recursive: true });
+            if (fs.existsSync(resolve(rootDir, 'icons'))) {
+                fs.cpSync(resolve(rootDir, 'icons'), resolve(rootDir, 'dist/icons'), { recursive: true });
             }
             // Copy Core Extension Scripts (Background, Content, Libs)
             // Manifest and icons are handled below.

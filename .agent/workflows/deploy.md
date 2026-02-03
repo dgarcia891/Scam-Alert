@@ -18,6 +18,7 @@ npm run test:unit
 
 ```bash
 node scripts/release.js patch
+npm run build
 ```
 
 ### 3. Deploy (Commit & Push)
