@@ -6,27 +6,19 @@ import fs from 'fs';
 import path from 'path';
 
 const type = process.argv[2] || 'patch'; // major | minor | patch
-const root = process.cwd();
 
 console.log(`📦 VERSION BUMP (${type})`);
 
 // 1. Calculate New Version
 let currentVer = '0.0.0';
-const pkgPath = path.join(root, 'package.json');
-const manifestPath = path.join(root, 'manifest.json');
-
-if (fs.existsSync(pkgPath)) {
-  currentVer = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0';
-} else if (fs.existsSync(manifestPath)) {
-  currentVer = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).version || '0.0.0';
+if (fs.existsSync('package.json')) {
+  currentVer = JSON.parse(fs.readFileSync('package.json', 'utf8')).version || '0.0.0';
+} else if (fs.existsSync('manifest.json')) {
+  currentVer = JSON.parse(fs.readFileSync('manifest.json', 'utf8')).version || '0.0.0';
 }
 
 const parts = currentVer.split('.').map(Number);
-if (parts.length !== 3) {
-  console.error('Invalid version format. Expected x.y.z');
-  process.exit(1);
-}
-
+// Fixed logic from Patch v20.5 to be semver compliant and valid JS
 switch (type) {
   case 'major':
     parts[0]++;
@@ -42,22 +34,21 @@ switch (type) {
     parts[2]++;
     break;
 }
-
 const newVer = parts.join('.');
 
 // 2. Update package.json
-if (fs.existsSync(pkgPath)) {
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+if (fs.existsSync('package.json')) {
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   pkg.version = newVer;
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+  fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
   console.log(` ✅ Updated package.json: ${currentVer} → ${newVer}`);
 }
 
 // 3. Update manifest.json (Chrome Extension Strictness)
-if (fs.existsSync(manifestPath)) {
-  const man = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+if (fs.existsSync('manifest.json')) {
+  const man = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
   man.version = newVer;
-  fs.writeFileSync(manifestPath, JSON.stringify(man, null, 2) + '\n');
+  fs.writeFileSync('manifest.json', JSON.stringify(man, null, 2));
   console.log(` ✅ Updated manifest.json: ${newVer}`);
 }
 

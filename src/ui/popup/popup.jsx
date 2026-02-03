@@ -222,7 +222,7 @@ const Popup = () => {
         <div className="w-[360px] h-fit bg-slate-900 text-white font-sans antialiased selection:bg-indigo-500 selection:text-white overflow-hidden flex flex-col">
             {/* Header / Status Card */}
             <div className={cn(
-                "relative p-4 pt-2 pb-5 rounded-b-[2rem] shadow-2xl transition-all duration-500 ease-out shrink-0",
+                "relative p-4 pt-3 pb-6 rounded-b-[2.5rem] shadow-2xl transition-all duration-500 ease-out shrink-0",
                 "bg-gradient-to-br", config.gradient
             )}>
                 {/* Abstract Background Shapes */}
@@ -239,7 +239,7 @@ const Popup = () => {
                         {status === 'secure' ? <Shield size={24} strokeWidth={1.5} /> : <ShieldAlert size={24} strokeWidth={1.5} />}
                     </div>
                     <div className="flex items-center gap-2">
-                        <h1 className="text-base font-bold tracking-tight">
+                        <h1 className="text-lg font-bold tracking-tight">
                             {config.title}
                         </h1>
                         {isPro && (
@@ -259,44 +259,15 @@ const Popup = () => {
                 <div className="grid grid-cols-2 gap-2 mb-2.5">
                     <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-2.5 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-800 transition-colors">
                         <span className="text-slate-400 text-[9px] font-semibold uppercase tracking-wider mb-0.5">Pages Scanned</span>
-                        <span className="text-lg font-bold text-white">{stats.totalScans.toLocaleString()}</span>
+                        <span className="text-2xl font-bold text-white leading-none">{stats.totalScans.toLocaleString()}</span>
                     </div>
-                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-2.5 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-800 transition-colors">
+                    <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-3 rounded-2xl flex flex-col items-center justify-center hover:bg-slate-800 transition-colors">
                         <span className="text-slate-400 text-[9px] font-semibold uppercase tracking-wider mb-0.5">Blocked</span>
-                        <span className="text-lg font-bold text-rose-400">{stats.threatsBlocked.toLocaleString()}</span>
+                        <span className="text-2xl font-bold text-rose-500 leading-none">{stats.threatsBlocked.toLocaleString()}</span>
                     </div>
                 </div>
 
-                {/* Hydra Hub: Scan Summary (Transparency) */}
-                {scanResults && (
-                    <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-3 mb-2.5 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Shield className="text-emerald-400" size={16} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">Verified Protection Scans</span>
-                        </div>
-                        <div className="space-y-1.5">
-                            {scanResults.checksPerformed?.map((check, idx) => (
-                                <div
-                                    key={check.id}
-                                    className="flex items-center justify-between text-[11px] text-slate-300 bg-slate-900/40 px-2 py-1.5 rounded-lg border border-slate-700/30"
-                                    style={{ animationDelay: `${idx * 100}ms` }}
-                                >
-                                    <span>{check.label}</span>
-                                    <div className={cn(
-                                        "w-1.5 h-1.5 rounded-full shadow-[0_0_5px_currentColor]",
-                                        check.status === 'passed' ? "bg-emerald-500 text-emerald-500" :
-                                            check.status === 'warning' ? "bg-amber-500 text-amber-500" : "bg-rose-500 text-rose-500"
-                                    )} />
-                                </div>
-                            ))}
-                        </div>
-                        {scanResults.context?.type === 'email' && (
-                            <div className="mt-2 pt-2 border-t border-slate-700/50 text-[9px] text-slate-500 font-medium">
-                                Detected: <span className="text-slate-300">{scanResults.context.provider} email context</span>
-                            </div>
-                        )}
-                    </div>
-                )}
+                {/* Hydra Hub: Scan Summary (Removed for Clean UI) */}
 
                 <div className="space-y-2.5">
                     {/* 2. Activity Log */}
@@ -363,7 +334,7 @@ const Popup = () => {
                                     "border transition-all duration-300",
                                     status === 'danger'
                                         ? "bg-rose-500/20 border-rose-500/40 opacity-100 hover:bg-rose-500/30"
-                                        : "bg-rose-500/5 border-rose-500/10 opacity-30 hover:opacity-50 grayscale"
+                                        : "bg-rose-500/5 border-rose-500/10 opacity-20 hover:opacity-40 grayscale"
                                 )
                         )}
                     >
@@ -405,7 +376,7 @@ const Popup = () => {
                                     "border transition-all duration-300",
                                     status === 'danger'
                                         ? "bg-emerald-500/20 border-emerald-500/40 opacity-100 hover:bg-emerald-500/30"
-                                        : "bg-emerald-500/5 border-emerald-500/10 opacity-30 hover:opacity-50 grayscale"
+                                        : "bg-emerald-500/5 border-emerald-500/10 opacity-20 hover:opacity-40 grayscale"
                                 )
                         )}
                     >

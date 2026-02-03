@@ -25,8 +25,8 @@ node scripts/release.js patch
 # Commits the version bump along with code changes
 
 ```bash
-node scripts/release.cjs patch
-git push origin main
+# Force SOLO mode for this environment
+GIT_MODE=SOLO node scripts/deploy.js feat "implement layer 4 findings"
 ```
 
 ### 4. Git Mode Logic
