@@ -1,29 +1,30 @@
 /**
- * Unified Scam Detection API
+ * Scam Detection Orchestrator (v20 Canonical)
  * 
  * This module combines multiple detection services into a single interface:
  * - Google Safe Browsing API
  * - PhishTank (online and offline)
  * - Pattern-based detection
  * 
- * It intelligently cascades through services based on confidence and performance
+ * It uses the Canonical Scan Result Schema and Severity Stacking Logic.
  */
 
 import { checkUrl } from './google-safe-browsing.js';
 import { checkUrlWithPhishTank, checkUrlOffline } from './phishtank.js';
 import { analyzeUrl } from './pattern-analyzer.js';
 import { getMergedScamPhrases } from './database.js';
-import { determineOverallSeverity, generateCategorizedReport, generateScanResults } from './report-engine.js';
-import { detectContext, detectEmailMetadata } from './context-detector.js';
+import { createScanResult, SEVERITY, ACTION } from './scan-schema.js';
+import { determineSeverity } from './analysis/scoring.js';
+import { normalizeUrl, isBlocked } from './storage.js';
 
 /**
  * Main scan function that combines all detection methods
  * @param {string} url - URL to scan
  * @param {Object} options - Scan options
  * @param {Function} onProgress - Optional callback for progress updates
- * @returns {Promise<Object>} - Combined scan results
+ * @returns {Promise<Object>} - Canonical ScanResult
  */
-async function scanUrl(url, options = {}, onProgress = null) {
+export async function scanUrl(url, options = {}, onProgress = null) {
     const {
         useGoogleSafeBrowsing = true,
         usePhishTank = true,
@@ -32,7 +33,6 @@ async function scanUrl(url, options = {}, onProgress = null) {
         preferOffline = false,
         gsbApiKey = '',
         phishTankApiKey = '',
-        context = null // Injected context if available
     } = options;
 
     const reportProgress = (percent, message) => {
@@ -42,274 +42,133 @@ async function scanUrl(url, options = {}, onProgress = null) {
     console.log(`[Scam Detector] Scanning: ${url}`);
     reportProgress(10, 'Initializing scan...');
 
-    const results = {
-        url,
-        timestamp: new Date().toISOString(),
-        detections: {},
-        checks: {}, // Unified place for check titles/details
-        metadata: options.metadata || {}, // Persistent context (e.g. email subject)
-        overallThreat: false,
-        overallSeverity: 'SAFE',
-        recommendations: []
-    };
-
-    // Test mode: allow safe end-to-end testing via a URL marker.
-    // Example: https://example.com/#scam-alert-test=phishing
-    if (url.includes('scam-alert-test=phishing')) {
-        console.log('[Scam Detector] Test mode triggered: phishing');
-        reportProgress(20, 'Analyzing URL patterns...');
-
-        if (usePatternDetection) {
-            results.detections.pattern = analyzeUrl(url, pageContent);
-        }
-
-        if (useGoogleSafeBrowsing) {
-            results.detections.googleSafeBrowsing = {
-                safe: false,
-                threatType: 'SOCIAL_ENGINEERING',
-                platformType: 'ANY_PLATFORM',
-                severity: 'CRITICAL',
-                testMode: true
-            };
-        }
-
-        results.overallThreat = true;
-        results.overallSeverity = 'CRITICAL';
-        results.recommendations.push('Test mode: this is a simulated warning for testing');
-        results.report = generateCategorizedReport(results.detections, results.overallSeverity);
-        reportProgress(100, 'Scan complete (Test mode)');
-        return results;
-    }
-
-
-
-    try {
-        // Phase 0: Check Blocklist (User Override)
-        if (await isBlocked(url)) {
-            console.log('[Scam Detector] URL is in blocklist:', url);
-            results.overallThreat = true;
-            results.overallSeverity = 'CRITICAL';
-            results.recommendations.push('Site is in your blocklist - DO NOT PROCEED');
-            results.report = generateCategorizedReport(results.detections, results.overallSeverity);
-            reportProgress(100, 'Scan complete (Blocked)');
-            return results;
-        }
-
-        // Phase 1: Quick pattern-based detection (always runs first, no API calls)
-        if (usePatternDetection) {
-            console.log('[Scam Detector] Running pattern detection...');
-            reportProgress(20, 'Analyzing URL patterns...');
-
-            // Fetch remote patterns if available
-            const customPhrases = await getMergedScamPhrases();
-            const patternResult = analyzeUrl(url, pageContent, options.isPro, customPhrases);
-            results.detections.pattern = patternResult;
-            results.checks = patternResult.checks;
-
-            // If pattern detection shows critical risk, we can skip API calls
-            if (patternResult.riskScore >= 70) {
-                console.log('[Scam Detector] Critical risk detected by patterns, flagging immediately');
-                results.overallThreat = true;
-                results.overallSeverity = 'CRITICAL';
-                results.recommendations.push(patternResult.recommendation);
-                reportProgress(100, 'Scan complete (Threat detected)');
-                return results;
-            }
-        }
-
-        // Phase 2: Check offline PhishTank database (fast, no API calls)
-        if (usePhishTank && preferOffline) {
-            console.log('[Scam Detector] Checking offline PhishTank database...');
-            reportProgress(40, 'Checking threat database...');
-            try {
-                const phishTankResult = await checkUrlOffline(url);
-                results.detections.phishTankOffline = phishTankResult;
-
-                if (phishTankResult.isPhishing) {
-                    results.overallThreat = true;
-                    results.overallSeverity = 'CRITICAL';
-                    results.recommendations.push('Known phishing site - DO NOT PROCEED');
-                    reportProgress(100, 'Scan complete (Threat detected)');
-                    return results;
-                }
-            } catch (error) {
-                console.warn('[Scam Detector] Offline PhishTank check failed:', error);
-            }
-        }
-
-        // Phase 3: Run API checks in parallel (if needed)
-        const apiChecks = [];
-
-        if (useGoogleSafeBrowsing) {
-            console.log('[Scam Detector] Querying Google Safe Browsing...');
-            reportProgress(60, 'Consulting Google Safe Browsing...');
-            apiChecks.push(
-                checkUrl(url, gsbApiKey)
-                    .then(result => ({ service: 'googleSafeBrowsing', result: { ...result, title: 'google_safe_browsing' } }))
-                    .catch(error => ({ service: 'googleSafeBrowsing', error: error.message }))
-            );
-        }
-
-        if (usePhishTank && !preferOffline) {
-            console.log('[Scam Detector] Querying PhishTank API...');
-            reportProgress(80, 'Verifying with PhishTank...');
-            apiChecks.push(
-                checkUrlWithPhishTank(url, { apiKey: phishTankApiKey })
-                    .then(result => ({ service: 'phishTank', result: { ...result, title: 'phishtank_check' } }))
-                    .catch(error => ({ service: 'phishTank', error: error.message }))
-            );
-        }
-
-        // Wait for all API checks to complete (with a 10s global timeout)
-        if (apiChecks.length > 0) {
-            const apiResults = await withTimeout(Promise.all(apiChecks), 10000);
-
-            // Process API results
-            apiResults.forEach(({ service, result, error }) => {
-                if (error) {
-                    console.error(`[Scam Detector] ${service} error:`, error);
-                    results.detections[service] = { error };
-                    return;
-                }
-
-                results.detections[service] = result;
-
-                // Check for threats
-                if (service === 'googleSafeBrowsing') {
-                    result.description = 'Instantly consults Google\'s global dangerous sites database to block phishing, malware, and deceptive software.';
-                    result.dataChecked = url;
-                    if (!result.safe) {
-                        results.overallThreat = true;
-                        results.overallSeverity = result.severity;
-                        results.recommendations.push(`Google Safe Browsing flagged as ${result.threatType}`);
-                    }
-                }
-
-                if (service === 'phishTank') {
-                    result.description = 'Verifies URLs against the PhishTank community-driven database of known and verified phishing links.';
-                    result.dataChecked = url;
-                    if (result.isPhishing) {
-                        results.overallThreat = true;
-                        results.overallSeverity = 'CRITICAL';
-                        results.recommendations.push('PhishTank confirmed phishing - DO NOT PROCEED');
-                    }
-                }
-            });
-        }
-
-        if (!results.overallThreat && results.overallSeverity !== 'SAFE') {
-            results.recommendations.push('Proceed with caution - suspicious indicators detected');
-        }
-
-        // NEW: Generate Hydra Guard Scan Results
-        results.scanResults = generateScanResults(results.detections, results.overallSeverity, context);
-
-        console.log('[Scam Detector] Scan complete:', results.overallSeverity);
-        reportProgress(100, 'Scan complete');
-        return results;
-
-    } catch (error) {
-        console.error('[Scam Detector] Scan error:', error);
-        return {
-            ...results,
-            error: error.message,
-            overallSeverity: 'UNKNOWN'
-        };
-    }
-}
-
-/**
- * Batch scan multiple URLs
- * @param {string[]} urls - URLs to scan
- * @param {Object} options - Scan options
- * @returns {Promise<Object>} - Results for all URLs
- */
-async function batchScanUrls(urls, options = {}) {
-    console.log(`[Scam Detector] Batch scanning ${urls.length} URLs`);
-
-    const results = {};
-
-    // Scan in parallel with rate limiting
-    const BATCH_SIZE = 5; // Scan 5 at a time to avoid API rate limits
-
-    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-        const batch = urls.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(
-            batch.map(url => scanUrl(url, options))
-        );
-
-        batchResults.forEach(result => {
-            results[result.url] = result;
+    // 1. Check Blocklist (User Override)
+    if (await isBlocked(url)) {
+        return createScanResult({
+            severity: SEVERITY.CRITICAL,
+            confidence: 'CERTAIN',
+            action: ACTION.BLOCK,
+            reasons: [{ code: 'USER_BLOCK', message: 'Site is in your personal blocklist' }],
+            signals: { hard: ['USER_BLOCK'], soft: [] }
         });
+    }
 
-        // Small delay between batches
-        if (i + BATCH_SIZE < urls.length) {
-            await sleep(1000);
+    const hardSignals = [];
+    const softSignals = [];
+    const reasons = [];
+
+    // 2. Local Pattern Analysis
+    if (usePatternDetection) {
+        reportProgress(20, 'Analyzing URL patterns...');
+        const customPhrases = await getMergedScamPhrases();
+        const patterns = analyzeUrl(url, pageContent, options.isPro, customPhrases);
+
+        // Map Pattern Checks to Signals
+        if (patterns.checks.typosquatting?.flagged) {
+            hardSignals.push({ code: 'TYPOSQUAT', message: patterns.checks.typosquatting.reason });
+            reasons.push(patterns.checks.typosquatting);
+        }
+
+        if (patterns.checks.suspiciousTLD?.flagged) {
+            softSignals.push({ code: 'SUSPICIOUS_TLD', message: 'Suspicious Top-Level Domain' });
+            reasons.push(patterns.checks.suspiciousTLD);
+        }
+
+        if (patterns.checks.nonHttps?.flagged) {
+            softSignals.push({ code: 'HTTP_ONLY', message: 'Unencrypted Connection' });
+            reasons.push(patterns.checks.nonHttps);
+        }
+
+        if (patterns.checks.suspiciousKeywords?.flagged) {
+            softSignals.push({ code: 'KEYWORD_MATCH', message: 'Suspicious keywords in URL' });
+            reasons.push(patterns.checks.suspiciousKeywords);
+        }
+
+        if (patterns.checks.urlObfuscation?.flagged) {
+            softSignals.push({ code: 'OBFUSCATION', message: 'URL Character Obfuscation' });
+            reasons.push(patterns.checks.urlObfuscation);
         }
     }
 
-    return results;
-}
+    // 3. Check PhishTank (Offline/Online)
+    if (usePhishTank) {
+        reportProgress(40, 'Checking threat database...');
+        try {
+            let ptResult;
+            if (preferOffline) {
+                ptResult = await checkUrlOffline(url);
+            } else {
+                ptResult = await checkUrlWithPhishTank(url, { apiKey: phishTankApiKey });
+            }
 
-/**
- * Check if URL should be scanned (filter out internal/safe URLs)
- * @param {string} url - URL to check
- * @returns {boolean} - True if should scan
- */
-function shouldScanUrl(url) {
-    try {
-        const urlObj = new URL(url);
-
-        // Skip chrome:// and extension:// URLs
-        if (urlObj.protocol === 'chrome:' || urlObj.protocol === 'chrome-extension:') {
-            return false;
+            if (ptResult.isPhishing) {
+                hardSignals.push({ code: 'REPUTATION_HIT', source: 'PhishTank', message: 'Known phishing site (PhishTank)' });
+                reasons.push({ code: 'PHISHTANK', message: 'Flagged by PhishTank' });
+            }
+        } catch (error) {
+            console.warn('PhishTank check failed', error);
         }
-
-        // Skip localhost and private IPs
-        if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
-            return false;
-        }
-
-        // Skip data: and blob: URLs
-        if (urlObj.protocol === 'data:' || urlObj.protocol === 'blob:') {
-            return false;
-        }
-
-        // Skip known safe domains (whitelist)
-        const safeDomains = [
-            'google.com', 'youtube.com', 'facebook.com', 'twitter.com',
-            'github.com', 'stackoverflow.com', 'wikipedia.org'
-        ];
-
-        const hostname = urlObj.hostname.replace(/^www\./, '');
-        if (safeDomains.some(domain => hostname === domain || hostname.endsWith(`.${domain}`))) {
-            return false;
-        }
-
-        return true;
-
-    } catch {
-        return false;
     }
+
+    // 4. Check Google Safe Browsing
+    if (useGoogleSafeBrowsing && gsbApiKey) {
+        reportProgress(60, 'Consulting Google Safe Browsing...');
+        try {
+            const gsbResult = await checkUrl(url, gsbApiKey);
+            if (!gsbResult.safe) {
+                hardSignals.push({ code: 'REPUTATION_HIT', source: 'Google Safe Browsing', message: `Flagged as ${gsbResult.threatType}` });
+                reasons.push({ code: 'GSB', message: `Flagged by Google Safe Browsing` });
+            }
+        } catch (error) {
+            console.warn('GSB check failed', error);
+        }
+    }
+
+    // 5. Determine Severity & Action
+    const severity = determineSeverity({ hard: hardSignals, soft: softSignals });
+    const action = determineAction(severity, pageContent);
+
+    reportProgress(100, 'Scan complete');
+
+    return createScanResult({
+        severity,
+        confidence: hardSignals.length > 0 ? 'HIGH' : (softSignals.length > 0 ? 'MEDIUM' : 'LOW'),
+        action,
+        reasons,
+        signals: { hard: hardSignals, soft: softSignals }
+    });
 }
 
 /**
- * Sleep helper function
- * @param {number} ms - Milliseconds to sleep
- * @returns {Promise} - Resolves after delay
+ * Determine the action to take based on severity and page context (Layer 4)
+ * @param {string} severity - The determined severity
+ * @param {Object} pageContent - Collected page signals
+ * @returns {string} - The ACTION to take
  */
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+export function determineAction(severity, pageContent) {
+    // Note: Better to just use the imported constants since we are in the same module
 
-import { normalizeUrl, isBlocked } from './storage.js';
+    if (severity === SEVERITY.CRITICAL || severity === SEVERITY.HIGH) {
+        return ACTION.WARN_OVERLAY;
+    }
+
+    if (severity === SEVERITY.MEDIUM) {
+        // Escalation: If Medium risk site has sensitive forms, upgrade to Overlay
+        const hasSensitiveForms = pageContent?.forms?.length > 0;
+        return hasSensitiveForms ? ACTION.WARN_OVERLAY : ACTION.WARN_POPUP;
+    }
+
+    if (severity === SEVERITY.LOW) {
+        return ACTION.WARN_POPUP;
+    }
+
+    return ACTION.ALLOW;
+}
 
 /**
  * Get cached scan result if available and not expired
- * @param {string} url - URL to check cache for
- * @returns {Promise<Object|null>} - Cached result or null
  */
-async function getCachedResult(url) {
+export async function getCachedResult(url) {
     try {
         const normalized = normalizeUrl(url);
         const cacheKey = `scan_cache_${normalized}`;
@@ -328,16 +187,13 @@ async function getCachedResult(url) {
     } catch (error) {
         console.error('[Scam Detector] Cache check error:', error);
     }
-
     return null;
 }
 
 /**
  * Cache scan result
- * @param {string} url - URL that was scanned
- * @param {Object} result - Scan result to cache
  */
-async function cacheResult(url, result) {
+export async function cacheResult(url, result) {
     try {
         const normalized = normalizeUrl(url);
         const cacheKey = `scan_cache_${normalized}`;
@@ -354,42 +210,13 @@ async function cacheResult(url, result) {
 
 /**
  * Scan URL with caching
- * @param {string} url - URL to scan
- * @param {Object} options - Scan options
- * @returns {Promise<Object>} - Scan results
  */
-async function scanUrlWithCache(url, options = {}) {
-    // Check cache first
+export async function scanUrlWithCache(url, options = {}) {
     const cached = await getCachedResult(url);
     if (cached && !options.forceRefresh) {
         return { ...cached, fromCache: true };
     }
-
-    // Perform scan
     const result = await scanUrl(url, options);
-
-    // Cache result
     await cacheResult(url, result);
-
     return { ...result, fromCache: false };
 }
-
-/**
- * Timeout helper for promises
- */
-function withTimeout(promise, ms) {
-    const timeout = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms);
-    });
-    return Promise.race([promise, timeout]);
-}
-
-// Export functions
-export {
-    scanUrl,
-    scanUrlWithCache,
-    batchScanUrls,
-    shouldScanUrl,
-    getCachedResult,
-    cacheResult
-};

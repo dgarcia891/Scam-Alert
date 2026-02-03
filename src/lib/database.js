@@ -5,7 +5,6 @@
  * This replaces the Supabase implementation for a zero-cost architecture.
  */
 
-// TODO: Replace this with your actual raw GitHub URL or CDN endpoint
 const REMOTE_PATTERNS_URL = 'https://raw.githubusercontent.com/dgarcia891/Scam-Alert/main/public/patterns.json';
 
 /**

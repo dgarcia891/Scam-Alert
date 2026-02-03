@@ -4,6 +4,7 @@
 import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, addToBlocklist, removeFromBlocklist, getBlocklist } from '../../lib/storage.js';
 import { submitReport } from '../../lib/supabase.js';
+import { syncManager } from './sync-manager.js';
 
 /**
  * Creates a message handler that delegates to specialized functions
@@ -43,6 +44,9 @@ export function handleIncomingMessage(message, sender, context) {
 
         case MessageTypes.GET_BLOCKLIST:
             return getBlocklist();
+
+        case MessageTypes.SYNC_BLOCKLIST:
+            return handleSyncBlocklist(data);
 
         default:
             console.warn('[Scam Alert] Unknown message type:', type);
@@ -131,4 +135,10 @@ async function handleRemoveFromBlocklist(data) {
         await removeFromBlocklist(domain);
     }
     return { success: true };
+}
+
+async function handleSyncBlocklist(data) {
+    console.log('[Scam Alert] Manual blocklist sync requested');
+    const result = await syncManager.sync(!!data?.force);
+    return result;
 }

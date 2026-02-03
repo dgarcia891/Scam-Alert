@@ -336,6 +336,36 @@ export async function removeFromBlocklist(domain) {
 }
 
 /**
+ * Merge new domains into blocklist
+ * @param {Array} newDomains - List of domains to add
+ * @returns {Promise<number>} Number of new domains added
+ */
+export async function mergeBlocklist(newDomains) {
+    if (!Array.isArray(newDomains) || newDomains.length === 0) return 0;
+
+    const blocklist = await getBlocklist();
+    const currentSet = new Set(blocklist);
+    let addedCount = 0;
+
+    newDomains.forEach(domain => {
+        if (domain && typeof domain === 'string') {
+            const normalized = domain.toLowerCase().trim();
+            if (normalized && !currentSet.has(normalized)) {
+                blocklist.push(normalized);
+                currentSet.add(normalized); // Keep set in sync for O(1) checks
+                addedCount++;
+            }
+        }
+    });
+
+    if (addedCount > 0) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.BLOCKLIST]: blocklist });
+        console.log(`[Storage] Merged ${addedCount} new domains into blocklist.`);
+    }
+    return addedCount;
+}
+
+/**
  * Check if domain is blocked
  * @param {string} urlOrEmail - URL or Email to check
  * @returns {Promise<boolean>} True if blocked

@@ -8,21 +8,18 @@
 
 ## Problem Statement
 
-Online scams targeting seniors are increasing. Users need automatic, passive protection that:
-
-- Detects scams in real-time before users interact
-- Requires no technical knowledge to operate
-- Provides clear, actionable warnings
-- Works silently in the background
+- **Core Value**: help users answer "Should I do this?" at the moment of action.
+- **Philosophy**: Warnings that feel calm, not panicky. Protection at the moment of action, not just navigation.
+- **Goal**: Decision support, not just threat detection.
 
 ## Solution
 
 A Chrome extension that combines multiple detection methods:
 
-1. **Google Safe Browsing API** - Industry-standard malware/phishing database
-2. **PhishTank** - Community-driven phishing detection (offline + online)
-3. **Pattern Detection** - Heuristic analysis of suspicious URL patterns
-4. **Content Analysis** - Page content scanning for scam indicators
+1. **Layer 1: URL & Reputation** (Fast, local, privacy-first)
+2. **Layer 2: Moment of Danger Protection** (Form interception, action blocking)
+3. **Layer 3: Trust Explanations** (Human-readable "why", not technical "what")
+4. **Layer 4: Progressive Disclosure** (Simple defaults, clear "safe" actions)
 
 ## Current Product Behavior (As Built Today)
 
@@ -135,55 +132,62 @@ Each item below has a Definition of Done (DoD) to make it measurable and testabl
 
 ### B. Page Content Analysis (Future / Optional)
 
-9. **Concerning words in page text**
+1. **Concerning words in page text**
    - **DoD**:
      - When content scanning is enabled, the system extracts a bounded amount of visible text and scans it locally.
      - The scan output reports matched phrases and where they were found (e.g., page title vs body excerpt) without uploading the page content.
      - Performance: extraction + analysis adds no more than a defined time budget (e.g., 100ms on typical pages).
 
-10. **Form protection signals (password / payment inputs)**
-   - **DoD**:
-     - Detects the presence of password fields and common payment fields.
-     - If the page is non-HTTPS and contains password/payment fields, the scan escalates to a user-visible warning.
-     - Does not collect form values, only field type presence.
+2. **Form protection signals (password / payment inputs)**
 
-11. **Mismatched link text vs destination**
-   - **DoD**:
-     - Finds anchor tags where displayed text suggests a trusted domain but the href points elsewhere.
-     - Reports a limited number of examples (bounded) to avoid UI overload.
+- **DoD**:
+  - Detects the presence of password fields and common payment fields.
+  - If the page is non-HTTPS and contains password/payment fields, the scan escalates to a user-visible warning.
+  - Does not collect form values, only field type presence.
+
+1. **Mismatched link text vs destination**
+
+- **DoD**:
+  - Finds anchor tags where displayed text suggests a trusted domain but the href points elsewhere.
+  - Reports a limited number of examples (bounded) to avoid UI overload.
 
 ### C. User Protection / UX
 
-12. **Warning overlay**
-   - **DoD**:
-     - Overlay appears reliably on threat levels at/above the defined threshold.
-     - Overlay has a clear safe default action (go back / close) and a secondary "continue" option.
-     - Overlay stays within accessibility guidelines (keyboard, focus trap, readable sizing).
+1. **Warning overlay**
 
-13. **Toolbar icon state**
-   - **DoD**:
-     - Icon reflects the current tab’s last scan result (green/yellow/red) within 1 second of scan completion.
-     - Icon updates correctly when switching tabs and navigating.
+- **DoD**:
+  - Overlay appears reliably on threat levels at/above the defined threshold.
+  - Overlay has a clear safe default action (go back / close) and a secondary "continue" option.
+  - Overlay stays within accessibility guidelines (keyboard, focus trap, readable sizing).
 
-14. **Popup transparency** (what was checked)
-   - **DoD**:
-     - Popup shows which detection sources were run vs skipped.
-     - Popup language is friendly by default, with advanced details available.
+1. **Toolbar icon state**
 
-15. **Whitelist / trusted sites**
-   - **DoD**:
-     - User can add/remove a site from a whitelist.
-     - Whitelisted sites are not blocked/overlaid, but may still be scanned for display purposes (explicit behavior documented).
+- **DoD**:
+  - Icon reflects the current tab’s last scan result (green/yellow/red) within 1 second of scan completion.
+  - Icon updates correctly when switching tabs and navigating.
+
+1. **Popup transparency** (what was checked)
+
+- **DoD**:
+  - Popup shows which detection sources were run vs skipped.
+  - Popup language is friendly by default, with advanced details available.
+
+1. **Whitelist / trusted sites**
+
+- **DoD**:
+  - User can add/remove a site from a whitelist.
+  - Whitelisted sites are not blocked/overlaid, but may still be scanned for display purposes (explicit behavior documented).
 
 ### D. Settings & Documentation
 
-16. **Expandable help for each option**
-   - **DoD**:
-     - Each setting has an expandable explanation that explicitly states:
-       - what is scanned (URL vs page content)
-       - what is sent off-device (if anything)
-       - what is stored locally
-     - Wording is clear for non-technical users.
+1. **Expandable help for each option**
+
+- **DoD**:
+  - Each setting has an expandable explanation that explicitly states:
+    - what is scanned (URL vs page content)
+    - what is sent off-device (if anything)
+    - what is stored locally
+  - Wording is clear for non-technical users.
 
 ## Architecture
 
@@ -282,16 +286,18 @@ Detector combines URL-only checks + page signals
 Severity escalation rules applied (e.g., HTTP + password field → high)
 ```
 
-#### Severity and alerting rules (guiding policy)
+#### Severity and alerting rules (Guideline)
 
-- **Green / SAFE**: No significant concerns
-- **Yellow / CAUTION**: Something worth noticing but not necessarily malicious
-  - Example: non-HTTPS (HTTP) connection
-- **Red / DANGER**: Strong indicators or reputation hits
-- **Notifications**: reserved for the highest confidence results to avoid alert fatigue
-  - Example policy:
-    - URL-only: notify only for critical reputation hits
-    - With page signals: notify if a high-risk situation is detected (e.g., HTTP + password field)
+| Scenario                     | Overlay | Notification |
+| ---------------------------- | ------- | ------------ |
+| Known phishing               | ✅       | ✅            |
+| Typosquat + brand            | ✅       | ❌            |
+| HTTP only                    | ❌       | ❌            |
+| CAUTION URL + password field | ✅       | ❌            |
+| CAUTION URL + payment field  | ✅       | ❌            |
+| LOW risk only                | ❌       | ❌            |
+
+**Notifications should be rare.** They are reserve for critical threats.
 
 #### Permission boundaries
 

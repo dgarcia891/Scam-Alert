@@ -63,6 +63,8 @@ export const MessageTypes = {
     SHOW_WARNING: 'show_warning',
     HIDE_WARNING: 'hide_warning',
     SCAN_RESULT: 'scan_result',
+    SCAN_RESULT_UPDATED: 'scan_result_updated', // Layer 2: Pushed to content script
+    SHOW_BANNER: 'show_banner', // Layer 4: Non-blocking top banner
     EXECUTE_SCAN: 'execute_scan', // NEW
 
     // From content script to service worker
@@ -90,7 +92,8 @@ export const MessageTypes = {
     ERROR: 'error',
 
     // Reporting
-    REPORT_SCAM: 'report_scam'
+    REPORT_SCAM: 'report_scam',
+    SYNC_BLOCKLIST: 'sync_blocklist'
 };
 
 /**

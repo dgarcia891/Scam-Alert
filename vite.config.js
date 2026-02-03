@@ -29,6 +29,9 @@ const copyManifest = () => {
 
 export default defineConfig({
     plugins: [react(), copyManifest()],
+    define: {
+        '__APP_VERSION__': JSON.stringify(process.env.npm_package_version),
+    },
     base: './',
     root: 'src/ui',
     build: {

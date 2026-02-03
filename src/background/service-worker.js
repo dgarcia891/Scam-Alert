@@ -17,6 +17,7 @@ import { scanUrl } from '../lib/detector.js';
 import { downloadPhishTankDatabase } from '../lib/phishtank.js';
 import { syncPatterns } from '../lib/database.js';
 import { submitReport } from '../lib/supabase.js';
+import { syncManager } from './lib/sync-manager.js';
 
 // Decentralized Modules (v19.2)
 import { handleIncomingMessage } from './messages/handler.js';
@@ -42,8 +43,10 @@ chrome.runtime.onStartup.addListener(onStartup);
 if (typeof chrome.alarms !== 'undefined') {
     chrome.alarms.onAlarm.addListener(async (alarm) => {
         if (alarm.name === 'syncScamPatterns') await syncPatterns();
+        if (alarm.name === 'syncBlocklist') await syncManager.sync();
     });
     chrome.alarms.create('syncScamPatterns', { periodInMinutes: 24 * 60 });
+    chrome.alarms.create('syncBlocklist', { periodInMinutes: 24 * 60 });
 }
 
 // ============================================================================
@@ -126,10 +129,21 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         if (result.overallThreat || result.overallSeverity !== 'SAFE') {
             await handleThreat(tabId, url, result, settings);
         } else {
-            chrome.action.setBadgeText({ tabId, text: '' });
+            try {
+                // Ensure we catch "No tab with id" errors here too
+                await chrome.action.setBadgeText({ tabId, text: '' });
+            } catch (error) { ignoreTabError(error); }
+
             await maybeShowHttpNotification(url, result, settings);
         }
         await setActionIconForTab(tabId, result.overallSeverity);
+
+        // Layer 2: Broadcast scan result to tab for Moment of Action interception
+        try {
+            await sendMessageToTab(tabId, createMessage(MessageTypes.SCAN_RESULT_UPDATED, { result }));
+        } catch (error) {
+            // Tab might be closed or inactive, not critical
+        }
 
     } catch (error) {
         console.error('[Scam Alert] Critical Scan Error:', error);
@@ -158,6 +172,7 @@ async function scanActiveTabs() {
 
 async function handleThreat(tabId, url, result, settings) {
     const severity = result.overallSeverity;
+    const action = result.action;
     const isDanger = severity === 'CRITICAL' || severity === 'HIGH';
     const badgeColor = isDanger ? '#DC2626' : '#f59e0b';
 
@@ -171,18 +186,23 @@ async function handleThreat(tabId, url, result, settings) {
             type: 'basic',
             iconUrl: chrome.runtime.getURL('icons/icon48.png'),
             title: '⚠️ SCAM WARNING',
-            message: result.recommendations[0] || 'Dangerous website detected!',
+            message: result.recommendations?.[0] || 'Dangerous website detected!',
             priority: 2,
             requireInteraction: true
         });
     }
 
-    const type = severity === 'CRITICAL' ? MessageTypes.SHOW_WARNING :
-        (severity === 'HIGH' || severity === 'MEDIUM') ? MessageTypes.SCAN_RESULT : null;
+    // Layer 4: Action-based UI Dispatch
+    let type = null;
+    if (action === 'WARN_OVERLAY') {
+        type = MessageTypes.SHOW_WARNING;
+    } else if (action === 'WARN_POPUP') {
+        type = MessageTypes.SHOW_BANNER;
+    }
 
     if (type) {
         try { await sendMessageToTab(tabId, createMessage(type, { result })); }
-        catch (error) { console.error(`[Scam Alert] Failed to send ${type}:`, error); }
+        catch (error) { console.warn(`[Scam Alert] Tab ${tabId} not ready for ${type}`); }
     }
 }
 

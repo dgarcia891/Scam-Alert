@@ -1,20 +1,38 @@
 ---
 name: deploy
-description: Cost-efficient deployment (Unit Tests + Human Verify).
+description: Release with Auto-Versioning (Global Rules §4.1)
 ---
-1. **Cost-Free Verification**
-   - Run `npm run test:unit` (Local CPU).
-   - If tests fail, STOP. (Saves tokens on broken deploys).
+## Steps
 
-2. **Security & Integrity**
-   - node scripts/security_scan.js
-   - node scripts/detect_mocks.js
+### 1. Quality Gates
 
-3. **Push to Remote**
-   - node scripts/release.js patch
-   - git push origin main
+```bash
+node scripts/security_scan.cjs
+node scripts/drift_check.cjs
+npm run test:unit
+```
 
-4. **Human Handoff**
-   - echo "✅ Code Pushed."
-   - echo "👁️ Opening browser for HUMAN verification (Free)..."
-   - node scripts/visual_audit.js
+### 2. Auto-Version (The Fix)
+
+# Bumps version in manifest.json/package.json
+
+```bash
+node scripts/release.js patch
+```
+
+### 3. Deploy (Commit & Push)
+
+# Commits the version bump along with code changes
+
+```bash
+node scripts/release.cjs patch
+git push origin main
+```
+
+### 4. Git Mode Logic
+
+| Mode | Commit Type | Action |
+|------|-------------|--------|
+| SOLO | docs/chore/style | Direct push |
+| SOLO | feat/fix/refactor | Branch + PR |
+| TEAM | Any | Branch + PR |

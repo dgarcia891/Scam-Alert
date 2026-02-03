@@ -472,7 +472,7 @@ const Popup = () => {
             {/* Footer */}
             <style>{scrollbarStyles}</style>
             <div className="py-3 text-center shrink-0 border-t border-slate-800/50 bg-slate-900/50 backdrop-blur-sm">
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Scam Alert Pro v1.1.0 (Hydra Guard)</p>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Scam Alert Pro v{__APP_VERSION__}</p>
             </div>
         </div>
     );
