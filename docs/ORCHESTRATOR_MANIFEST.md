@@ -1,45 +1,19 @@
-# Orchestrator Manifest (v19.2)
+Orchestrator Manifest (v20.7)
+Compliance: Implements ANTIGRAVITY_GLOBAL_RULES_v1.1
 
-## 1. Core Identity
-| Attribute | Requirement |
-|-----------|-------------|
-| **Role** | Chrome Extension Architect (Manifest V3) |
-| **Runtime** | Service Workers ONLY (no background.html) |
-| **State** | `chrome.storage.local` (no global variables) |
-| **Security** | Strict CSP · No eval() · No inline scripts |
+## Core Protocols
 
-## 2. Safety Clamps (Non-Negotiable)
-- **Relative Paths:** Absolute paths (`/`, `~`) are FORBIDDEN
-- **500-Line Limit:** Files exceeding 500 lines require refactor
-- **Drift Check:** Code must match `architecture.md`
-- **No Blind Deletes:** `rm -rf` requires explicit user confirmation
+• **Single Source of Truth**: `docs/architecture/CONTEXT.md`
+• **Two-Strike Rule**: If fix fails twice, STOP and escalate.
+• **Git Mode**: SOLO (Direct push allowed for chores) vs TEAM (PR Only).
 
-## 3. Swarm Protocol
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Mock-Writer │ ──► │   Builder   │ ──► │ Orchestrator│
-│   (Tests)   │     │    (Code)   │     │   (Verify)  │
-└─────────────┘     └─────────────┘     └─────────────┘
-```
+## Workflows
 
-## 4. Workflow Commands
-| Command | Purpose | Headless? |
-|---------|---------|-----------|
-| `/plan` | Impact analysis (READ ONLY) | ✓ |
-| `/build` | Parallel test + code generation | ✓ |
-| `/fix [ID]` | Two-Strike bug repair | ✓ |
-| `/deploy` | Security → Drift → Test → Build → Push | ✓ |
-| `/verify` | Visual browser inspection | ✗ |
-| `/bug_report` | Log issue (NO CODE) | ✓ |
-
-## 5. Forbidden Patterns
-- `eval()`
-- `new Function()`
-- `innerHTML` (unless sanitized)
-- `document.write()`
-- `chrome.tabs.executeScript` (Use `chrome.scripting`)
-
-## 7. Cost-Efficiency Protocol (v20.3)
-- **Unit Tests First:** Verify logic via `npm test` (Jest/Vitest) whenever possible. This consumes Local CPU, not AI Tokens.
-- **Visual Rationing:** Do NOT spawn a Browser Agent to verify UI unless explicitly commanded via `/verify --ai`.
-- **The "Pop" Rule:** For standard deploys, simply open the URL for the human. Do not analyze the page yourself.
+| Command | Purpose |
+|---------|---------|
+| `/plan` | Architecture blueprint + Active Recall |
+| `/build` | Parallel Test & Code Generation |
+| `/deploy` | Version Bump -> Build -> Git Push |
+| `/fix` | Two-Strike Bug Repair (Test-Driven) |
+| `/bug_report` | Log issue (Read-Only/No Code) |
+| `/handoff` | Session Archival & Context Save |
