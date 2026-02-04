@@ -130,8 +130,9 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             await handleThreat(tabId, url, result, settings);
         } else {
             try {
-                // Ensure we catch "No tab with id" errors here too
+                // Ensure the badge is truly wiped for SAFE sites
                 await chrome.action.setBadgeText({ tabId, text: '' });
+                await chrome.action.setBadgeBackgroundColor({ tabId, color: [0, 0, 0, 0] });
             } catch (error) { ignoreTabError(error); }
 
             await maybeShowHttpNotification(url, result, settings);

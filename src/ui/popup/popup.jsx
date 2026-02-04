@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Shield, ShieldAlert, Settings, ExternalLink, Activity } from 'lucide-react';
+import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTriangle, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
@@ -72,27 +72,35 @@ const Popup = () => {
                 }
             });
 
-            chrome.runtime.sendMessage({ type: MessageTypes.GET_SCAN_RESULTS, data: { tabId: null } }, (response) => {
-                const data = response?.data;
-                console.log('[Popup] Scan results response:', data);
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                const tab = tabs[0];
+                if (!tab) return;
 
-                if (data?.url) setCurrentUrl(data.url);
-                if (data?.results) {
-                    const res = data.results;
-                    setScanResults(res); // Store full results
-                    console.log('[Popup] Setting status from severity:', res.overallSeverity);
+                const tabId = tab.id;
+                if (tab.url) setCurrentUrl(tab.url);
 
-                    if (res.whitelisted) {
-                        setIsWhitelisted(true);
-                        setStatus('secure');
-                    } else if (res.overallSeverity === 'CRITICAL' || res.overallSeverity === 'HIGH') {
-                        setStatus('danger');
-                    } else if (res.overallSeverity === 'MEDIUM' || res.overallSeverity === 'LOW') {
-                        setStatus('caution');
-                    } else {
-                        setStatus('secure');
+                chrome.runtime.sendMessage({ type: MessageTypes.GET_SCAN_RESULTS, data: { tabId } }, (response) => {
+                    const data = response?.data;
+                    console.log('[Popup] Scan results response:', data);
+
+                    if (data?.url) setCurrentUrl(data.url);
+                    if (data?.results) {
+                        const res = data.results;
+                        setScanResults(res); // Store full results
+                        console.log('[Popup] Setting status from severity:', res.overallSeverity);
+
+                        if (res.whitelisted) {
+                            setIsWhitelisted(true);
+                            setStatus('secure');
+                        } else if (res.overallSeverity === 'CRITICAL' || res.overallSeverity === 'HIGH') {
+                            setStatus('danger');
+                        } else if (res.overallSeverity === 'MEDIUM' || res.overallSeverity === 'LOW') {
+                            setStatus('caution');
+                        } else {
+                            setStatus('secure');
+                        }
                     }
-                }
+                });
             });
         };
 
@@ -239,9 +247,10 @@ const Popup = () => {
                         {status === 'secure' ? <Shield size={24} strokeWidth={1.5} /> : <ShieldAlert size={24} strokeWidth={1.5} />}
                     </div>
                     <div className="flex items-center gap-2">
-                        <h1 className="text-lg font-bold tracking-tight">
+                        <h1 className="text-lg font-bold tracking-tight mb-0.5">
                             {config.title}
                         </h1>
+                        {status !== 'secure' && <AlertTriangle size={18} className="text-amber-300 animate-pulse" />}
                         {isPro && (
                             <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-white/30">PRO</span>
                         )}
@@ -267,7 +276,22 @@ const Popup = () => {
                     </div>
                 </div>
 
-                {/* Hydra Hub: Scan Summary (Removed for Clean UI) */}
+                {/* Findings Indicator (requested by user) */}
+                {status !== 'secure' && scanResults?.reasons?.length > 0 && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-2.5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5 opacity-80">
+                            <Info size={12} strokeWidth={2.5} /> Risk Indicators
+                        </div>
+                        <div className="space-y-1.5">
+                            {scanResults.reasons.map((reason, idx) => (
+                                <div key={idx} className="flex gap-2 text-[11px] text-amber-200/70 leading-relaxed font-medium">
+                                    <div className="w-1 h-1 rounded-full bg-amber-500/50 mt-1.5 shrink-0" />
+                                    {reason.message || reason.details}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-2.5">
                     {/* 2. Activity Log */}
