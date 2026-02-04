@@ -36,11 +36,12 @@ export async function sendMessageToTab(tabId, message) {
             if (chrome.runtime.lastError) {
                 const msg = chrome.runtime.lastError.message || '';
 
-                // Common case: content script not injected / tab navigated / restricted URL.
+                // Common case: content script not injected / tab navigated / restricted URL / tab closed.
                 // This is not fatal and should not surface as an extension error.
                 if (
                     msg.includes('Receiving end does not exist') ||
-                    msg.includes('Could not establish connection')
+                    msg.includes('Could not establish connection') ||
+                    msg.includes('No tab with id')
                 ) {
                     resolve(null);
                     return;
