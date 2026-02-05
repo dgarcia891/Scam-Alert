@@ -126,7 +126,9 @@ export async function syncIconForTabFromCache(tabId, url, shouldScanUrl) {
         if (!tabId || !url) return;
         if (!shouldScanUrl(url)) {
             await setActionIconForTab(tabId, null);
-            chrome.action.setBadgeText({ tabId, text: '' });
+            try {
+                await chrome.action.setBadgeText({ tabId, text: '' });
+            } catch (error) { ignoreTabError(error); }
             return;
         }
         const cached = await getCachedScan(url);
@@ -138,10 +140,14 @@ export async function syncIconForTabFromCache(tabId, url, shouldScanUrl) {
         if (isAlert) {
             const isDanger = severity === 'CRITICAL' || severity === 'HIGH';
             const badgeColor = isDanger ? '#DC2626' : '#f59e0b';
-            chrome.action.setBadgeText({ tabId, text: '!' });
-            chrome.action.setBadgeBackgroundColor({ tabId, color: badgeColor });
+            try {
+                await chrome.action.setBadgeText({ tabId, text: '!' });
+                await chrome.action.setBadgeBackgroundColor({ tabId, color: badgeColor });
+            } catch (error) { ignoreTabError(error); }
         } else {
-            chrome.action.setBadgeText({ tabId, text: '' });
+            try {
+                await chrome.action.setBadgeText({ tabId, text: '' });
+            } catch (error) { ignoreTabError(error); }
         }
     } catch (error) {
         console.warn('[Scam Alert] Failed to sync action icon from cache:', error);
