@@ -10,3 +10,4 @@
 | BUG-054 | CLOSED | High | Recurring "No tab with id" errors in service worker | Added "No tab with id" error message to graceful handling in `sendMessageToTab` function. Created regression test to prevent recurrence. |
 | BUG-055 | CLOSED | High | Ghost Badge Discrepancy (Badge shows but Popup says Secure) | Fixed `tabId` retrieval in `popup.jsx` and added "Risk Indicators" section to explain warnings. Explicitly cleared badge for SAFE sites in SW. |
 | BUG-056 | CLOSED | High | Uncaught (in promise) Error: No tab with id | Awaited `chrome.action` badge calls and wrapped them in `try-catch` with `ignoreTabError` in `icon-manager.js`. |
+| BUG-057 | CLOSED | High | Ghost Badge Discrepancy (Badge shows warning but popup shows "No Threats Detected") | Added "message port closed" to graceful error handling in `messaging.js`. Synced scan results to `tabStateManager` in `service-worker.js` so badge and popup read from same data source. |

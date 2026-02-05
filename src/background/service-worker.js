@@ -139,6 +139,15 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         }
         await setActionIconForTab(tabId, result.overallSeverity);
 
+        // BUG-057 Fix: Sync scan results to tab state manager
+        // This ensures the popup (which reads from tabStateManager) and badge (which reads from cache)
+        // are always in sync
+        tabStateManager.updateTabState(tabId, {
+            url,
+            scanResults: result,
+            lastScanned: Date.now()
+        });
+
         // Layer 2: Broadcast scan result to tab for Moment of Action interception
         try {
             await sendMessageToTab(tabId, createMessage(MessageTypes.SCAN_RESULT_UPDATED, { result }));

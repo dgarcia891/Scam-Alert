@@ -41,7 +41,8 @@ export async function sendMessageToTab(tabId, message) {
                 if (
                     msg.includes('Receiving end does not exist') ||
                     msg.includes('Could not establish connection') ||
-                    msg.includes('No tab with id')
+                    msg.includes('No tab with id') ||
+                    msg.includes('message port closed')
                 ) {
                     resolve(null);
                     return;
