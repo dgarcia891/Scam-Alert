@@ -187,8 +187,8 @@ async function handleThreat(tabId, url, result, settings) {
     const badgeColor = isDanger ? '#DC2626' : '#f59e0b';
 
     try {
-        chrome.action.setBadgeText({ tabId, text: '!' });
-        chrome.action.setBadgeBackgroundColor({ tabId, color: badgeColor });
+        await chrome.action.setBadgeText({ tabId, text: '!' });
+        await chrome.action.setBadgeBackgroundColor({ tabId, color: badgeColor });
     } catch (error) { ignoreTabError(error); }
 
     if (settings.notificationsEnabled && severity === 'CRITICAL') {
@@ -223,7 +223,8 @@ async function handleThreat(tabId, url, result, settings) {
 chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
     shouldScanUrl,
     scanAndHandle,
-    syncIconForTabFromCache
+    syncIconForTabFromCache,
+    tabStateManager
 }));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

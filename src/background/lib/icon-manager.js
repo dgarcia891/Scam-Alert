@@ -121,7 +121,7 @@ export async function setActionIconForTab(tabId, severity) {
     }
 }
 
-export async function syncIconForTabFromCache(tabId, url, shouldScanUrl) {
+export async function syncIconForTabFromCache(tabId, url, shouldScanUrl, tabStateManager = null) {
     try {
         if (!tabId || !url) return;
         if (!shouldScanUrl(url)) {
@@ -134,6 +134,15 @@ export async function syncIconForTabFromCache(tabId, url, shouldScanUrl) {
         const cached = await getCachedScan(url);
         const severity = cached?.overallSeverity || 'SAFE';
         await setActionIconForTab(tabId, severity);
+
+        // Sync state to manager if provided (BUG-059)
+        if (tabStateManager && cached) {
+            tabStateManager.updateTabState(tabId, {
+                url,
+                scanResults: cached,
+                lastScanned: Date.now()
+            });
+        }
 
         // Sync badge color with multi-tier logic (BUG-038)
         const isAlert = severity !== 'SAFE';

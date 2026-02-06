@@ -19,8 +19,8 @@ export function createNavigationHandler(context) {
             await scanAndHandle(tabId, url);
         } catch (error) {
             console.error('[Scam Alert] Navigation scan failed:', error);
-            // Fallback: sync icon from cache if available
-            await syncIconForTabFromCache(tabId, url);
+            // Fallback: sync icon from cache if available (BUG-059: pass tabStateManager)
+            await syncIconForTabFromCache(tabId, url, shouldScanUrl, context.tabStateManager);
         }
     };
 }
