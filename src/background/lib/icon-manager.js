@@ -22,8 +22,8 @@ export function severityToIconState(severity) {
         case 'HIGH':
             return 'DANGER';
         case 'MEDIUM':
-        case 'LOW':
             return 'WARNING';
+        case 'LOW':
         default:
             return 'SAFE';
     }
@@ -145,7 +145,7 @@ export async function syncIconForTabFromCache(tabId, url, shouldScanUrl, tabStat
         }
 
         // Sync badge color with multi-tier logic (BUG-038)
-        const isAlert = severity !== 'SAFE';
+        const isAlert = severity !== 'SAFE' && severity !== 'LOW';
         if (isAlert) {
             const isDanger = severity === 'CRITICAL' || severity === 'HIGH';
             const badgeColor = isDanger ? '#DC2626' : '#f59e0b';

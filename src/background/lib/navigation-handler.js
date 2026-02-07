@@ -15,6 +15,13 @@ export function createNavigationHandler(context) {
         const tabId = details.tabId;
         console.log(`[Scam Alert] Navigation detected on tab ${tabId}:`, url);
 
+        // Immediate: Clear stale badge state to prevent flickers (BUG-062)
+        try {
+            await chrome.action.setBadgeText({ tabId, text: '' });
+        } catch (e) {
+            // Ignore if tab is already closed or unavailable
+        }
+
         try {
             await scanAndHandle(tabId, url);
         } catch (error) {
