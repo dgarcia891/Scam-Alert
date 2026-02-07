@@ -131,15 +131,15 @@ function createOverlay(result) {
             <line x1="12" y1="9" x2="12" y2="13"></line>
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
-        <h1>Deceptive Site Ahead</h1>
-        <p>Scam Alert has blocked this page because it matches known scam patterns or phishing techniques.</p>
+        <h1>High Risk Detected</h1>
+        <p>We recommend leaving this page. Scam Alert blocked it because it matches known scam techniques.</p>
         
         <div class="recommendation">
             Reason: <strong>${result?.recommendations?.[0] || 'Suspicious Activity Detected'}</strong>
         </div>
 
         <div class="actions">
-            <button class="primary" id="btn-back">Get Me Out of Here</button>
+            <button class="primary" id="btn-back">Go back to safety</button>
             <button class="secondary" id="btn-proceed">I understand the risks, proceed anyway</button>
         </div>
     `;
@@ -238,6 +238,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
     } else if (message.type === 'OPEN_REPORT_MODAL') {
         const url = window.location.href;
+        let domain = '';
+        try { domain = new URL(url).hostname; } catch (e) { }
+
         const confirmReport = confirm(`Report this site as a scam?\n\nURL: ${url}`);
         if (confirmReport) {
             chrome.runtime.sendMessage({
@@ -256,15 +259,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }, async (response) => {
                 if (response && response.success) {
                     alert('Thanks! Report submitted.');
-                    // Persist state
+                    // Persist state by domain (hostname) as per BUG-060
                     const { reportedSites = {} } = await chrome.storage.local.get('reportedSites');
-                    reportedSites[url] = Date.now();
+                    if (domain) reportedSites[domain] = Date.now();
+                    reportedSites[url] = Date.now(); // Keep URL for backward compatibility/granularity
                     await chrome.storage.local.set({ reportedSites });
                 } else {
                     alert('Submission failed: ' + (response?.error || 'Unknown error'));
                 }
             });
         }
+        sendResponse({ success: true });
+    } else if (message.type === 'HISTORY_BACK') {
+        // Robust navigation fallback for popup
+        window.history.back();
         sendResponse({ success: true });
     } else if (message.type === MessageTypes.EXECUTE_SCAN) {
         handleExecuteScan(message.payload || message.data).then(sendResponse);
