@@ -182,9 +182,8 @@ const Popup = () => {
         }
     };
 
-    const handleOpenTab = (target) => {
-        // Updated to use the correct hash or page
-        const page = target === 'dashboard' ? 'dashboard.html' : 'logs.html';
+    const handleOpenTab = (hash) => {
+        const page = `options/index.html#${hash}`;
         const url = chrome.runtime?.getURL ? chrome.runtime.getURL(page) : page;
         chrome.tabs.create({ url });
     };
@@ -277,7 +276,7 @@ const Popup = () => {
                         {/* 2. Global Settings & Actions */}
                         <div className="space-y-2">
                             <button
-                                onClick={() => handleOpenTab('dashboard')}
+                                onClick={() => handleOpenTab('logs')}
                                 className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-800 rounded-xl transition-all"
                             >
                                 <div className="flex items-center gap-3">
@@ -288,7 +287,7 @@ const Popup = () => {
                             </button>
 
                             <button
-                                onClick={() => handleOpenTab('dashboard')}
+                                onClick={() => handleOpenTab('settings')}
                                 className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-800 rounded-xl transition-all"
                             >
                                 <div className="flex items-center gap-3">
@@ -352,7 +351,7 @@ const Popup = () => {
             {!detailsOpen && (
                 <div className="mt-auto pt-6 flex justify-center">
                     <button
-                        onClick={() => handleOpenTab('dashboard')}
+                        onClick={() => handleOpenTab('settings')}
                         className="text-slate-600 hover:text-slate-400 text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
                     >
                         <Settings size={12} />
