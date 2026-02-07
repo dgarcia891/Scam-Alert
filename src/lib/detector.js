@@ -56,6 +56,10 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     const hardSignals = [];
     const softSignals = [];
     const reasons = [];
+    const sources = [];
+
+    // Track local checks by default
+    sources.push({ id: 'local_patterns', status: 'success' });
 
     // 2. Local Pattern Analysis
     if (usePatternDetection) {
@@ -105,23 +109,35 @@ export async function scanUrl(url, options = {}, onProgress = null) {
                 hardSignals.push({ code: 'REPUTATION_HIT', source: 'PhishTank', message: 'Known phishing site (PhishTank)' });
                 reasons.push({ code: 'PHISHTANK', message: 'Flagged by PhishTank' });
             }
+            sources.push({ id: 'phishtank', status: 'success' });
         } catch (error) {
             console.warn('PhishTank check failed', error);
+            sources.push({ id: 'phishtank', status: 'failed', reason: error.message });
         }
+    } else {
+        sources.push({ id: 'phishtank', status: 'skipped', reason: 'disabled' });
     }
 
     // 4. Check Google Safe Browsing
-    if (useGoogleSafeBrowsing && gsbApiKey) {
-        reportProgress(60, 'Consulting Google Safe Browsing...');
-        try {
-            const gsbResult = await checkUrl(url, gsbApiKey);
-            if (!gsbResult.safe) {
-                hardSignals.push({ code: 'REPUTATION_HIT', source: 'Google Safe Browsing', message: `Flagged as ${gsbResult.threatType}` });
-                reasons.push({ code: 'GSB', message: `Flagged by Google Safe Browsing` });
+    if (useGoogleSafeBrowsing) {
+        if (gsbApiKey) {
+            reportProgress(60, 'Consulting Google Safe Browsing...');
+            try {
+                const gsbResult = await checkUrl(url, gsbApiKey);
+                if (!gsbResult.safe) {
+                    hardSignals.push({ code: 'REPUTATION_HIT', source: 'Google Safe Browsing', message: `Flagged as ${gsbResult.threatType}` });
+                    reasons.push({ code: 'GSB', message: `Flagged by Google Safe Browsing` });
+                }
+                sources.push({ id: 'gsb', status: 'success' });
+            } catch (error) {
+                console.warn('GSB check failed', error);
+                sources.push({ id: 'gsb', status: 'failed', reason: 'network_error' });
             }
-        } catch (error) {
-            console.warn('GSB check failed', error);
+        } else {
+            sources.push({ id: 'gsb', status: 'skipped', reason: 'missing_key' });
         }
+    } else {
+        sources.push({ id: 'gsb', status: 'skipped', reason: 'disabled' });
     }
 
     // 5. Determine Severity & Action
@@ -135,7 +151,8 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         confidence: hardSignals.length > 0 ? 'HIGH' : (softSignals.length > 0 ? 'MEDIUM' : 'LOW'),
         action,
         reasons,
-        signals: { hard: hardSignals, soft: softSignals }
+        signals: { hard: hardSignals, soft: softSignals },
+        meta: { sources }
     });
 }
 

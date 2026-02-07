@@ -219,6 +219,14 @@ const Popup = () => {
                     <p className={cn("text-sm leading-snug font-medium", config.subColor)}>
                         {config.subtitle}
                     </p>
+                    {status === 'secure' && currentUrl && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[10px] font-medium text-slate-400">
+                                Checked: URL + connection security
+                                {scanResults?.meta?.sources?.some(s => s.id === 'gsb' && s.status === 'success') && ' + reputation'}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -248,7 +256,7 @@ const Popup = () => {
                     className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors px-1"
                 >
                     <span className="text-[11px] font-bold uppercase tracking-wider">
-                        {detailsOpen ? 'Hide Details' : 'Details (why?)'}
+                        {detailsOpen ? 'Hide Details' : 'Details'}
                     </span>
                     <ChevronRight size={12} className={cn("transition-transform duration-300", detailsOpen && "rotate-90")} />
                 </button>
@@ -256,22 +264,70 @@ const Popup = () => {
                 {detailsOpen && (
                     <div className="mt-3 space-y-3 animate-in fade-in zoom-in-95 duration-200">
 
-                        {/* 1. Technical Findings (Why this page looks unusual) */}
-                        {scanResults?.reasons?.length > 0 && (
-                            <div className="bg-slate-800/40 border border-slate-800 rounded-xl p-3 space-y-2">
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                    <Info size={12} className="text-slate-500" /> Why this page looks unusual
-                                </div>
+                        {/* 1. Technical Findings / Checks Performed */}
+                        <div className="bg-slate-800/40 border border-slate-800 rounded-xl p-3 space-y-2">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                <Info size={12} className="text-slate-500" />
+                                {status === 'secure' ? 'Checks performed' : 'Why this page looks unusual'}
+                            </div>
+
+                            {status === 'secure' ? (
                                 <div className="space-y-1.5">
-                                    {scanResults.reasons.map((reason, idx) => (
+                                    <div className="flex gap-2 text-[11px] text-slate-400 leading-relaxed font-medium">
+                                        <div className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                        URL checks (local)
+                                    </div>
+                                    {(() => {
+                                        try {
+                                            const urlObj = new URL(currentUrl);
+                                            if (urlObj.protocol === 'https:' || urlObj.protocol === 'http:') {
+                                                return (
+                                                    <div className="flex gap-2 text-[11px] text-slate-400 leading-relaxed font-medium">
+                                                        <div className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                                        Connection security ({urlObj.protocol.replace(':', '').toUpperCase()})
+                                                    </div>
+                                                );
+                                            }
+                                        } catch (e) { /* skip if invalid */ }
+                                        return null;
+                                    })()}
+                                    {(() => {
+                                        const gsb = scanResults?.meta?.sources?.find(s => s.id === 'gsb');
+                                        if (gsb?.status === 'success') {
+                                            return (
+                                                <div className="flex gap-2 text-[11px] text-slate-400 leading-relaxed font-medium">
+                                                    <div className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                                    Reputation check: Google Safe Browsing
+                                                </div>
+                                            );
+                                        } else if (gsb?.status === 'failed') {
+                                            return (
+                                                <div className="flex gap-2 text-[11px] text-slate-400 leading-relaxed font-medium">
+                                                    <div className="w-1 h-1 rounded-full bg-slate-600 mt-1.5 shrink-0" />
+                                                    Reputation check: unavailable
+                                                </div>
+                                            );
+                                        } else {
+                                            return (
+                                                <div className="flex gap-2 text-[11px] text-slate-500 leading-relaxed font-medium italic">
+                                                    <div className="w-1 h-1 rounded-full bg-slate-700 mt-1.5 shrink-0" />
+                                                    Reputation checks: Off
+                                                </div>
+                                            );
+                                        }
+                                    })()}
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    {scanResults?.reasons?.map((reason, idx) => (
                                         <div key={idx} className="flex gap-2 text-[11px] text-slate-400 leading-relaxed font-medium">
                                             <div className="w-1 h-1 rounded-full bg-slate-600 mt-1.5 shrink-0" />
                                             {reason.message || reason.details}
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
                         {/* 2. Global Settings & Actions */}
                         <div className="space-y-2">
@@ -349,12 +405,18 @@ const Popup = () => {
 
             {/* Footer Settings Link */}
             {!detailsOpen && (
-                <div className="mt-auto pt-6 flex justify-center">
+                <div className="mt-auto pt-6 flex justify-center items-center gap-4">
+                    <button
+                        onClick={() => handleOpenTab('dashboard')}
+                        className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2"
+                    >
+                        View activity →
+                    </button>
+                    <div className="w-px h-3 bg-slate-800" />
                     <button
                         onClick={() => handleOpenTab('settings')}
-                        className="text-slate-600 hover:text-slate-400 text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                        className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2"
                     >
-                        <Settings size={12} />
                         Settings
                     </button>
                 </div>
