@@ -1,6 +1,6 @@
 {
   "name": "scam-alert-extension",
-  "version": "1.0.86",
+  "version": "1.0.87",
   "description": "Real-time scam and phishing protection Chrome extension",
   "private": true,
   "type": "module",
