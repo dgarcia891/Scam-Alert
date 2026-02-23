@@ -256,7 +256,7 @@ const Popup = () => {
                     className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors px-1"
                 >
                     <span className="text-[11px] font-bold uppercase tracking-wider">
-                        {detailsOpen ? 'Hide Details' : 'Details'}
+                        {detailsOpen ? 'Hide Details' : 'Details (why?)'}
                     </span>
                     <ChevronRight size={12} className={cn("transition-transform duration-300", detailsOpen && "rotate-90")} />
                 </button>
@@ -408,16 +408,17 @@ const Popup = () => {
                 <div className="mt-auto pt-6 flex justify-center items-center gap-4">
                     <button
                         onClick={() => handleOpenTab('dashboard')}
-                        className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2"
+                        className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2 flex items-center gap-1.5"
                     >
-                        View activity →
+                        <Settings size={12} />
+                        Settings
                     </button>
                     <div className="w-px h-3 bg-slate-800" />
                     <button
-                        onClick={() => handleOpenTab('settings')}
+                        onClick={() => handleOpenTab('logs')}
                         className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2"
                     >
-                        Settings
+                        Activity Log
                     </button>
                 </div>
             )}

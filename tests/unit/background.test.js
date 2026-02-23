@@ -18,8 +18,9 @@ describe('Background Module - Severity to Icon Mapping', () => {
         expect(severityToIconState('LOW')).toBe('SAFE');
     });
 
-    it('maps SAFE and others to SAFE', () => {
+    it('maps SAFE, LOW, and others to SAFE', () => {
         expect(severityToIconState('SAFE')).toBe('SAFE');
+        expect(severityToIconState('LOW')).toBe('SAFE');
         expect(severityToIconState('UNKNOWN')).toBe('SAFE');
     });
 });
@@ -37,24 +38,21 @@ describe('Background Module - HTTP Notification Throttling', () => {
 });
 
 describe('Background Module - Navigation Handler (Wrapper)', () => {
-    it('calls scanAndHandle for main frame navigations and clears badge', async () => {
+    it('calls resetActionUIForTab and scanAndHandle for main frame navigations', async () => {
         const scanAndHandle = jest.fn();
         const shouldScanUrl = jest.fn().mockReturnValue(true);
+        const resetActionUIForTab = jest.fn();
 
-        // Mock chrome.action
-        global.chrome = {
-            action: {
-                setBadgeText: jest.fn().mockResolvedValue(undefined)
-            }
-        };
-
-        const handler = createNavigationHandler({ shouldScanUrl, scanAndHandle });
+        const handler = createNavigationHandler({ shouldScanUrl, scanAndHandle, resetActionUIForTab });
 
         await handler({ frameId: 0, url: 'https://test.com', tabId: 123 });
 
-        expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ tabId: 123, text: '' });
+        expect(resetActionUIForTab).toHaveBeenCalledWith(123);
         expect(shouldScanUrl).toHaveBeenCalledWith('https://test.com');
         expect(scanAndHandle).toHaveBeenCalledWith(123, 'https://test.com');
+
+        // Assert ordering: reset happens before checking/scanning
+        expect(resetActionUIForTab.mock.invocationCallOrder[0]).toBeLessThan(shouldScanUrl.mock.invocationCallOrder[0]);
     });
 
     it('ignores subframe navigations', async () => {

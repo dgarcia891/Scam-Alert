@@ -162,3 +162,13 @@ export async function syncIconForTabFromCache(tabId, url, shouldScanUrl, tabStat
         console.warn('[Scam Alert] Failed to sync action icon from cache:', error);
     }
 }
+
+export async function resetActionUIForTab(tabId) {
+    try {
+        await chrome.action.setBadgeText({ tabId, text: '' });
+        await chrome.action.setBadgeBackgroundColor({ tabId, color: [0, 0, 0, 0] });
+        await setActionIconForTab(tabId, null);
+    } catch (error) {
+        ignoreTabError(error);
+    }
+}

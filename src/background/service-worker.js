@@ -23,7 +23,7 @@ import { syncManager } from './lib/sync-manager.js';
 import { handleIncomingMessage } from './messages/handler.js';
 import { onInstalled, onStartup } from './events/lifecycle.js';
 import { checkProStatus } from './services/auth.js';
-import { maybeShowHttpNotification, setActionIconForTab, syncIconForTabFromCache, ignoreTabError } from './lib/icon-manager.js';
+import { maybeShowHttpNotification, setActionIconForTab, syncIconForTabFromCache, ignoreTabError, resetActionUIForTab } from './lib/icon-manager.js';
 import { createNavigationHandler } from './lib/navigation-handler.js';
 import { tabStateManager } from '../lib/tab-state-manager.js';
 
@@ -224,7 +224,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
     shouldScanUrl,
     scanAndHandle,
     syncIconForTabFromCache,
-    tabStateManager
+    tabStateManager,
+    resetActionUIForTab
 }));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

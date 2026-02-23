@@ -3,11 +3,16 @@
  */
 
 export function createNavigationHandler(context) {
-    const { shouldScanUrl, scanAndHandle, syncIconForTabFromCache } = context;
+    const { shouldScanUrl, scanAndHandle, syncIconForTabFromCache, resetActionUIForTab } = context;
 
     return async function (details) {
         // Only scan main frame
         if (details.frameId !== 0) return;
+
+        // Clear badge/icon immediately to prevent flicker (BUG-062)
+        if (resetActionUIForTab) {
+            await resetActionUIForTab(details.tabId);
+        }
 
         const url = details.url;
         if (!shouldScanUrl(url)) return;
