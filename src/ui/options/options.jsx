@@ -382,26 +382,8 @@ const DashboardContent = ({ isPro, stats, onUpgrade, onCheckClick }) => {
                 </Card>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-6">
                 <RecentActivity activities={stats.recentActivity} onCheckClick={onCheckClick} />
-
-                {/* Placeholder for Threat Graph */}
-                <Card className="flex flex-col justify-center items-center text-center p-12 border-dashed border-2 border-slate-700 bg-slate-900/30">
-                    <div className="p-4 rounded-full bg-slate-800 mb-4 text-slate-500">
-                        {isPro ? <Activity size={32} /> : <Lock size={32} />}
-                    </div>
-                    <CardTitle className="text-slate-300">Live Threat Map</CardTitle>
-                    <p className="text-slate-500 text-sm mt-2 max-w-xs">
-                        {isPro
-                            ? "Real-time visualization of global phishing attacks and blocked attempts."
-                            : "Upgrade to Pro to visualize live threats and attack vectors in real-time."}
-                    </p>
-                    {isPro ? (
-                        <Badge variant="info" className="mt-4">COMING SOON</Badge>
-                    ) : (
-                        <Button variant="primary" size="sm" className="mt-4" onClick={onUpgrade}>Unlock Now</Button>
-                    )}
-                </Card>
             </div>
         </div>
     );
