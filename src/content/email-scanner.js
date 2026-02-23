@@ -12,6 +12,7 @@ import { setupEmailObserver } from './email/mutation-observer.js';
 import { applyInPageHighlighting } from './email/tooltip.js';
 import { extractEmailText } from '../lib/scanner/parser.js';
 import { runHeuristics } from '../lib/scanner/heuristics.js';
+import { setupLinkInterceptor } from './email/link-interceptor.js';
 
 (function () {
     let currentEmailId = null;
@@ -47,6 +48,21 @@ import { runHeuristics } from '../lib/scanner/heuristics.js';
 
     // Initialize DOM Observer
     setupEmailObserver(triggerScan);
+
+    // Initialize Link Interceptor
+    setupLinkInterceptor((href) => {
+        // Send a message to content.js to display the danger overlay
+        chrome.runtime.sendMessage({
+            type: MessageTypes.SHOW_WARNING,
+            data: {
+                result: {
+                    recommendations: ['You clicked a download link or cloud document in your webmail. This is a common vector for phishing and malware.'],
+                    overallSeverity: 'HIGH',
+                    url: href
+                }
+            }
+        });
+    });
 
     // Global Message Listener for Scan Results
     chrome.runtime.onMessage.addListener((message) => {

@@ -11,6 +11,7 @@
 │   │   ├── content.js  # Main content logic
 │   │   ├── email-scanner.js # Email Orchestrator
 │   │   └── email/      # Email modules (UI, extraction, observer)
+│   │       └── link-interceptor.js # Outbound Click Protection
 │   ├── popup/          # Extension popup UI
 │   │   ├── popup.js    # UI Orchestrator
 │   │   └── modules/    # UI renderers and helpers

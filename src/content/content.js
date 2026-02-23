@@ -158,7 +158,11 @@ function createOverlay(result) {
 
     btnProceed.addEventListener('click', () => {
         container.remove();
-        // Ideally we'd whitelist this session, but for now just removing the overlay is enough
+        if (result?.url) {
+            // It was an intercepted link. Navigate to it directly.
+            window.location.href = result.url;
+        }
+        // Otherwise just let the user see the current page
     });
 
     document.documentElement.appendChild(container);
