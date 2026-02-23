@@ -126,7 +126,8 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             }
         });
 
-        if (result.overallThreat || (result.overallSeverity !== 'SAFE' && result.overallSeverity !== 'LOW')) {
+        const isAlert = result.overallThreat || (result.overallSeverity !== 'SAFE' && result.overallSeverity !== 'LOW');
+        if (isAlert) {
             await handleThreat(tabId, url, result, settings);
         } else {
             try {

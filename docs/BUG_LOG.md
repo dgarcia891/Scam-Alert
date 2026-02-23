@@ -16,3 +16,4 @@
 | BUG-060 | CLOSED | Medium | Popup UI is cluttered and "unfriendly" for seniors | Refactored `popup.jsx` for calm SAFE state (neutral slate), softened CAUTION copy ("Take a moment"), reordered accordion (reasons-first), and implemented robust navigation fallback. |
 | BUG-061 | CLOSED | High | Dashboard/Logs links in popup lead to 404 error | Updated `handleOpenTab` in `popup.jsx` to correctly target integrated options page with URL hashes (`#logs`, `#settings`). |
 | BUG-062 | CLOSED | Medium | Yellow exclamation badge flashes briefly on navigation | Updated `navigation-handler.js` to clear badge state immediately on navigation. Aligned `service-worker.js` and `icon-manager.js` to treat `LOW` severity as `SAFE` for badge purposes. |
+| BUG-063 | CLOSED | Medium | Ghost Badge Discrepancy ("!" badge shows for LOW severity while Popup is SAFE) | Prevented LOW severity items from triggering `handleThreat` inside `scanAndHandle` in the service worker. |
