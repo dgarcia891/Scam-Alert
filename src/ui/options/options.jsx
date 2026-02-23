@@ -167,8 +167,22 @@ const CheckDetailModal = ({ check, onClose }) => {
                     </div>
 
                     {check.details && check.description !== check.details && (
-                        <div className="bg-rose-500/5 rounded-lg p-3 border border-rose-500/10">
-                            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest block mb-1">Detection Result</span>
+                        <div className={clsx(
+                            "rounded-lg p-3 border",
+                            check.severity === 'HIGH' || check.severity === 'CRITICAL'
+                                ? "bg-rose-500/5 border-rose-500/10"
+                                : check.severity === 'MEDIUM'
+                                    ? "bg-amber-500/5 border-amber-500/10"
+                                    : "bg-emerald-500/5 border-emerald-500/10"
+                        )}>
+                            <span className={clsx(
+                                "text-[10px] font-bold uppercase tracking-widest block mb-1",
+                                check.severity === 'HIGH' || check.severity === 'CRITICAL'
+                                    ? "text-rose-400"
+                                    : check.severity === 'MEDIUM'
+                                        ? "text-amber-400"
+                                        : "text-emerald-400"
+                            )}>Detection Result</span>
                             <p className="text-xs text-slate-300">{check.details}</p>
                         </div>
                     )}
