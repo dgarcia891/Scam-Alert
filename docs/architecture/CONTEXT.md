@@ -3,7 +3,7 @@
 ## Current State
 
 - **Mode:** CHROME
-- **Version:** 1.0.86
+- **Version:** 1.0.88
 - **Orchestrator:** v22.0
 
 ## Project Config
@@ -12,12 +12,12 @@
 
 ## Active Work
 
-- Improved Activity Log: Expose detailed checks per scan (clickable analysis tags)
+- Resolution of BUG-067: Detection Result box color conditional on severity
+- Improved Activity Log: Detailed checks with clickable analysis tags (Gold Master)
 - Resolved BUG-066: Ghost Badge Root Cause (overallSeverity field mismatch)
-- Resolved BUG-065: Single soft signals (suspicious TLD) triggering MEDIUM severity
 
 ## Recent Changes
 
-- Enhanced `scan-schema.js` and `detector.js` to preserve `checks` objects for UI detail.
-- Updated heuristic engines to provide `description` and `dataChecked` for clickable tags.
-- Verified fix for persistent ghost badge on safe sites via `overallSeverity` canonicalization.
+- Modified `options.jsx` to use Emerald/Rose/Amber for check detections based on risk.
+- Canonicalized `checks` object in `detector.js` to expose descriptions/evidence to UI.
+- Unified "Ghost Badge" logic across `scan-schema.js` and `service-worker.js`.
