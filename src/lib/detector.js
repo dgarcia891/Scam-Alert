@@ -61,11 +61,16 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     // Track local checks by default
     sources.push({ id: 'local_patterns', status: 'success' });
 
+    let finalChecks = {};
+
     // 2. Local Pattern Analysis
     if (usePatternDetection) {
         reportProgress(20, 'Analyzing URL patterns...');
         const customPhrases = await getMergedScamPhrases();
         const patterns = analyzeUrl(url, pageContent, options.isPro, customPhrases);
+
+        // Preserve all checks for the UI Activity Log
+        finalChecks = { ...patterns.checks };
 
         // Map Pattern Checks to Signals
         if (patterns.checks.typosquatting?.flagged) {
@@ -109,6 +114,16 @@ export async function scanUrl(url, options = {}, onProgress = null) {
                 hardSignals.push({ code: 'REPUTATION_HIT', source: 'PhishTank', message: 'Known phishing site (PhishTank)' });
                 reasons.push({ code: 'PHISHTANK', message: 'Flagged by PhishTank' });
             }
+
+            finalChecks.phishTank = {
+                title: 'phish_tank_database',
+                description: 'Verifies the domain against the global PhishTank threat database.',
+                flagged: ptResult.isPhishing,
+                severity: ptResult.isPhishing ? 'CRITICAL' : 'NONE',
+                details: ptResult.isPhishing ? 'Listed in PhishTank database' : 'Not found in PhishTank',
+                dataChecked: extractHostname(url)
+            };
+
             sources.push({ id: 'phishtank', status: 'success' });
         } catch (error) {
             console.warn('PhishTank check failed', error);
@@ -128,6 +143,16 @@ export async function scanUrl(url, options = {}, onProgress = null) {
                     hardSignals.push({ code: 'REPUTATION_HIT', source: 'Google Safe Browsing', message: `Flagged as ${gsbResult.threatType}` });
                     reasons.push({ code: 'GSB', message: `Flagged by Google Safe Browsing` });
                 }
+
+                finalChecks.googleSafeBrowsing = {
+                    title: 'google_safe_browsing',
+                    description: 'Consults Google\'s Safe Browsing API for known malware and phishing associations.',
+                    flagged: !gsbResult.safe,
+                    severity: !gsbResult.safe ? 'CRITICAL' : 'NONE',
+                    details: !gsbResult.safe ? `Flagged as ${gsbResult.threatType}` : 'Safe according to Google',
+                    dataChecked: extractHostname(url)
+                };
+
                 sources.push({ id: 'gsb', status: 'success' });
             } catch (error) {
                 console.warn('GSB check failed', error);
@@ -152,6 +177,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         action,
         reasons,
         signals: { hard: hardSignals, soft: softSignals },
+        checks: finalChecks,
         meta: { sources }
     });
 }

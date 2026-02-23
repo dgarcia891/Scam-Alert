@@ -97,10 +97,12 @@ export function checkTyposquatting(url) {
             if (!brandPattern.test(hostname) || hostname !== brand) {
                 return {
                     title: 'check_typosquatting',
+                    description: 'Detects domains that look almost identical to popular brands.',
                     flagged: true,
                     severity: 'HIGH',
                     details: `Possible impersonation of ${brand}`,
                     suspectedBrand: brand,
+                    dataChecked: hostname,
                     score: 40
                 };
             }
@@ -190,10 +192,12 @@ export function checkAdvancedTyposquatting(url) {
         if (distance > 0 && distance <= 2 && target.length > 4) {
             return {
                 title: 'check_advanced_typosquatting',
+                description: 'Performs mathematical string similarity analysis to catch subtle misspellings of high-value targets.',
                 flagged: true,
                 severity: 'CRITICAL',
                 details: `Domain name "${mainPart}" is suspiciously similar to "${target}"`,
                 target,
+                dataChecked: mainPart,
                 score: 50
             };
         }

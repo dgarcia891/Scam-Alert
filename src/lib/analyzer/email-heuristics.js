@@ -38,12 +38,12 @@ export function checkEmailScams(pageContent) {
 
     return {
         title: 'check_email_scams',
-        description: 'Specific scanner for common email frauds.',
+        description: 'Specific scanner for common email frauds like gift card and invoice scams.',
         flagged: indicators.length > 0,
         severity: score >= 50 ? 'CRITICAL' : (score >= 30 ? 'HIGH' : 'NONE'),
         details: indicators.length > 0 ? `Email scam indicators: ${indicators.join(', ')}` : 'No email-specific scams detected',
         indicators,
-        dataChecked: `Sender: ${sender}`,
+        dataChecked: Math.max(emailBody.length, 1) > 1 ? emailBody.substring(0, 5000) : `Sender: ${sender}`,
         matches: [...(giftCardKeywords.filter(k => emailBody.includes(k))), ...(commandWords.filter(k => emailBody.includes(k))), ...(financeKeywords.filter(k => emailBody.includes(k)))],
         score
     };
