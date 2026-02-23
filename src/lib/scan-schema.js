@@ -37,12 +37,20 @@ export function createScanResult({
     signals = { hard: [], soft: [] },
     meta = {}
 } = {}) {
+    // BUG-066 Fix: The codebase universally reads `overallSeverity` and `overallThreat`.
+    // `createScanResult` was only setting `severity`, causing `overallSeverity` to be
+    // `undefined`. Since `undefined !== 'SAFE'` is true, this triggered the badge on
+    // every single page regardless of the actual scan outcome.
+    const overallThreat = severity === SEVERITY.CRITICAL || severity === SEVERITY.HIGH;
+
     return {
         severity,
+        overallSeverity: severity,   // Canonical alias consumed by all badge/popup logic
+        overallThreat,               // True only for HIGH/CRITICAL — safe sites are false
         confidence,
         action,
-        reasons, // Array of { code: string, message: string }
-        signals, // { hard: string[], soft: string[] }
+        reasons,
+        signals,
         meta: {
             timestamp: Date.now(),
             ...meta
