@@ -32,11 +32,10 @@ export function determineSeverity(signals) {
         const count = signals.soft.length;
         if (count > 1) return SEVERITY.MEDIUM;
 
-        // Single Soft Signal check
-        const signal = signals.soft[0];
-        if (signal.code === 'HTTP_ONLY') return SEVERITY.LOW;
-
-        return SEVERITY.MEDIUM; // Default single soft signal (e.g. suspicious TLD)
+        // Single Soft Signal: treat as LOW regardless of type.
+        // A single weak signal (even a suspicious TLD alone) is NOT enough to warn.
+        // 2+ signals is required for MEDIUM to prevent ghost badges on legitimate sites. (BUG-065)
+        return SEVERITY.LOW;
     }
 
     return SEVERITY.SAFE;

@@ -22,9 +22,9 @@ describe('Severity Stacking Logic', () => {
         expect(determineSeverity(signals)).toBe(SEVERITY.LOW);
     });
 
-    test('Single Soft Signal (Suspicious TLD) should be MEDIUM', () => {
+    test('Single Soft Signal (Suspicious TLD) should be LOW (BUG-065: single soft signal not enough for badge)', () => {
         const signals = { hard: [], soft: [{ code: 'SUSPICIOUS_TLD' }] };
-        expect(determineSeverity(signals)).toBe(SEVERITY.MEDIUM);
+        expect(determineSeverity(signals)).toBe(SEVERITY.LOW);
     });
 
     test('Multiple Soft Signals should be CAPPED at MEDIUM', () => {
