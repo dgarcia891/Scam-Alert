@@ -14,19 +14,30 @@ export function checkEmailScams(pageContent) {
     const indicators = [];
     let score = 0;
 
-    // 1. Gift Card Scams
-    const giftCardKeywords = ['gift card', 'google play', 'apple card', 'amazon card', 'steam card', 'itunes', 'vanilla visa'];
+    // 1. Gift Card Scams — Expanded keyword set
+    const giftCardKeywords = ['gift card', 'google play', 'apple card', 'amazon card', 'steam card', 'itunes', 'vanilla visa', 'gift cards'];
+    const commandWords = [
+        'buy', 'purchase', 'scratch', 'photo', 'picture', 'code', 'front and back',
+        'pick up', 'amount', 'how many', 'each card', 'i have them',
+        'get reimbursed', 'reimbursed', 'amount of each', 'pick them up',
+        'get this done', 'done today', 'get it done'
+    ];
     const hasGiftCard = giftCardKeywords.some(k => emailBody.includes(k));
-    const commandWords = ['buy', 'purchase', 'scratch', 'photo', 'picture', 'code', 'front and back', 'pick up', 'amount', 'how many', 'each card', 'i have them'];
     const hasCommand = commandWords.some(k => emailBody.includes(k));
 
     if (hasGiftCard && hasCommand) { indicators.push('Gift card payment request'); score += 50; }
 
-    // 2. Sender Inconsistency
+    // 2. Sender Inconsistency: Official title from free email address
     if (displayName && sender) {
-        const brandNames = ['gmail.com', 'outlook.com', 'yahoo.com', 'hotmail.com', 'icloud.com'];
-        const isFreeEmail = brandNames.some(b => sender.endsWith(b));
-        const officialKeywords = ['official', 'support', 'admin', 'service', 'desk', 'ceo', 'security', 'alert'];
+        const freeEmailProviders = ['gmail.com', 'outlook.com', 'yahoo.com', 'hotmail.com', 'icloud.com', 'aol.com', 'protonmail.com'];
+        const isFreeEmail = freeEmailProviders.some(b => sender.endsWith(b));
+
+        // Expanded: authority titles now include religious/organizational roles
+        const officialKeywords = [
+            'official', 'support', 'admin', 'service', 'desk', 'ceo', 'security', 'alert',
+            'father', 'pastor', 'priest', 'bishop', 'reverend', 'deacon', 'minister',
+            'director', 'president', 'principal', 'superintendent', 'manager', 'hr'
+        ];
         const isOfficialName = officialKeywords.some(k => displayName.includes(k));
         if (isOfficialName && isFreeEmail) { indicators.push('Official name from personal email address'); score += 40; }
     }
@@ -35,6 +46,19 @@ export function checkEmailScams(pageContent) {
     const financeKeywords = ['invoice', 'wire transfer', 'payment pending', 'unpaid', 'overdue', 'bank details', 'routing number'];
     const hasFinance = financeKeywords.filter(k => emailBody.includes(k));
     if (hasFinance.length >= 2) { indicators.push('Suspicious financial request'); score += 30; }
+
+    // 4. Authority Impersonation Body Language (Confidence + Urgency Pattern)
+    const authorityPressureSignals = [
+        'requires discretion', 'cannot take calls', 'cannot receive calls', 'not able to take calls',
+        'this should be confidential', 'keep this confidential', 'this is confidential',
+        'get this done today', 'done now or later today', 'get it done today',
+        'i need your help with something', 'are you in a good space', 'are you available'
+    ];
+    const authorityFound = authorityPressureSignals.filter(k => emailBody.includes(k));
+    if (authorityFound.length >= 1 && (hasGiftCard || indicators.length > 0)) {
+        indicators.push('Authority pressure + secrecy language');
+        score += 30;
+    }
 
     return {
         title: 'check_email_scams',
@@ -48,3 +72,4 @@ export function checkEmailScams(pageContent) {
         score
     };
 }
+

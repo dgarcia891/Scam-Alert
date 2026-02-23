@@ -20,3 +20,4 @@
 | BUG-065 | CLOSED | High | Ghost Badge on Safe Sites (Single soft signal triggering MEDIUM severity) | Fixed `determineSeverity` in `scoring.js` to return `LOW` for any single soft signal. Only 2+ soft signals escalate to `MEDIUM`. |
 | BUG-066 | CLOSED | High | Ghost Badge on every page (overallSeverity field mismatch) | Modified `createScanResult` in `scan-schema.js` to correctly expose `overallSeverity` and `overallThreat` fields, ensuring proper badge logic. |
 | BUG-067 | CLOSED | Low | Detection Result box is always red in Modal | Modified `src/ui/options/options.jsx` to make the "Detection Result" box color conditional on severity (Emerald for SAFE/LOW/NONE). |
+| BUG-068 | CLOSED | Critical | Authority impersonation gift card scam not detected | Expanded `email-heuristics.js` with: religious/org authority titles (father/pastor/priest), 'get reimbursed', 'done today', and authority pressure + secrecy language pattern. |
