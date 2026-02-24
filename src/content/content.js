@@ -209,9 +209,13 @@ export function createOverlay(result) {
     });
 
     btnBack.addEventListener('click', () => {
-        window.history.back();
-        // Fallback if no history
-        setTimeout(() => window.close(), 500);
+        if (window.history.length > 1) {
+            window.history.back();
+        }
+        // Fallback: If back() fails (e.g. opened in new tab with no history)
+        setTimeout(() => {
+            window.location.href = 'about:blank';
+        }, 150);
     });
 
     btnProceed.addEventListener('click', () => {

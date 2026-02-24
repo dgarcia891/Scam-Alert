@@ -25,3 +25,4 @@
 | BUG-070 | CLOSED | Critical | Scam email still not triggering Red icon/Overlay | Resolved logic gap in `detector.js` where `emailScams` and `urgencySignals` results from `analyzeUrl` were being ignored for global severity calculation. |
 | BUG-071 | CLOSED | Critical | Email Scanner dead (Uncaught ReferenceError) | Fixed `ReferenceError: parseSenderInfo is not defined` in `email-scanner.js` by adding the missing import from `../lib/scanner/parser.js`. |
 | BUG-072 | CLOSED | Medium | Overlay "Reason" button is not interactive | Added clickable expansion to the "Reason" button in `content.js`, revealing a technical details panel populated from `result.checks`. Refactored `content.js` for testability. |
+| BUG-075 | CLOSED | Medium | 'Go back to safety' button does nothing | Added robust fallback navigation using setTimeout and `window.location.href='about:blank'` for tabs lacking history in `content.js`. |
