@@ -10,7 +10,7 @@ import { showActivationPrompt } from './email/activation-prompt.js';
 import { showThreatDashboard } from './email/dashboard.js';
 import { setupEmailObserver } from './email/mutation-observer.js';
 import { applyInPageHighlighting } from './email/tooltip.js';
-import { extractEmailText } from '../lib/scanner/parser.js';
+import { extractEmailText, parseSenderInfo } from '../lib/scanner/parser.js';
 import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
 
