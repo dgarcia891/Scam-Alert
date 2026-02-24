@@ -242,6 +242,17 @@ export async function getCachedResult(url) {
 
             if (age < MAX_CACHE_AGE) {
                 console.log('[Scam Detector] Using cached result for:', normalized);
+
+                // BUG-076: Normalize legacy cache schemas lacking canonical overallSeverity mapping
+                if (result && typeof result === 'object') {
+                    if (result.overallSeverity === undefined && result.severity) {
+                        result.overallSeverity = result.severity;
+                    }
+                    if (result.overallThreat === undefined && result.severity) {
+                        result.overallThreat = result.severity === 'CRITICAL' || result.severity === 'HIGH';
+                    }
+                }
+
                 return result;
             }
         }

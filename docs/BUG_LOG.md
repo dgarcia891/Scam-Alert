@@ -26,3 +26,4 @@
 | BUG-071 | CLOSED | Critical | Email Scanner dead (Uncaught ReferenceError) | Fixed `ReferenceError: parseSenderInfo is not defined` in `email-scanner.js` by adding the missing import from `../lib/scanner/parser.js`. |
 | BUG-072 | CLOSED | Medium | Overlay "Reason" button is not interactive | Added clickable expansion to the "Reason" button in `content.js`, revealing a technical details panel populated from `result.checks`. Refactored `content.js` for testability. |
 | BUG-075 | CLOSED | Medium | 'Go back to safety' button does nothing | Added robust fallback navigation using setTimeout and `window.location.href='about:blank'` for tabs lacking history in `content.js`. |
+| BUG-076 | CLOSED | High | Previously flagged sites appearing SAFE due to cache regression | Added backwards compatibility to `getCachedScan` in `storage.js` to normalize deprecated `severity` fields to `overallSeverity`, preventing silent `SAFE` evaluation in UI elements. |
