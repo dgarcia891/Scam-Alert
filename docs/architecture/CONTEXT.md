@@ -3,7 +3,7 @@
 ## Current State
 
 - **Mode:** CHROME
-- **Version:** 1.0.97
+- **Version:** 1.0.98
 - **Orchestrator:** v22.0
 
 ## Project Config
@@ -13,10 +13,10 @@
 ## Active Work
 
 - Status: Gold Master (Stable Release)
-- Final heuristics & icon preservation verified.
+- Technical Details Overlay verified.
 
 ## Recent Changes
 
-- Formally deployed v1.0.97 after BUG-071 (ReferenceError) fix.
-- Re-verified all 126 regression tests.
-- Icon tinting detail preservation finalized.
+- Implemented interactive "Reason" button on high-risk overlay (BUG-072).
+- Formally deployed v1.0.98 after UI refactoring.
+- Re-verified all 128 regression tests.
