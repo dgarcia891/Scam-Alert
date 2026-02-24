@@ -77,11 +77,20 @@ export async function getTintedIconImageData(state) {
         const canvas = new OffscreenCanvas(size, size);
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, size, size);
+
+        // Step 1: Draw original icon to preserve shape/detail
         ctx.drawImage(bitmap, 0, 0, size, size);
 
-        ctx.globalCompositeOperation = 'source-atop';
+        // Step 2: Apply color tint using 'multiply' blend (preserves luminance)
+        ctx.globalCompositeOperation = 'multiply';
         ctx.fillStyle = tint;
         ctx.fillRect(0, 0, size, size);
+
+        // Step 3: Restore alpha channel from original icon ('destination-in')
+        // This clips the result back to the original icon's non-transparent pixels
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(bitmap, 0, 0, size, size);
+
         ctx.globalCompositeOperation = 'source-over';
 
         result[size] = ctx.getImageData(0, 0, size, size);

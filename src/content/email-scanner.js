@@ -35,13 +35,21 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         const data = extractEmailText(); // Should be from parser now
         if (!data) return;
 
+        // Extract sender information for authority impersonation detection
+        const senderInfo = parseSenderInfo();
+
         console.log('[Scam Alert] Intentional scan triggered...');
 
         chrome.runtime.sendMessage({
             type: MessageTypes.SCAN_CURRENT_TAB,
             data: {
                 forceRefresh: true,
-                pageContent: { bodyText: data }
+                pageContent: {
+                    bodyText: data,
+                    isEmailView: true,
+                    senderName: senderInfo.name,
+                    senderEmail: senderInfo.email
+                }
             }
         });
     }
