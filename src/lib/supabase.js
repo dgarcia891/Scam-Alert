@@ -50,6 +50,54 @@ export async function submitReport(url, type, description = '', metadata = {}) {
 }
 
 /**
+ * Submit a false positive report for a specific detection rule
+ * @param {Object} payload - The structured report payload
+ * @returns {Promise<Object>} - The result of the insertion
+ */
+export async function submitFalsePositive(payload) {
+    try {
+        const { url, issueId, ruleId, issueType, severity, phrase, explanation, version } = payload;
+
+        // Sanitize URL (strip query params)
+        let sanitizedUrl = url || '';
+        try {
+            const urlObj = new URL(url);
+            sanitizedUrl = `${urlObj.hostname}${urlObj.pathname}`;
+        } catch (e) {
+            // Failsafe for invalid URLs
+        }
+
+        const { data, error } = await supabase
+            .from('reported_scams')
+            .insert([
+                {
+                    url: sanitizedUrl,
+                    scam_type: 'false_positive',
+                    description: 'User reported highlighted phrase as a false positive',
+                    metadata: {
+                        rule_id: ruleId || 'unknown',
+                        issue_id: issueId || 'unknown',
+                        issue_type: issueType || 'unknown',
+                        severity: severity || 'unknown',
+                        phrase: phrase || '',
+                        user_explanation: explanation || '',
+                        version: version || chrome.runtime.getManifest().version
+                    },
+                    severity: 'unverified',
+                    status: 'pending'
+                }
+            ])
+            .select();
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        console.error('[Scam Alert] Failed to submit false positive:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Fetch verified community reports (for blocklist)
  * @returns {Promise<Array>} - List of verified scam URLs
  */

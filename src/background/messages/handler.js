@@ -8,7 +8,7 @@ import { submitReport } from '../../lib/supabase.js';
 export async function handleIncomingMessage(message, sender, context) {
     const { type, data, payload } = message; // Support both for transition
     const msgData = payload || data;
-    const { scanAndHandle, getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, submitReport, tabStateManager } = context;
+    const { scanAndHandle, getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, submitReport, submitFalsePositive, tabStateManager } = context;
 
     switch (type) {
         case MessageTypes.GET_TAB_STATUS:
@@ -29,6 +29,8 @@ export async function handleIncomingMessage(message, sender, context) {
             return handleResetStats(repairStatistics);
         case MessageTypes.REPORT_SCAM:
             return handleReportScam(data, submitReport);
+        case MessageTypes.REPORT_FALSE_POSITIVE:
+            return handleReportFalsePositive(data, submitFalsePositive);
         default:
             console.log('[Scam Alert] Unknown message type:', type);
             return { error: 'Unknown message type' };
@@ -105,5 +107,45 @@ async function handleGetScanResults(data, tabStateManager) {
         lastScanned: state.lastScanned,
         context: state.context
     };
+}
+
+// Global rate limit cache for false positives
+const fpRateLimits = {
+    count: 0,
+    timestamp: Date.now()
+};
+
+async function handleReportFalsePositive(data, submitFalsePositive) {
+    try {
+        const payload = data;
+
+        // 1. Validate explanation length
+        if (!payload.explanation || payload.explanation.trim().length < 15) {
+            return { success: false, error: 'Explanation must be at least 15 characters long.' };
+        }
+
+        // 2. Rate limiting (max 10 per day per installation)
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+        if (Date.now() - fpRateLimits.timestamp > ONE_DAY) {
+            fpRateLimits.count = 0;
+            fpRateLimits.timestamp = Date.now();
+        }
+
+        if (fpRateLimits.count >= 10) {
+            return { success: false, error: 'Daily report limit reached. Thank you for your feedback!' };
+        }
+
+        // 3. Submit
+        const result = await submitFalsePositive(payload);
+
+        if (result.success) {
+            fpRateLimits.count++;
+        }
+
+        return result;
+    } catch (error) {
+        console.error('[Scam Alert] False positive handler error:', error);
+        return { success: false, error: error.message };
+    }
 }
 
