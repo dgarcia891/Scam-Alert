@@ -3,7 +3,7 @@
 ## Current State
 
 - **Mode:** CHROME
-- **Version:** 1.0.92
+- **Version:** 1.0.94
 - **Orchestrator:** v22.0
 
 ## Project Config
@@ -12,12 +12,12 @@
 
 ## Active Work
 
-- Resolution of BUG-069: Icon tinting detail loss & Email scan trigger
+- Resolution of BUG-070: Email heuristic connectivity in detector.js
+- Resolution of BUG-069: Icon tinting detail preservation
 - Refined Activity Log: Clickable tags and conditional CSS colors (Gold Master)
-- Resolved BUG-068: Authority impersonation gift card scams
 
 ## Recent Changes
 
-- Fixed icon tinting to use `multiply` blend mode, preserving shield icon details.
-- Added `isEmailView` and sender data to email scan payload in `email-scanner.js`.
-- Verified v1.0.92 with 125/125 unit tests passed.
+- Fixed `detector.js` to correctly map email/urgency signals to severity scoring.
+- Preserved shield icon detail during tinting using `multiply` blend mode.
+- Verified v1.0.94 with 126/126 unit tests passed.
