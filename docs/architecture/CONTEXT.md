@@ -3,7 +3,7 @@
 ## Current State
 
 - **Mode:** CHROME
-- **Version:** 1.0.98
+- **Version:** 1.0.100
 - **Orchestrator:** v22.0
 
 ## Project Config
@@ -12,11 +12,11 @@
 
 ## Active Work
 
-- Status: Gold Master (Stable Release)
-- Technical Details Overlay verified.
+- Status: Gold Master (v1.0.100 Released)
+- Interactive reporting and diagnostics fully deployed.
 
 ## Recent Changes
 
-- Implemented interactive "Reason" button on high-risk overlay (BUG-072).
-- Formally deployed v1.0.98 after UI refactoring.
-- Re-verified all 128 regression tests.
+- Implemented Interactive Highlighting & False Positive Reporting (BUG-073).
+- Fixed hardcoded popup diagnostics to show email heuristics (BUG-074).
+- Deployed v1.0.100 with 131/131 passing unit tests.
