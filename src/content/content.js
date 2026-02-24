@@ -17,9 +17,10 @@ chrome.runtime.sendMessage({
     }
 });
 
-const OVERLAY_ID = 'scam-alert-overlay-root';
+// Export for unit testing
+export const OVERLAY_ID = 'scam-alert-overlay-root';
 
-function createOverlay(result) {
+export function createOverlay(result) {
     // Remove existing if any
     const existing = document.getElementById(OVERLAY_ID);
     if (existing) existing.remove();
@@ -78,14 +79,51 @@ function createOverlay(result) {
             border: 1px solid #dc2626;
             padding: 1rem;
             border-radius: 0.5rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .recommendation:hover {
+            background: rgba(220, 38, 38, 0.3);
+        }
+        .details {
+            display: none;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: left;
+            font-size: 0.875rem;
+            color: #d1d5db;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .details.visible {
+            display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+        .details ul {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+        .details li {
+            margin-bottom: 0.5rem;
         }
         .actions {
             display: flex;
             gap: 1rem;
             justify-content: center;
             flex-direction: column;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         button.primary {
             background: #ef4444;
@@ -125,6 +163,12 @@ function createOverlay(result) {
     const wrapper = document.createElement('div');
     wrapper.className = 'card';
 
+    // Format technical details from checks
+    const findings = Object.values(result?.checks || {})
+        .filter(c => c.flagged)
+        .map(c => `<li><strong>${c.title || 'Indicator'}:</strong> ${c.details || c.description}</li>`)
+        .join('');
+
     wrapper.innerHTML = `
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1.5rem;">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -134,8 +178,16 @@ function createOverlay(result) {
         <h1>High Risk Detected</h1>
         <p>We recommend leaving this page. Scam Alert blocked it because it matches known scam techniques.</p>
         
-        <div class="recommendation">
+        <div class="recommendation" id="btn-reason" title="Click for technical details">
             Reason: <strong>${result?.recommendations?.[0] || 'Suspicious Activity Detected'}</strong>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </div>
+
+        <div class="details" id="pnl-details">
+            <div style="font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.75rem; letter-spacing: 0.05em;">Technical Indicators</div>
+            <ul>
+                ${findings || '<li>Multiple pattern matches found. Technical details restricted in Lite mode.</li>'}
+            </ul>
         </div>
 
         <div class="actions">
@@ -149,6 +201,12 @@ function createOverlay(result) {
     // Handlers
     const btnBack = shadow.getElementById('btn-back');
     const btnProceed = shadow.getElementById('btn-proceed');
+    const btnReason = shadow.getElementById('btn-reason');
+    const pnlDetails = shadow.getElementById('pnl-details');
+
+    btnReason.addEventListener('click', () => {
+        pnlDetails.classList.toggle('visible');
+    });
 
     btnBack.addEventListener('click', () => {
         window.history.back();

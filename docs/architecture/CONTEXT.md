@@ -3,7 +3,7 @@
 ## Current State
 
 - **Mode:** CHROME
-- **Version:** 1.0.96
+- **Version:** 1.0.97
 - **Orchestrator:** v22.0
 
 ## Project Config
@@ -12,12 +12,11 @@
 
 ## Active Work
 
-- Resolution of BUG-071: ReferenceError in email-scanner.js
-- Resolution of BUG-070: Email heuristic connectivity in detector.js
-- Resolution of BUG-069: Icon tinting detail preservation
+- Status: Gold Master (Stable Release)
+- Final heuristics & icon preservation verified.
 
 ## Recent Changes
 
-- Fixed missing import of `parseSenderInfo` in `email-scanner.js`.
-- Fixed `detector.js` to correctly map email/urgency signals to severity scoring.
-- Verified v1.0.96 with 126/126 unit tests passed.
+- Formally deployed v1.0.97 after BUG-071 (ReferenceError) fix.
+- Re-verified all 126 regression tests.
+- Icon tinting detail preservation finalized.
