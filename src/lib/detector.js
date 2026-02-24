@@ -97,6 +97,24 @@ export async function scanUrl(url, options = {}, onProgress = null) {
             softSignals.push({ code: 'OBFUSCATION', message: 'URL Character Obfuscation' });
             reasons.push(patterns.checks.urlObfuscation);
         }
+
+        // Email & Urgency Signals (BUG-070 Connectivity Fix)
+        if (patterns.checks.emailScams?.flagged) {
+            const emailScam = patterns.checks.emailScams;
+            const isCritical = emailScam.severity === 'CRITICAL' || emailScam.severity === 'HIGH';
+
+            if (isCritical) {
+                hardSignals.push({ code: 'EMAIL_SCAM', message: emailScam.details });
+            } else {
+                softSignals.push({ code: 'EMAIL_SCAM_LOW', message: emailScam.details });
+            }
+            reasons.push(emailScam);
+        }
+
+        if (patterns.checks.urgencySignals?.flagged) {
+            softSignals.push({ code: 'URGENCY', message: patterns.checks.urgencySignals.details });
+            reasons.push(patterns.checks.urgencySignals);
+        }
     }
 
     // 3. Check PhishTank (Offline/Online)
