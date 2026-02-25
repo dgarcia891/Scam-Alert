@@ -29,29 +29,13 @@ describe('BUG-075: "Go back to safety" Button Fallback Navigation', () => {
         window.location = originalLocation;
     });
 
-    test('Button navigates to about:blank when history length is 1', () => {
-        createOverlay({
-            recommendations: ['Danger'],
-            checks: { phishing: { details: 'Phishing domain' } }
-        });
-
-        const root = document.getElementById('scam-alert-overlay-root');
-        const shadow = root.shadowRoot;
-        const btnBack = shadow.getElementById('btn-back');
-
-        btnBack.click();
-
-        // Should not call back because length <= 1
-        expect(window.history.back).not.toHaveBeenCalled();
-
-        // Advance timers to trigger the fallback
-        jest.advanceTimersByTime(200);
-
-        expect(window.location.href).toBe('about:blank');
-    });
-
-    test('Button attempts to use history.back if history length > 1', () => {
-        window.history.length = 5;
+    test('Button sends NAVIGATE_BACK message and fallbacks after 500ms', () => {
+        global.chrome = {
+            runtime: {
+                sendMessage: jest.fn(),
+                getURL: (path) => path
+            }
+        };
 
         createOverlay({
             recommendations: ['Danger'],
@@ -64,11 +48,13 @@ describe('BUG-075: "Go back to safety" Button Fallback Navigation', () => {
 
         btnBack.click();
 
-        // Should call back because length > 1
-        expect(window.history.back).toHaveBeenCalled();
+        // Should call background script
+        expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'navigate_back'
+        }));
 
-        // Advance timers to trigger the fallback
-        jest.advanceTimersByTime(200);
+        // Advance timers to trigger the fallback (500ms)
+        jest.advanceTimersByTime(501);
 
         expect(window.location.href).toBe('about:blank');
     });

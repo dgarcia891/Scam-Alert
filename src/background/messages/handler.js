@@ -31,6 +31,8 @@ export async function handleIncomingMessage(message, sender, context) {
             return handleReportScam(data, submitReport);
         case MessageTypes.REPORT_FALSE_POSITIVE:
             return handleReportFalsePositive(data, submitFalsePositive);
+        case MessageTypes.NAVIGATE_BACK:
+            return handleNavigateBack(sender);
         default:
             console.log('[Scam Alert] Unknown message type:', type);
             return { error: 'Unknown message type' };
@@ -169,6 +171,24 @@ async function handleReportFalsePositive(data, submitFalsePositive) {
     } catch (error) {
         console.error('[Scam Alert] False positive handler error:', error);
         return { success: false, error: error.message };
+    }
+}
+
+async function handleNavigateBack(sender) {
+    const tabId = sender.tab?.id;
+    if (!tabId) return { error: 'No tab ID' };
+
+    try {
+        // Use Chrome API for most robust navigation
+        if (chrome.tabs.goBack) {
+            await chrome.tabs.goBack(tabId);
+            return { success: true };
+        } else {
+            // Fallback for context without goBack
+            return { error: 'goBack API unavailable' };
+        }
+    } catch (error) {
+        return { error: error.message };
     }
 }
 

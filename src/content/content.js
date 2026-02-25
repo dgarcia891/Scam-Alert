@@ -209,13 +209,13 @@ export function createOverlay(result) {
     });
 
     btnBack.addEventListener('click', () => {
-        if (window.history.length > 1) {
-            window.history.back();
-        }
-        // Fallback: If back() fails (e.g. opened in new tab with no history)
+        // Use background script for more robust navigation (BUG-081)
+        chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
+
+        // Local fallback if message fails or history is empty
         setTimeout(() => {
             window.location.href = 'about:blank';
-        }, 150);
+        }, 500);
     });
 
     btnProceed.addEventListener('click', () => {
