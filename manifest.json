@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Scam Alert",
-  "version": "1.0.101",
+  "version": "1.0.102",
   "description": "Real-time scam and phishing protection. Stay safe online with automatic threat detection.",
   "permissions": [
     "storage",
