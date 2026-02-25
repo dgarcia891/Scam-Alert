@@ -208,14 +208,30 @@ export function createOverlay(result) {
         pnlDetails.classList.toggle('visible');
     });
 
-    btnBack.addEventListener('click', () => {
-        // Use background script for more robust navigation (BUG-081)
-        chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
-
-        // Local fallback if message fails or history is empty
-        setTimeout(() => {
+    btnBack.addEventListener('click', async () => {
+        // Set up the local fallback timer (e.g. if script connection is broken)
+        const fallbackTimer = setTimeout(() => {
             window.location.href = 'about:blank';
         }, 500);
+
+        try {
+            // Use background script for more robust navigation (BUG-081/BUG-082)
+            // Need to use the Promise-based API
+            const response = await chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
+
+            if (response && response.success) {
+                clearTimeout(fallbackTimer);
+                container.remove(); // Remove overlay so user can interact with the SPA
+
+                // If the history is genuinely empty, goBack does nothing, so we should still fallback
+                if (window.history.length <= 1) {
+                    window.location.href = 'about:blank';
+                }
+            }
+        } catch (e) {
+            // Allow fallback timer to execute
+            console.warn('[Scam Alert] Background navigation failed:', e);
+        }
     });
 
     btnProceed.addEventListener('click', () => {
