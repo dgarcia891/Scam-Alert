@@ -36,11 +36,31 @@ export function checkEmailScams(pageContent) {
         'director', 'president', 'principal', 'superintendent', 'manager', 'hr'
     ];
 
-    // Check direct sender OR forwarded block sender in body
-    const isFreeEmail = sender ? freeEmailProviders.some(b => sender.endsWith(b)) : freeEmailProviders.some(b => emailBody.includes(b));
-    const isOfficialName = officialKeywords.some(k => displayName.includes(k) || emailBody.includes(`from: ${k}`) || emailBody.includes(`to: ${k}`) || (emailBody.includes(k) && emailBody.includes('request')));
+    let senderFound = false;
 
-    if (isOfficialName && isFreeEmail) {
+    // A. Check direct sender
+    if (displayName && sender) {
+        const isFreeEmail = freeEmailProviders.some(b => sender.endsWith(b));
+        const isOfficialName = officialKeywords.some(k => displayName.includes(k));
+        if (isOfficialName && isFreeEmail) { senderFound = true; }
+    }
+
+    // B. Check forwarded blocks in body (more robust than generic include)
+    // Looking for patterns like "From: Father Ivan <scammer@gmail.com>"
+    if (!senderFound) {
+        // Regex to find "From: [Name] <[Email]>" or "From: [Email]" or "[Name] [Email]" blocks
+        const fromLines = emailBody.match(/(?:from|sent by):\s*([^<>\n]+)(?:<([^<>\n]+)>)?/gi) || [];
+        for (const line of fromLines) {
+            const hasOfficial = officialKeywords.some(k => line.includes(k));
+            const hasFreeProvider = freeEmailProviders.some(b => line.includes(b));
+            if (hasOfficial && hasFreeProvider) {
+                senderFound = true;
+                break;
+            }
+        }
+    }
+
+    if (senderFound) {
         indicators.push('Official name from personal email address');
         score += 40;
     }
