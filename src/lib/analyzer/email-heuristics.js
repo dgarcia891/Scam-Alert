@@ -20,7 +20,8 @@ export function checkEmailScams(pageContent) {
         'buy', 'purchase', 'scratch', 'photo', 'picture', 'code', 'front and back',
         'pick up', 'amount', 'how many', 'each card', 'i have them',
         'get reimbursed', 'reimbursed', 'amount of each', 'pick them up',
-        'get this done', 'done today', 'get it done'
+        'get this done', 'done today', 'get it done',
+        'do with them', 'let me know'
     ];
     const hasGiftCard = giftCardKeywords.some(k => emailBody.includes(k));
     const hasCommand = commandWords.some(k => emailBody.includes(k));
@@ -28,18 +29,20 @@ export function checkEmailScams(pageContent) {
     if (hasGiftCard && hasCommand) { indicators.push('Gift card payment request'); score += 50; }
 
     // 2. Sender Inconsistency: Official title from free email address
-    if (displayName && sender) {
-        const freeEmailProviders = ['gmail.com', 'outlook.com', 'yahoo.com', 'hotmail.com', 'icloud.com', 'aol.com', 'protonmail.com'];
-        const isFreeEmail = freeEmailProviders.some(b => sender.endsWith(b));
+    const freeEmailProviders = ['gmail.com', 'outlook.com', 'yahoo.com', 'hotmail.com', 'icloud.com', 'aol.com', 'protonmail.com'];
+    const officialKeywords = [
+        'official', 'support', 'admin', 'service', 'desk', 'ceo', 'security', 'alert',
+        'father', 'pastor', 'priest', 'bishop', 'reverend', 'deacon', 'minister',
+        'director', 'president', 'principal', 'superintendent', 'manager', 'hr'
+    ];
 
-        // Expanded: authority titles now include religious/organizational roles
-        const officialKeywords = [
-            'official', 'support', 'admin', 'service', 'desk', 'ceo', 'security', 'alert',
-            'father', 'pastor', 'priest', 'bishop', 'reverend', 'deacon', 'minister',
-            'director', 'president', 'principal', 'superintendent', 'manager', 'hr'
-        ];
-        const isOfficialName = officialKeywords.some(k => displayName.includes(k));
-        if (isOfficialName && isFreeEmail) { indicators.push('Official name from personal email address'); score += 40; }
+    // Check direct sender OR forwarded block sender in body
+    const isFreeEmail = sender ? freeEmailProviders.some(b => sender.endsWith(b)) : freeEmailProviders.some(b => emailBody.includes(b));
+    const isOfficialName = officialKeywords.some(k => displayName.includes(k) || emailBody.includes(`from: ${k}`) || emailBody.includes(`to: ${k}`) || (emailBody.includes(k) && emailBody.includes('request')));
+
+    if (isOfficialName && isFreeEmail) {
+        indicators.push('Official name from personal email address');
+        score += 40;
     }
 
     // 3. Invoice/Wire Fraud

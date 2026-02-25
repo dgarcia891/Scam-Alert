@@ -292,11 +292,10 @@ const Popup = () => {
                                         return null;
                                     })()}
                                     {(() => {
-                                        // Dynamic check for email heuristics
-                                        const isWebmail = currentUrl?.includes('mail.google.com') || currentUrl?.includes('outlook.live.com');
+                                        // Dynamic check for email heuristics MUST strictly rely on backend payloads, not URL assumptions 
                                         const hasEmailHeuristics = scanResults?.checks?.emailScams !== undefined || scanResults?.checks?.urgencySignals !== undefined;
 
-                                        if (isWebmail || hasEmailHeuristics) {
+                                        if (hasEmailHeuristics) {
                                             return (
                                                 <div className="flex gap-2 text-[11px] text-slate-400 leading-relaxed font-medium">
                                                     <div className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
