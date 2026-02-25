@@ -227,6 +227,12 @@ export function createOverlay(result) {
         // Otherwise just let the user see the current page
     });
 
+    // Prevent any clicks within the overlay from bubbling up to the native app (e.g., Gmail)
+    // which could trigger a DOM mutation, kicking off an infinite rescan loop (BUG-080).
+    container.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
     document.documentElement.appendChild(container);
 }
 

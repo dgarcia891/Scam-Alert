@@ -14,7 +14,7 @@ export async function handleIncomingMessage(message, sender, context) {
         case MessageTypes.GET_TAB_STATUS:
             return handleGetTabStatus(getCachedScan);
         case MessageTypes.GET_SCAN_RESULTS:
-            return handleGetScanResults(msgData, tabStateManager);
+            return handleGetScanResults(msgData, tabStateManager, getCachedScan);
         case MessageTypes.CONTEXT_DETECTED:
             return handleContextDetected(sender, msgData, tabStateManager);
         case MessageTypes.SCAN_CURRENT_TAB:
@@ -97,15 +97,38 @@ async function handleContextDetected(sender, data, tabStateManager) {
     return { success: true };
 }
 
-async function handleGetScanResults(data, tabStateManager) {
-    const tabId = data.tabId || data.payload?.tabId;
-    if (!tabId) return { error: 'No tabId' };
-    const state = tabStateManager.getTabState(tabId);
+async function handleGetScanResults(msgData, tabStateManager, getCachedScan) {
+    const state = tabStateManager.getTabState(msgData.tabId);
+    let results = state?.scanResults || null;
+
+    // BUG-059 / Email Desync: Handle MV3 ephemeral service worker state loss.
+    // If the SW went to sleep, tabStateManager (in-memory) is wiped, so popup defaults to SAFE
+    // while the Chrome-managed badge stays RED. Fall back to persistent storage.
+    if (!results) {
+        try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const tabUrl = tabs[0]?.url;
+            if (tabUrl) {
+                const cached = await getCachedScan(tabUrl);
+                if (cached) {
+                    results = cached;
+                    // Restore state memory
+                    tabStateManager.updateTabState(msgData.tabId, {
+                        url: tabUrl,
+                        scanResults: cached,
+                        lastScanned: Date.now()
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[Scam Alert] Cache fallback for tab state failed', e);
+        }
+    }
+
     return {
-        hasResults: !!state.scanResults,
-        results: state.scanResults,
-        lastScanned: state.lastScanned,
-        context: state.context
+        results: results,
+        url: state?.url || null,
+        context: state?.context || null
     };
 }
 
