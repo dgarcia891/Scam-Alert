@@ -11,7 +11,8 @@ import {
     checkUrlObfuscation,
     checkIPAddress,
     checkExcessiveSubdomains,
-    checkAdvancedTyposquatting
+    checkAdvancedTyposquatting,
+    checkSuspiciousPort
 } from './analyzer/url-engine.js';
 
 import {
@@ -32,11 +33,12 @@ export function analyzeUrl(url, pageContent = null, isPro = false, customPhrases
 
     const checks = {
         nonHttps: checkNonHttps(url),
-        suspiciousTLD: { flagged: isSuspiciousTLD, ...checkSuspiciousTLD(url) }, // Reuse for efficiency
+        suspiciousTLD: { flagged: isSuspiciousTLD, ...checkSuspiciousTLD(url) },
         typosquatting: checkTyposquatting(url),
         urlObfuscation: checkUrlObfuscation(url),
         ipAddress: checkIPAddress(url),
         excessiveSubdomains: checkExcessiveSubdomains(url),
+        suspiciousPort: checkSuspiciousPort(url),
         suspiciousKeywords: checkSuspiciousKeywords(url, isSuspiciousTLD),
 
         // Pro Features

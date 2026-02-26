@@ -210,3 +210,39 @@ export function checkAdvancedTyposquatting(url) {
         score: 0
     };
 }
+
+/**
+ * Checks for non-standard ports in URL, which are commonly used by scammers
+ * to host payloads and avoid simple domain/port blocklists.
+ * Standard ports: 80 (HTTP), 443 (HTTPS), 8080/8888 (common dev)
+ */
+export function checkSuspiciousPort(url) {
+    const ALLOWED_PORTS = new Set([80, 443, 8080, 8888]);
+    try {
+        const urlObj = new URL(url);
+        const port = urlObj.port; // Empty string if default port for the protocol
+
+        if (port !== '' && !ALLOWED_PORTS.has(parseInt(port, 10))) {
+            return {
+                title: 'check_suspicious_port',
+                description: 'Flags URLs using non-standard ports, a common technique to host payloads and bypass domain filters.',
+                flagged: true,
+                severity: 'MEDIUM',
+                details: `Non-standard port detected: :${port}`,
+                dataChecked: url,
+                score: 25
+            };
+        }
+    } catch (e) { /* ignore invalid URLs */ }
+
+    return {
+        title: 'check_suspicious_port',
+        description: 'Flags URLs using non-standard ports.',
+        flagged: false,
+        severity: 'NONE',
+        details: 'Standard port',
+        dataChecked: url,
+        score: 0
+    };
+}
+

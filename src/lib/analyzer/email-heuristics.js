@@ -83,6 +83,23 @@ export function checkEmailScams(pageContent) {
         score += 30;
     }
 
+    // 5. Vague Lure Detection: Nostalgia/Photos/Documents + External Link
+    // Attackers often use a disarming, friendly lure with an embedded malicious URL.
+    // e.g. "I've been meaning to send you these photos" + suspicious link
+    const vagueLureKeywords = [
+        'nostalgic', 'old photos', 'pictures i wanted to share', 'thought you might enjoy',
+        'remember when', 'i found this', 'been meaning to send', 'had to share this',
+        'check out this', 'look at this', 'wanted you to see this',
+        'voice message', 'voicemail', 'shared a document', 'review this document',
+    ];
+    const hasVagueLure = vagueLureKeywords.some(k => emailBody.includes(k));
+    const hasExternalLinks = pageContent?.links?.length > 0 || pageContent?.rawUrls?.length > 0;
+
+    if (hasVagueLure && hasExternalLinks) {
+        indicators.push('Vague social lure with external link');
+        score += 35;
+    }
+
     return {
         title: 'check_email_scams',
         description: 'Specific scanner for common email frauds like gift card and invoice scams.',
