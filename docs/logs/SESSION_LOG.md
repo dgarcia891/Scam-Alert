@@ -59,3 +59,30 @@ BLOCKERS:
 NEXT STEPS:
 • Awaiting new feature specifications from human stakeholder.
 ═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+HANDOFF: 2026-02-27T02:12:52.878Z
+═══════════════════════════════════════════════════
+CURRENT STATE:
+Branch: main
+Last Commit: 45cb154 fix: BUG-084 suppress email observer rescan while overlay is active
+
+GIT STATUS:
+M src/content/content.js
+M tests/regression/BUG-084.test.js
+
+COMPLETED:
+• Resolved BUG-083: Added detection for non-standard ports (:8443) and vague social lures ("nostalgic photos").
+• Deployed v1.0.107 (BUG-083 fix) and v1.0.108 (Initial BUG-084 observer guard).
+• Finalized BUG-084: Implemented MutationObserver guard in `mutation-observer.js` to suppress rescans when overlay is present.
+• Verified all 142 tests pass (fixed regressions in BUG-072/075/082 by removing aggressive propagation guards).
+
+IN PROGRESS:
+• Ready for final deployment of the polished BUG-084 fix.
+
+BLOCKERS:
+• None.
+
+NEXT STEPS:
+• Deploy v1.0.109 with the final verified BUG-084 fix.
+═══════════════════════════════════════════════════
