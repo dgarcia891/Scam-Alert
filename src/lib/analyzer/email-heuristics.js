@@ -2,6 +2,7 @@
  * Email Heuristic Engine
  * Handles detections specific to email clients like Gmail and Outlook.
  */
+import { getExplanation, INDICATOR_EXPLANATIONS } from './explanations.js';
 
 export function checkEmailScams(pageContent) {
     if (!pageContent || (!pageContent.isEmailView && !pageContent.emailContext)) {
@@ -100,15 +101,40 @@ export function checkEmailScams(pageContent) {
         score += 35;
     }
 
+    const keywordMatches = [
+        ...(giftCardKeywords.filter(k => emailBody.includes(k))),
+        ...(commandWords.filter(k => emailBody.includes(k))),
+        ...(financeKeywords.filter(k => emailBody.includes(k))),
+        ...(vagueLureKeywords.filter(k => emailBody.includes(k)))
+    ];
+
+    // Build visualIndicators: prefer high-level narrative labels so the tooltip
+    // is as informative as possible, then fall back to raw keyword matches.
+    const visualIndicators = [
+        // High-level labels (most informative)
+        ...indicators.map(label => ({
+            phrase: label,
+            ...(INDICATOR_EXPLANATIONS[label] || getExplanation(label))
+        })),
+        // Individual keyword matches that aren't already covered by a label
+        ...keywordMatches
+            .filter(k => !indicators.some(label =>
+                (INDICATOR_EXPLANATIONS[label]?.category || '') ===
+                (getExplanation(k)?.category || 'x')
+            ))
+            .map(phrase => ({ phrase, ...getExplanation(phrase) }))
+    ];
+
     return {
         title: 'check_email_scams',
         description: 'Specific scanner for common email frauds like gift card and invoice scams.',
         flagged: indicators.length > 0,
         severity: score >= 50 ? 'CRITICAL' : (score >= 30 ? 'HIGH' : 'NONE'),
         details: indicators.length > 0 ? `Email scam indicators: ${indicators.join(', ')}` : 'No email-specific scams detected',
-        indicators,
+        indicators: indicators,
+        visualIndicators,
         dataChecked: Math.max(emailBody.length, 1) > 1 ? emailBody.substring(0, 5000) : `Sender: ${sender}`,
-        matches: [...(giftCardKeywords.filter(k => emailBody.includes(k))), ...(commandWords.filter(k => emailBody.includes(k))), ...(financeKeywords.filter(k => emailBody.includes(k)))],
+        matches: keywordMatches,
         score
     };
 }

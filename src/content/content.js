@@ -1,6 +1,7 @@
 import { MessageTypes } from '../lib/messaging.js';
 import { detectContext, detectEmailMetadata } from '../lib/context-detector.js';
 import { scanUrl } from '../lib/detector.js';
+import { highlightDetections, removeHighlights } from './highlighter.js';
 
 console.log('[Scam Alert] Content script loaded (Hydra Guard)');
 
@@ -19,8 +20,17 @@ chrome.runtime.sendMessage({
 
 // Export for unit testing
 export const OVERLAY_ID = 'scam-alert-overlay-root';
+let warningAcknowledged = false;
+
+export function resetWarningAcknowledgement() {
+    warningAcknowledged = false;
+}
 
 export function createOverlay(result) {
+    if (warningAcknowledged) {
+        console.log('[Scam Alert] Warning overlay suppressed for this session (acknowledged).');
+        return;
+    }
     // Remove existing if any
     const existing = document.getElementById(OVERLAY_ID);
     if (existing) existing.remove();
@@ -227,6 +237,7 @@ export function createOverlay(result) {
             if (response && response.success) {
                 clearTimeout(fallbackTimer);
                 container.remove(); // Remove overlay so user can interact with the SPA
+                removeHighlights(); // Clean up any on-page highlights
 
                 // If the history is genuinely empty, goBack does nothing, so we should still fallback
                 if (window.history.length <= 1) {
@@ -244,6 +255,11 @@ export function createOverlay(result) {
         e.stopImmediatePropagation();
         e.preventDefault();
         container.remove();
+        warningAcknowledged = true;
+
+        // Highlight triggers after acknowledging risk (BUG-085-ENHANCE)
+        highlightDetections(result);
+
         if (result?.url) {
             // It was an intercepted link. Navigate to it directly.
             window.location.href = result.url;
@@ -261,6 +277,8 @@ export function createOverlay(result) {
 }
 
 function showDetectionToast(result) {
+    if (warningAcknowledged) return;
+
     // Only show for High/Medium if not already handled by overlay
     if (result.overallSeverity === 'SAFE' || result.overallSeverity === 'LOW') return;
 
@@ -325,12 +343,24 @@ function showDetectionToast(result) {
 // Listen for messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === MessageTypes.SHOW_WARNING) {
+        if (warningAcknowledged) {
+            highlightDetections(message.data.result);
+            sendResponse({ success: true, suppressed: true });
+            return;
+        }
         console.warn('[Scam Alert] Received warning command', message.data);
         createOverlay(message.data.result);
+        highlightDetections(message.data.result);
         sendResponse({ success: true });
     } else if (message.type === MessageTypes.SCAN_RESULT && message.data?.result) {
+        if (warningAcknowledged) {
+            highlightDetections(message.data.result);
+            sendResponse({ success: true, suppressed: true });
+            return;
+        }
         // Phase 25.0: Restored toast for High/Medium risks
         showDetectionToast(message.data.result);
+        highlightDetections(message.data.result);
         sendResponse({ success: true });
     } else if (message.type === 'OPEN_REPORT_MODAL') {
         const url = window.location.href;
@@ -368,6 +398,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
     } else if (message.type === 'HISTORY_BACK') {
         // Robust navigation fallback for popup
+        removeHighlights();
         window.history.back();
         sendResponse({ success: true });
     } else if (message.type === MessageTypes.EXECUTE_SCAN) {

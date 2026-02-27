@@ -3,6 +3,7 @@
  * Handles linguistic detection and page structure analysis.
  */
 import { findBestScamMatch } from './local-matching.js';
+import { getExplanation } from './explanations.js';
 
 export function checkSuspiciousKeywords(url, isSuspiciousTLD) {
     const keywords = ['login', 'signin', 'verify', 'update', 'secure', 'account', 'banking', 'suspend', 'locked', 'urgent', 'confirm', 'billing', 'payment', 'wallet', 'alert', 'warning'];
@@ -77,6 +78,7 @@ export function checkUrgencySignals(pageContent, customPhrases = null) {
             details: found.length >= 2 ? `High urgency language detected: ${found.join(', ')}` : `Suspicious urgency keyword: ${found[0]}`,
             dataChecked: found.join(', '),
             matches: found,
+            visualIndicators: found.map(phrase => ({ phrase, ...getExplanation(phrase) })),
             score: found.length >= 2 ? 30 : 15
         };
     }
@@ -119,7 +121,10 @@ export function analyzePageContent(pageContent, customPhrases = null) {
         flagged: foundPhrases.length > 0 || insecureForms.length > 0 || suspiciousLinks.length > 0,
         severity, scamPhrases: foundPhrases, hasPasswordInput: sensitiveForms.length > 0, insecureForms, suspiciousLinks,
         details: foundPhrases.length > 0 ? `Urgent wording: ${foundPhrases.join(', ')}` : 'No risky forms or links found.',
-        dataChecked: (title + ' ' + bodyText).substring(0, 5000), matches: foundPhrases, score
+        dataChecked: (title + ' ' + bodyText).substring(0, 5000),
+        matches: foundPhrases,
+        visualIndicators: foundPhrases.map(phrase => ({ phrase, ...getExplanation(phrase) })),
+        score
     };
 }
 

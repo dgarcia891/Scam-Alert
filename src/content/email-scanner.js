@@ -9,7 +9,7 @@ import { getEmailSettings, shouldShowPrompt } from './email/extraction-logic.js'
 import { showActivationPrompt } from './email/activation-prompt.js';
 import { showThreatDashboard } from './email/dashboard.js';
 import { setupEmailObserver } from './email/mutation-observer.js';
-import { applyInPageHighlighting } from './email/tooltip.js';
+import { highlightDetections } from './highlighter.js';
 import { extractEmailText, parseSenderInfo } from '../lib/scanner/parser.js';
 import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
@@ -80,7 +80,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
             const result = message.data.result;
             if (result.overallThreat || result.overallSeverity !== 'SAFE') {
                 try {
-                    applyInPageHighlighting(result);
+                    highlightDetections(result);
                     showThreatDashboard(result);
                 } catch (e) {
                     console.error('[Scam Alert] UI Orchestration failed:', e);
