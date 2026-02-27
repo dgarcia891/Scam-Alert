@@ -204,11 +204,17 @@ export function createOverlay(result) {
     const btnReason = shadow.getElementById('btn-reason');
     const pnlDetails = shadow.getElementById('pnl-details');
 
-    btnReason.addEventListener('click', () => {
+    btnReason.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
         pnlDetails.classList.toggle('visible');
     });
 
-    btnBack.addEventListener('click', async () => {
+    btnBack.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
         // Set up the local fallback timer (e.g. if script connection is broken)
         const fallbackTimer = setTimeout(() => {
             window.location.href = 'about:blank';
@@ -216,7 +222,6 @@ export function createOverlay(result) {
 
         try {
             // Use background script for more robust navigation (BUG-081/BUG-082)
-            // Need to use the Promise-based API
             const response = await chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
 
             if (response && response.success) {
@@ -234,17 +239,20 @@ export function createOverlay(result) {
         }
     });
 
-    btnProceed.addEventListener('click', () => {
+    btnProceed.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
         container.remove();
         if (result?.url) {
             // It was an intercepted link. Navigate to it directly.
             window.location.href = result.url;
         }
-        // Otherwise just let the user see the current page
     });
 
-    // Prevent any clicks within the overlay from bubbling up to the native app (e.g., Gmail)
-    // which could trigger a DOM mutation, kicking off an infinite rescan loop (BUG-080).
+    // BUG-080/BUG-084: Prevent any clicks within the overlay from bubbling up to
+    // the native app (e.g., Gmail) which could trigger a DOM mutation and
+    // lead to an infinite rescan loop.
     container.addEventListener('click', (e) => {
         e.stopPropagation();
     });
