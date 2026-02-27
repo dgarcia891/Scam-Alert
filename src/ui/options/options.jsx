@@ -158,13 +158,30 @@ const CheckDetailModal = ({ check, onClose }) => {
                     </div>
 
                     <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800/50">
-                        <span className="text-[10px] font-bold text-indigo-500/70 uppercase tracking-widest block mb-3 flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-indigo-400/70 uppercase tracking-widest block mb-3 flex items-center gap-2">
                             <Eye size={12} /> Evidence Collected
                         </span>
-                        <div className="font-mono text-[11px] text-slate-400 break-all bg-slate-900/50 p-3 rounded-lg border border-slate-800 select-all max-h-60 overflow-y-auto custom-scrollbar">
+                        <div className="font-mono text-[11px] text-slate-400 break-all bg-slate-900/50 p-3 rounded-lg border border-slate-800 select-all max-h-40 overflow-y-auto custom-scrollbar">
                             <HighlightedText text={dataChecked} matches={check.matches} severity={check.severity} />
                         </div>
                     </div>
+
+                    {check.visualIndicators && check.visualIndicators.length > 0 && (
+                        <div className="space-y-3">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Threat Intelligence</span>
+                            <div className="space-y-2">
+                                {check.visualIndicators.map((ind, i) => (
+                                    <div key={i} className="bg-indigo-500/5 border border-indigo-500/10 rounded-lg p-3">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-bold text-indigo-300">"{ind.phrase}"</span>
+                                            <Badge variant="info" className="text-[9px] py-0 px-1">{ind.category}</Badge>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 leading-relaxed italic">"{ind.reason}"</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {check.details && check.description !== check.details && (
                         <div className={clsx(
@@ -498,7 +515,10 @@ const Options = () => {
 
 const WhitelistSettings = () => {
     const [whitelist, setWhitelist] = useState([]);
-    const [settings, setSettings] = useState({ emailScanningEnabled: true });
+    const [settings, setSettings] = useState({
+        emailScanningEnabled: true,
+        highlightingEnabled: true
+    });
 
     useEffect(() => {
         const fetchSettings = () => {
@@ -547,6 +567,28 @@ const WhitelistSettings = () => {
                             <div className={clsx(
                                 "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
                                 settings.emailScanningEnabled ? "left-7" : "left-1"
+                            )} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
+                        <div className="flex flex-col">
+                            <span className="text-slate-200 font-semibold text-sm">Visual Threat Highlighting</span>
+                            <span className="text-slate-500 text-xs">Highlight suspicious phrases directly on the page with explanatory tooltips.</span>
+                        </div>
+                        <button
+                            onClick={() => {
+                                const updated = { ...settings, highlightingEnabled: !settings.highlightingEnabled };
+                                setSettings(updated);
+                                chrome.storage.local.set({ settings: updated });
+                            }}
+                            className={clsx(
+                                "w-12 h-6 rounded-full transition-colors relative",
+                                settings.highlightingEnabled || settings.highlightingEnabled === undefined ? "bg-indigo-600" : "bg-slate-700"
+                            )}>
+                            <div className={clsx(
+                                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                settings.highlightingEnabled || settings.highlightingEnabled === undefined ? "left-7" : "left-1"
                             )} />
                         </button>
                     </div>

@@ -258,7 +258,12 @@ export function createOverlay(result) {
         warningAcknowledged = true;
 
         // Highlight triggers after acknowledging risk (BUG-085-ENHANCE)
-        highlightDetections(result);
+        chrome.storage.local.get(['settings'], (result_settings) => {
+            const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
+            if (highlightingEnabled) {
+                highlightDetections(result);
+            }
+        });
 
         if (result?.url) {
             // It was an intercepted link. Navigate to it directly.
@@ -344,23 +349,43 @@ function showDetectionToast(result) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === MessageTypes.SHOW_WARNING) {
         if (warningAcknowledged) {
-            highlightDetections(message.data.result);
+            chrome.storage.local.get(['settings'], (result_settings) => {
+                const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
+                if (highlightingEnabled) {
+                    highlightDetections(message.data.result);
+                }
+            });
             sendResponse({ success: true, suppressed: true });
             return;
         }
         console.warn('[Scam Alert] Received warning command', message.data);
         createOverlay(message.data.result);
-        highlightDetections(message.data.result);
+        chrome.storage.local.get(['settings'], (result_settings) => {
+            const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
+            if (highlightingEnabled) {
+                highlightDetections(message.data.result);
+            }
+        });
         sendResponse({ success: true });
     } else if (message.type === MessageTypes.SCAN_RESULT && message.data?.result) {
         if (warningAcknowledged) {
-            highlightDetections(message.data.result);
+            chrome.storage.local.get(['settings'], (result_settings) => {
+                const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
+                if (highlightingEnabled) {
+                    highlightDetections(message.data.result);
+                }
+            });
             sendResponse({ success: true, suppressed: true });
             return;
         }
         // Phase 25.0: Restored toast for High/Medium risks
         showDetectionToast(message.data.result);
-        highlightDetections(message.data.result);
+        chrome.storage.local.get(['settings'], (result_settings) => {
+            const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
+            if (highlightingEnabled) {
+                highlightDetections(message.data.result);
+            }
+        });
         sendResponse({ success: true });
     } else if (message.type === 'OPEN_REPORT_MODAL') {
         const url = window.location.href;
