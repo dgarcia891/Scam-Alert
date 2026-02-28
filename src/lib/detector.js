@@ -17,6 +17,9 @@ import { createScanResult, SEVERITY, ACTION } from './scan-schema.js';
 import { determineSeverity } from './analysis/scoring.js';
 import { normalizeUrl, isBlocked } from './storage.js';
 import { extractHostname } from './analyzer/url-engine.js';
+import { verifyWithAI } from './ai-verifier.js';
+import { checkAICanRun, incrementRateCounters } from './ai-rate-limiter.js';
+import { recordAICall } from './ai-telemetry.js';
 
 /**
  * Main scan function that combines all detection methods
@@ -185,7 +188,67 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     }
 
     // 5. Determine Severity & Action
-    const severity = determineSeverity({ hard: hardSignals, soft: softSignals });
+    let severity = determineSeverity({ hard: hardSignals, soft: softSignals });
+
+    // 5.5 AI Second Opinion (FEAT-088)
+    let aiVerification = null;
+    if (options.aiEnabled && options.aiApiKey &&
+        severity !== SEVERITY.SAFE && severity !== SEVERITY.LOW) {
+
+        reportProgress(80, 'AI Second Opinion analysis...');
+        const rateCheck = await checkAICanRun(url, options);
+
+        if (rateCheck.allowed) {
+            const startTime = Date.now();
+            const phrases = (finalChecks.emailScams?.visualIndicators || []).map(i => i.phrase);
+
+            // withTimeout helper (inline)
+            const withTimeout = (promise, ms, fallback) => {
+                let timeoutId;
+                const timeout = new Promise(resolve => {
+                    timeoutId = setTimeout(() => resolve(fallback), ms);
+                });
+                return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+            };
+
+            const aiResult = await withTimeout(
+                verifyWithAI(url, { signals: [...hardSignals, ...softSignals], phrases }, { apiKey: options.aiApiKey }),
+                4000,
+                { verdict: 'CONFIRMED', reason: 'AI validation timed out.', confidence: 50 }
+            );
+            const latencyMs = Date.now() - startTime;
+
+            // Apply verdict (Safety First: Downgrade only if high confidence >= 70)
+            const prevSeverity = severity;
+            if (aiResult.verdict === 'DOWNGRADED' && aiResult.confidence >= 70) {
+                severity = SEVERITY.LOW;
+            } else if (aiResult.verdict === 'ESCALATED') {
+                severity = SEVERITY.CRITICAL;
+            }
+
+            // Record telemetry
+            await recordAICall({ url, localSeverity: prevSeverity, ...aiResult, latencyMs });
+            await incrementRateCounters(new URL(url).hostname);
+
+            aiVerification = {
+                title: 'ai_second_opinion',
+                description: 'Gemini AI cross-validated the local detection result.',
+                flagged: aiResult.verdict !== 'DOWNGRADED',
+                severity: severity,
+                details: aiResult.verdict === 'DOWNGRADED'
+                    ? `AI review suggests this is likely safe (confidence: ${aiResult.confidence}%). Stay cautious.`
+                    : aiResult.reason,
+                confidence: aiResult.confidence,
+                verdict: aiResult.verdict,
+                dataChecked: new URL(url).hostname
+            };
+
+            finalChecks.aiVerification = aiVerification;
+        } else {
+            console.log('[Detector] AI skipped:', rateCheck.reason);
+        }
+    }
+
     const action = determineAction(severity, pageContent);
 
     reportProgress(100, 'Scan complete');
@@ -197,7 +260,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         reasons,
         signals: { hard: hardSignals, soft: softSignals },
         checks: finalChecks,
-        meta: { sources }
+        meta: { sources, aiVerification }
     });
 }
 

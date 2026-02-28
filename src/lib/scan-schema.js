@@ -53,6 +53,7 @@ export function createScanResult({
         reasons,
         signals,
         checks,                      // Canonical checks object for the Activity Log UI
+        aiVerification: meta.aiVerification || null, // FEAT-088: Secondary AI signal
         meta: {
             timestamp: Date.now(),
             ...meta

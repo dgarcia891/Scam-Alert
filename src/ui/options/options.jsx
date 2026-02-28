@@ -199,8 +199,42 @@ const CheckDetailModal = ({ check, onClose }) => {
                                     : check.severity === 'MEDIUM'
                                         ? "text-amber-400"
                                         : "text-emerald-400"
-                            )}>Detection Result</span>
-                            <p className="text-xs text-slate-300">{check.details}</p>
+                            )}>{check.severity === 'SAFE' || check.severity === 'LOW' || check.severity === 'NONE' ? 'Verification' : 'Detection'} Result</span>
+                            <p className="text-[11px] text-slate-300 leading-relaxed">
+                                {check.details}
+                            </p>
+                        </div>
+                    )}
+
+                    {check.verdict && (
+                        <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="bg-indigo-500/20 text-indigo-300 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">AI Second Opinion</span>
+                                <span className={clsx(
+                                    "text-[10px] font-bold uppercase",
+                                    check.verdict === 'DOWNGRADED' ? "text-emerald-400" : "text-rose-400"
+                                )}>{check.verdict}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-relaxed italic mb-3">
+                                {check.details}
+                            </p>
+                            {check.verdict === 'DOWNGRADED' && (
+                                <button
+                                    onClick={() => {
+                                        const payload = {
+                                            url: dataChecked, // Use hostname from check
+                                            ruleId: 'ai_second_opinion',
+                                            issueType: 'false_negative',
+                                            severity: 'HIGH',
+                                            explanation: `AI downgraded a local detection (${check.verdict} with ${check.confidence}% confidence), but user reported it as suspicious.`
+                                        };
+                                        chrome.runtime.sendMessage({ type: 'SUBMIT_FALSE_POSITIVE', data: payload });
+                                        alert('Reported. Thank you for improving our AI accuracy.');
+                                    }}
+                                    className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors underline flex items-center gap-1">
+                                    Was this wrong? Report it
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -591,6 +625,80 @@ const WhitelistSettings = () => {
                                 settings.highlightingEnabled || settings.highlightingEnabled === undefined ? "left-7" : "left-1"
                             )} />
                         </button>
+                    </div>
+
+                    <div className="space-y-4 p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-200 font-semibold text-sm">AI Second Opinion</span>
+                                    <Badge variant="info" className="text-[9px] py-0 px-1">PRO</Badge>
+                                </div>
+                                <span className="text-slate-500 text-[11px] leading-tight mt-1 max-w-[300px]">
+                                    Use Gemini AI to cross-validate detections and reduce false alerts. No page body or passwords are sent.
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const updated = { ...settings, aiEnabled: !settings.aiEnabled };
+                                    setSettings(updated);
+                                    chrome.storage.local.set({ settings: updated });
+                                }}
+                                className={clsx(
+                                    "w-12 h-6 rounded-full transition-colors relative",
+                                    settings.aiEnabled ? "bg-indigo-600" : "bg-slate-700"
+                                )}>
+                                <div className={clsx(
+                                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                    settings.aiEnabled ? "left-7" : "left-1"
+                                )} />
+                            </button>
+                        </div>
+
+                        {settings.aiEnabled && (
+                            <div className="space-y-3 pt-2 border-t border-slate-700/30">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">Gemini API Key</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="password"
+                                            value={settings.aiApiKey || ''}
+                                            onChange={(e) => {
+                                                const updated = { ...settings, aiApiKey: e.target.value };
+                                                setSettings(updated);
+                                                chrome.storage.local.set({ settings: updated });
+                                            }}
+                                            placeholder="Enter your API key..."
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-indigo-500 transition-colors pr-20"
+                                        />
+                                        <button
+                                            onClick={() => window.open('https://aistudio.google.com/app/apikey', '_blank')}
+                                            className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
+                                            GET KEY ↗
+                                        </button>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 mt-1 block italic text-center">Your key is stored locally and never shared.</span>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex flex-col">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Daily Call Ceiling</label>
+                                        <span className="text-[9px] text-slate-600">Max AI validations per day</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        value={settings.aiDailyCeiling || 50}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 0;
+                                            const updated = { ...settings, aiDailyCeiling: val };
+                                            setSettings(updated);
+                                            chrome.storage.local.set({ settings: updated });
+                                        }}
+                                        className="w-16 bg-slate-900/50 border border-slate-700 rounded-lg py-1 px-2 text-sm text-slate-300 text-center"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">

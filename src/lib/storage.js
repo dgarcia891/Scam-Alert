@@ -62,10 +62,20 @@ export async function getSettings() {
         licenseKey: '',
         planType: 'free', // 'free' | 'pro'
         emailScanningEnabled: true,
-        emailPromptDisabled: false
+        emailPromptDisabled: false,
+        aiEnabled: true,
+        aiApiKey: '',
+        aiDailyCeiling: 50
     };
 
-    return { ...defaults, ...(result[STORAGE_KEYS.SETTINGS] || {}) };
+    const merged = { ...defaults, ...(result[STORAGE_KEYS.SETTINGS] || {}) };
+
+    // FEAT-088: Default ON for Pro, OFF for Free if not explicitly set
+    if (result[STORAGE_KEYS.SETTINGS]?.aiEnabled === undefined) {
+        merged.aiEnabled = merged.planType === 'pro';
+    }
+
+    return merged;
 }
 
 /**

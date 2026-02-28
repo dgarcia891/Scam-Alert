@@ -36,7 +36,10 @@ describe('Storage Service', () => {
                 licenseKey: '',
                 planType: 'free',
                 emailScanningEnabled: true,
-                emailPromptDisabled: false
+                emailPromptDisabled: false,
+                aiEnabled: false,
+                aiApiKey: '',
+                aiDailyCeiling: 50
             });
         });
 
@@ -60,7 +63,10 @@ describe('Storage Service', () => {
                 licenseKey: '',
                 planType: 'free',
                 emailScanningEnabled: true,
-                emailPromptDisabled: false
+                emailPromptDisabled: false,
+                aiEnabled: false,
+                aiApiKey: '',
+                aiDailyCeiling: 50
             });
         });
     });

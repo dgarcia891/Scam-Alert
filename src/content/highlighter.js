@@ -147,8 +147,8 @@ function _applyHighlight(indicator) {
             Object.assign(mark.style, {
                 all: 'unset',
                 display: 'inline',          // `all:unset` removes display — restore it
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                borderBottom: '2px dashed #ef4444',
+                backgroundColor: 'rgba(220, 38, 38, 0.12)', // red-600
+                borderBottom: '2px dashed #dc2626',         // red-600
                 borderRadius: '2px',
                 color: 'inherit',
                 cursor: 'help',
@@ -174,16 +174,23 @@ function _applyHighlight(indicator) {
 }
 
 function _showTooltip(event, { phrase, category, reason }) {
+    // If we're already showing a tooltip for this specific element, ignore
+    if (activeTooltip && activeTooltip.dataset.phrase === phrase && activeTooltip.dataset.target === event.target.textContent) {
+        return;
+    }
+
     _hideTooltip();
 
     const tooltip = document.createElement('div');
     tooltip.id = TOOLTIP_ID;
+    tooltip.dataset.phrase = phrase;
+    tooltip.dataset.target = event.target.textContent;
 
     // Base styles — position will be set after layout measurement
     Object.assign(tooltip.style, {
         position: 'fixed',
         zIndex: '2147483647',
-        background: 'linear-gradient(145deg, #450a0a, #3b0808)',
+        background: 'linear-gradient(145deg, #7f1d1d, #450a0a)', // Deep red (red-900)
         color: 'white',
         padding: '12px 16px',
         borderRadius: '10px',
@@ -191,8 +198,8 @@ function _showTooltip(event, { phrase, category, reason }) {
         fontSize: '13px',
         lineHeight: '1.5',
         maxWidth: '270px',
-        boxShadow: '0 12px 20px -4px rgba(0,0,0,0.6), 0 0 0 1px rgba(153,27,27,0.6)',
-        border: '1px solid rgba(239,68,68,0.35)',
+        boxShadow: '0 12px 20px -4px rgba(0,0,0,0.7), 0 0 0 1px rgba(185,28,28,0.5)',
+        border: '1px solid rgba(239,68,68,0.4)',
         pointerEvents: 'none',
         opacity: '0',           // Start invisible for measurement
         animation: 'sa-tooltip-in 0.2s ease-out forwards'
@@ -239,11 +246,12 @@ function _showTooltip(event, { phrase, category, reason }) {
     const targetRect = event.target.getBoundingClientRect();
     const ttRect = tooltip.getBoundingClientRect();
 
-    let top = targetRect.top - ttRect.height - 10;
+    // Increase gap to 14px to move it further from the cursor hotspot
+    let top = targetRect.top - ttRect.height - 14;
     let left = targetRect.left + (targetRect.width / 2) - (ttRect.width / 2);
 
     // Flip below if not enough room above
-    if (top < 10) top = targetRect.bottom + 10;
+    if (top < 10) top = targetRect.bottom + 14;
     // Clamp to viewport edges
     if (left < 10) left = 10;
     if (left + ttRect.width > window.innerWidth - 10) {

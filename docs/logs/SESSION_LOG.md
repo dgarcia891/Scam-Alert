@@ -86,3 +86,48 @@ BLOCKERS:
 NEXT STEPS:
 • Deploy v1.0.109 with the final verified BUG-084 fix.
 ═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+HANDOFF: 2026-02-28T17:14:44.846Z
+═══════════════════════════════════════════════════
+CURRENT STATE:
+Branch: main
+Last Commit: a6d0493 feat: full integration of visual highlights into settings and modal
+
+GIT STATUS:
+M docs/BUG_LOG.md
+ M docs/architecture/CONTEXT.md
+ M src/content/highlighter.js
+ M src/lib/detector.js
+ M src/lib/scan-schema.js
+ M src/lib/storage.js
+ M src/ui/options/options.jsx
+?? src/lib/ai-rate-limiter.js
+?? src/lib/ai-telemetry.js
+?? src/lib/ai-verifier.js
+?? tests/unit/BUG-087.test.js
+?? tests/unit/ai-rate-limiter.test.js
+?? tests/unit/ai-verifier.adversarial.test.js
+?? tests/unit/ai-verifier.test.js
+
+COMPLETED:
+• Implemented **FEAT-086: Visual Highlighting**. Suspicious phrases are now highlighted in red on the page with hoverable tooltips explaining the risk.
+• Resolved **BUG-085**: Suppressed recurring warning overlays within a session after user acknowledgment.
+• Resolved **BUG-087**: Fixed tooltip blinking and corrected highlight color to vibrant red (#dc2626).
+• Implemented **FEAT-088: AI Second Opinion**. Integrated Google Gemini (Flash 1.5) to cross-validate MEDIUM+ detections.
+• Added **AI Rate Limiting**: Implemented domain cooldowns and global daily ceilings to control API usage.
+• Added **AI Telemetry**: Implemented local performance and verdict tracking for the dashboard.
+• Updated **Options UI**: Added AI toggle, API key management, and detailed verification logs in the Activity modal.
+• Verified all **18 new tests** (including adversarial prompt injection guards) and existing test suite pass.
+
+IN PROGRESS:
+• Finished AI Second Opinion implementation; ready for comprehensive field testing.
+
+BLOCKERS:
+• None.
+
+NEXT STEPS:
+• Roll out v1.0.111 with AI Verification features.
+• Monitor "Report Wrong Decision" feedback to tune Gemini prompt weights.
+• Expand "Threat Intelligence" explanations for TLD-based signals.
+═══════════════════════════════════════════════════
