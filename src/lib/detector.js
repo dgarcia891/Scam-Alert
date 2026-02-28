@@ -16,6 +16,7 @@ import { getMergedScamPhrases } from './database.js';
 import { createScanResult, SEVERITY, ACTION } from './scan-schema.js';
 import { determineSeverity } from './analysis/scoring.js';
 import { normalizeUrl, isBlocked } from './storage.js';
+import { extractHostname } from './analyzer/url-engine.js';
 
 /**
  * Main scan function that combines all detection methods

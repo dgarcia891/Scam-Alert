@@ -196,6 +196,92 @@ function showInlineInterceptionModal(form, { headline, reason, severity }) {
 }
 
 /**
+ * Show full-page warning overlay for dangerous sites
+ * @param {Object} result - Scan result with severity, checks, recommendations
+ */
+function showWarningOverlay(result) {
+  if (document.getElementById('scam-alert-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'scam-alert-overlay';
+
+  overlay.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
+    z-index: 2147483647;
+    display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: white;
+  `;
+
+  const severity = result?.severity || result?.overallSeverity || 'HIGH';
+  const reason = result?.reasons?.[0]?.message || result?.recommendations?.[0] || 'Suspicious Activity Detected';
+
+  // Build findings list from flagged checks
+  const findings = Object.values(result?.checks || {})
+    .filter(c => c.flagged)
+    .map(c => `<li><strong>${c.title || 'Indicator'}:</strong> ${c.details || c.description}</li>`)
+    .join('');
+
+  overlay.innerHTML = `
+    <div style="background: rgba(0,0,0,0.4); padding: 3rem; border-radius: 1.5rem;
+                max-width: 600px; text-align: center;
+                box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+      <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+      <h1 style="font-size: 2rem; font-weight: 800; color: #fca5a5; margin: 0 0 1rem 0;">
+        ${severity === 'CRITICAL' ? 'Critical Threat Detected' : 'High Risk Detected'}
+      </h1>
+      <p style="font-size: 1.1rem; line-height: 1.6; color: #e5e7eb; margin-bottom: 1.5rem;">
+        We recommend leaving this page. Scam Alert blocked it because it matches known scam techniques.
+      </p>
+      <div style="background: rgba(220,38,38,0.2); border: 1px solid #dc2626;
+                  padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;
+                  font-weight: 500; cursor: pointer;" id="sa-overlay-reason">
+        Reason: <strong>${reason}</strong>
+      </div>
+      <div id="sa-overlay-details" style="display: none; background: rgba(0,0,0,0.3);
+                  border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;
+                  text-align: left; font-size: 0.875rem; color: #d1d5db;">
+        <ul style="margin: 0; padding-left: 1.25rem;">
+          ${findings || '<li>Multiple pattern matches found.</li>'}
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
+        <button id="sa-overlay-back" style="background: #ef4444; color: white; border: none;
+                    padding: 1rem 2rem; font-size: 1.1rem; font-weight: 600;
+                    border-radius: 0.75rem; cursor: pointer;">Go back to safety</button>
+        <button id="sa-overlay-proceed" style="background: transparent; border: none;
+                    color: #9ca3af; text-decoration: underline; cursor: pointer;
+                    font-size: 0.875rem;">I understand the risks, proceed anyway</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Toggle technical details
+  document.getElementById('sa-overlay-reason').onclick = () => {
+    const details = document.getElementById('sa-overlay-details');
+    details.style.display = details.style.display === 'none' ? 'block' : 'none';
+  };
+
+  // Go back
+  document.getElementById('sa-overlay-back').onclick = () => {
+    overlay.remove();
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = 'about:blank';
+    }
+  };
+
+  // Proceed anyway
+  document.getElementById('sa-overlay-proceed').onclick = () => {
+    overlay.remove();
+  };
+}
+
+/**
  * Hide warning overlay
  */
 function hideWarningOverlay() {

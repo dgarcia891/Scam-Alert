@@ -65,6 +65,12 @@ beforeAll(async () => {
         analyzeUrl: mockAnalyzeUrl
     }));
 
+    jest.unstable_mockModule(src('analyzer/url-engine.js'), () => ({
+        extractHostname: jest.fn((url) => {
+            try { return new URL(url).hostname; } catch { return url; }
+        })
+    }));
+
     const detector = await import('../../src/lib/detector.js');
     scanUrl = detector.scanUrl;
     determineAction = detector.determineAction;
@@ -345,12 +351,10 @@ describe('scanUrl — PhishTank Integration', () => {
         expect(result.signals.hard).toEqual(
             expect.arrayContaining([expect.objectContaining({ code: 'REPUTATION_HIT', source: 'PhishTank' })])
         );
-        // BUG: extractHostname is not imported in detector.js, so the
-        // finalChecks.phishTank assignment throws a ReferenceError inside the
-        // try block, causing checks.phishTank to never be set.
-        // Uncomment these once the bug is fixed:
-        // expect(result.checks.phishTank).toBeDefined();
-        // expect(result.checks.phishTank.flagged).toBe(true);
+        // BUG FIXED: extractHostname is now imported in detector.js,
+        // so finalChecks.phishTank is set correctly.
+        expect(result.checks.phishTank).toBeDefined();
+        expect(result.checks.phishTank.flagged).toBe(true);
     });
 
     test('preferOffline uses checkUrlOffline', async () => {
@@ -393,10 +397,10 @@ describe('scanUrl — Google Safe Browsing Integration', () => {
         expect(result.signals.hard).toEqual(
             expect.arrayContaining([expect.objectContaining({ code: 'REPUTATION_HIT', source: 'Google Safe Browsing' })])
         );
-        // BUG: extractHostname is not imported in detector.js — same issue as PhishTank.
-        // Uncomment once fixed:
-        // expect(result.checks.googleSafeBrowsing).toBeDefined();
-        // expect(result.checks.googleSafeBrowsing.flagged).toBe(true);
+        // BUG FIXED: extractHostname is now imported in detector.js,
+        // so finalChecks.googleSafeBrowsing is set correctly.
+        expect(result.checks.googleSafeBrowsing).toBeDefined();
+        expect(result.checks.googleSafeBrowsing.flagged).toBe(true);
     });
 
     test('GSB skipped silently when API key is missing', async () => {

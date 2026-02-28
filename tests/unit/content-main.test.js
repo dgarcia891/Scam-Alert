@@ -126,13 +126,12 @@ describe('Message listener routing', () => {
     expect(sendResponse).toHaveBeenCalledWith({ success: true });
   });
 
-  test('SHOW_WARNING calls showWarningOverlay (not defined — source bug)', () => {
-    // NOTE: showWarningOverlay() is called on line 90 of content-main.js
-    // but is never defined in the file. This causes a ReferenceError at runtime.
-    // Documenting as a source bug — similar to the extractHostname bug in detector.js.
-    expect(() => {
-      sendMessage('show_warning', { result: { severity: 'HIGH' } });
-    }).toThrow(ReferenceError);
+  test('SHOW_WARNING creates warning overlay and responds success', () => {
+    const sendResponse = sendMessage('show_warning', {
+      result: { severity: 'HIGH', reasons: [{ message: 'Phishing detected' }] }
+    });
+    expect(sendResponse).toHaveBeenCalledWith({ success: true });
+    expect(document.getElementById('scam-alert-overlay')).not.toBeNull();
   });
 
   test('HIDE_WARNING removes overlay and responds success', () => {
@@ -451,14 +450,110 @@ describe('showInlineInterceptionModal', () => {
 /* ════════════════════════════════════════════════════════════════════════
  *  showWarningOverlay (via SHOW_WARNING message)
  * ════════════════════════════════════════════════════════════════════ */
-describe('showWarningOverlay — source bug', () => {
-  test('showWarningOverlay is referenced but undefined in content-main.js', () => {
-    // This documents a real bug: the SHOW_WARNING handler on line 90 calls
-    // showWarningOverlay(data.result) but the function is never defined.
-    // At runtime this silently fails because of the try/catch-less message handler.
-    // content.js (the ESM version) has createOverlay() which is the intended implementation.
-    expect(() => {
-      sendMessage('show_warning', { result: { severity: 'CRITICAL' } });
-    }).toThrow(ReferenceError);
+describe('showWarningOverlay', () => {
+  test('creates full-page overlay with correct ID', () => {
+    sendMessage('show_warning', {
+      result: { severity: 'CRITICAL', reasons: [{ message: 'Known phishing' }] }
+    });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay).not.toBeNull();
+    expect(overlay.style.zIndex).toBe('2147483647');
+  });
+
+  test('does not create duplicate overlays', () => {
+    sendMessage('show_warning', { result: { severity: 'HIGH' } });
+    sendMessage('show_warning', { result: { severity: 'HIGH' } });
+    const overlays = document.querySelectorAll('#scam-alert-overlay');
+    expect(overlays.length).toBe(1);
+  });
+
+  test('shows CRITICAL title for CRITICAL severity', () => {
+    sendMessage('show_warning', {
+      result: { severity: 'CRITICAL', checks: {}, reasons: [{ message: 'test' }] }
+    });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay.textContent).toContain('Critical Threat Detected');
+  });
+
+  test('shows HIGH title for HIGH severity', () => {
+    sendMessage('show_warning', {
+      result: { severity: 'HIGH', checks: {}, reasons: [{ message: 'test' }] }
+    });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay.textContent).toContain('High Risk Detected');
+  });
+
+  test('displays reason from scan result', () => {
+    sendMessage('show_warning', {
+      result: { severity: 'HIGH', reasons: [{ message: 'Typosquatting paypal.com' }] }
+    });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay.textContent).toContain('Typosquatting paypal.com');
+  });
+
+  test('fallback reason when no reasons provided', () => {
+    sendMessage('show_warning', { result: { severity: 'HIGH' } });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay.textContent).toContain('Suspicious Activity Detected');
+  });
+
+  test('displays flagged checks as findings', () => {
+    sendMessage('show_warning', {
+      result: {
+        severity: 'HIGH',
+        checks: {
+          typosquatting: { flagged: true, title: 'Typosquatting', details: 'Looks like paypal.com' },
+          nonHttps: { flagged: false, title: 'HTTPS', details: 'Secure' }
+        },
+        reasons: [{ message: 'test' }]
+      }
+    });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay.textContent).toContain('Typosquatting');
+    expect(overlay.textContent).toContain('Looks like paypal.com');
+  });
+
+  test('go back button removes overlay', () => {
+    sendMessage('show_warning', { result: { severity: 'HIGH' } });
+    const backBtn = document.getElementById('sa-overlay-back');
+    expect(backBtn).not.toBeNull();
+    backBtn.click();
+    expect(document.getElementById('scam-alert-overlay')).toBeNull();
+  });
+
+  test('proceed button removes overlay', () => {
+    sendMessage('show_warning', { result: { severity: 'HIGH' } });
+    const proceedBtn = document.getElementById('sa-overlay-proceed');
+    expect(proceedBtn).not.toBeNull();
+    proceedBtn.click();
+    expect(document.getElementById('scam-alert-overlay')).toBeNull();
+  });
+
+  test('reason toggle shows/hides details panel', () => {
+    sendMessage('show_warning', {
+      result: { severity: 'HIGH', checks: { a: { flagged: true, title: 'A', details: 'Detail A' } } }
+    });
+    const reasonBtn = document.getElementById('sa-overlay-reason');
+    const detailsPanel = document.getElementById('sa-overlay-details');
+
+    // Initially hidden
+    expect(detailsPanel.style.display).toBe('none');
+
+    // Click to show
+    reasonBtn.click();
+    expect(detailsPanel.style.display).toBe('block');
+
+    // Click again to hide
+    reasonBtn.click();
+    expect(detailsPanel.style.display).toBe('none');
+  });
+
+  test('uses overallSeverity when severity is not set', () => {
+    sendMessage('show_warning', {
+      result: { overallSeverity: 'CRITICAL', reasons: [] }
+    });
+    const overlay = document.getElementById('scam-alert-overlay');
+    expect(overlay).not.toBeNull();
+    expect(overlay.textContent).toContain('Critical Threat Detected');
   });
 });
