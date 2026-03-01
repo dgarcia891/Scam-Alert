@@ -17,7 +17,7 @@ const {
   findBestScamMatch,
   generateNgrams
 } = await import(
-  new URL('../../src/lib/analyzer/local-matching.js', import.meta.url).pathname
+  new URL('../../src/lib/analyzer/local-matching.js', import.meta.url)
 );
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -59,8 +59,8 @@ describe('tokenize', () => {
  * ════════════════════════════════════════════════════════════════════ */
 describe('calculateSimilarity', () => {
   test('returns 100 when all scam-phrase tokens appear in page text', () => {
-    const page  = 'You have won a special prize today';
-    const scam  = 'you have won a prize';
+    const page = 'You have won a special prize today';
+    const scam = 'you have won a prize';
     expect(calculateSimilarity(page, scam)).toBe(100);
   });
 
