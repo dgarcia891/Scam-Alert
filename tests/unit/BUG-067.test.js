@@ -1,5 +1,5 @@
 
-import { checkIPAddress } from '../../src/lib/analyzer/url-engine.js';
+import { checkIPAddress } from '../../extension/src/lib/analyzer/url-engine.js';
 
 describe('BUG-067: UI Color Regression (Logical)', () => {
     test('checkIPAddress should return severity NONE for a legitimate domain', () => {

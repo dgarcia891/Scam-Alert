@@ -1,4 +1,4 @@
-import { detectContext, detectEmailMetadata } from '../../src/lib/context-detector.js';
+import { detectContext, detectEmailMetadata } from '../../extension/src/lib/context-detector.js';
 
 describe('Context Detector', () => {
     beforeEach(() => {

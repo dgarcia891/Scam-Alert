@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { createOverlay } from '../../src/content/content.js';
+import { createOverlay } from '../../extension/src/content/content.js';
 
 describe('BUG-082: SPA Back Navigation Fallback', () => {
     let mockSendMessage;

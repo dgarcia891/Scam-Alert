@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { MessageTypes } from '../../src/lib/messaging.js';
-import { handleIncomingMessage } from '../../src/background/messages/handler.js';
+import { MessageTypes } from '../../extension/src/lib/messaging.js';
+import { handleIncomingMessage } from '../../extension/src/background/messages/handler.js';
 
 describe('BUG-081 Regression: Robust Navigation', () => {
     let mockGoBack;

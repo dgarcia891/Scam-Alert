@@ -22,14 +22,18 @@ import {
 } from './analyzer/phrase-engine.js';
 
 import { checkEmailScams } from './analyzer/email-heuristics.js';
-import { matchRegex } from './analysis/regex-engine.js';
 import { calculateRiskScore, determineRiskLevel } from './analysis/scoring.js';
+import { getMergedScamPhrases, getMergedSuspiciousKeywords } from './database.js';
 
 /**
  * Analyze URL for suspicious patterns
  */
-export function analyzeUrl(url, pageContent = null, isPro = false, customPhrases = null) {
+export async function analyzeUrl(url, pageContent = null, isPro = false, customPhrases = null) {
     const isSuspiciousTLD = checkSuspiciousTLD(url).flagged;
+
+    // Fetch dynamic keywords and phrases
+    const dynamicKeywords = await getMergedSuspiciousKeywords();
+    const dynamicPhrases = customPhrases || await getMergedScamPhrases();
 
     const checks = {
         nonHttps: checkNonHttps(url),
@@ -39,7 +43,7 @@ export function analyzeUrl(url, pageContent = null, isPro = false, customPhrases
         ipAddress: checkIPAddress(url),
         excessiveSubdomains: checkExcessiveSubdomains(url),
         suspiciousPort: checkSuspiciousPort(url),
-        suspiciousKeywords: checkSuspiciousKeywords(url, isSuspiciousTLD),
+        suspiciousKeywords: checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent, dynamicKeywords),
 
         // Pro Features
         advancedTyposquatting: { ...checkAdvancedTyposquatting(url), isProFeature: true },
@@ -48,7 +52,7 @@ export function analyzeUrl(url, pageContent = null, isPro = false, customPhrases
     };
 
     if (pageContent) {
-        checks.contentAnalysis = analyzePageContent(pageContent, customPhrases);
+        checks.contentAnalysis = analyzePageContent(pageContent, dynamicPhrases);
     }
 
     // Convert checks to signals for the new scoring engine

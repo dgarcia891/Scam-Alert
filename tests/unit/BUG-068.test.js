@@ -1,5 +1,5 @@
 
-import { checkEmailScams } from '../../src/lib/analyzer/email-heuristics.js';
+import { checkEmailScams } from '../../extension/src/lib/analyzer/email-heuristics.js';
 
 // The exact text from the reported scam email (Jesse gift card email scam)
 const SCAM_BODY = `

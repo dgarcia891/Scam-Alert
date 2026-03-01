@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { calculateSimilarity, findBestScamMatch } from '../../src/lib/analyzer/local-matching.js';
+import { calculateSimilarity, findBestScamMatch } from '../../extension/src/lib/analyzer/local-matching.js';
 
 describe('Hydra Guard - Local Matching', () => {
 

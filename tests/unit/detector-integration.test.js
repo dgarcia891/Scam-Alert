@@ -7,13 +7,13 @@
 import { describe, test, expect, jest, beforeEach, beforeAll } from '@jest/globals';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
-import { SEVERITY, ACTION } from '../../src/lib/scan-schema.js';
+import { SEVERITY, ACTION } from '../../extension/src/lib/scan-schema.js';
 
 // Resolve absolute paths so jest.unstable_mockModule works regardless of
 // which file Jest considers the "caller" (avoids the setup.js resolution bug).
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
-const src = (rel) => resolve(__dirname, '../../src/lib', rel);
+const src = (rel) => resolve(__dirname, '../../extension/src/lib', rel);
 
 let scanUrl, determineAction, getCachedResult, cacheResult, scanUrlWithCache;
 let mockIsBlocked, mockCheckUrl, mockCheckUrlWithPhishTank, mockCheckUrlOffline;
@@ -71,7 +71,7 @@ beforeAll(async () => {
         })
     }));
 
-    const detector = await import('../../src/lib/detector.js');
+    const detector = await import('../../extension/src/lib/detector.js');
     scanUrl = detector.scanUrl;
     determineAction = detector.determineAction;
     getCachedResult = detector.getCachedResult;
@@ -465,27 +465,27 @@ describe('scanUrl — Compound Signals', () => {
 // ─── determineAction Unit Tests ─────────────────────────────────────────────
 
 describe('determineAction', () => {
-    test('CRITICAL → WARN_OVERLAY', () => {
+    test('CRITICAL → WARN_OVERLAY', async () => {
         expect(determineAction(SEVERITY.CRITICAL, null)).toBe(ACTION.WARN_OVERLAY);
     });
 
-    test('HIGH → WARN_OVERLAY', () => {
+    test('HIGH → WARN_OVERLAY', async () => {
         expect(determineAction(SEVERITY.HIGH, null)).toBe(ACTION.WARN_OVERLAY);
     });
 
-    test('MEDIUM without forms → WARN_POPUP', () => {
+    test('MEDIUM without forms → WARN_POPUP', async () => {
         expect(determineAction(SEVERITY.MEDIUM, null)).toBe(ACTION.WARN_POPUP);
     });
 
-    test('MEDIUM with sensitive forms → WARN_OVERLAY (escalation)', () => {
+    test('MEDIUM with sensitive forms → WARN_OVERLAY (escalation)', async () => {
         expect(determineAction(SEVERITY.MEDIUM, { forms: [{ type: 'password' }] })).toBe(ACTION.WARN_OVERLAY);
     });
 
-    test('LOW → WARN_POPUP', () => {
+    test('LOW → WARN_POPUP', async () => {
         expect(determineAction(SEVERITY.LOW, null)).toBe(ACTION.WARN_POPUP);
     });
 
-    test('SAFE → ALLOW', () => {
+    test('SAFE → ALLOW', async () => {
         expect(determineAction(SEVERITY.SAFE, null)).toBe(ACTION.ALLOW);
     });
 });

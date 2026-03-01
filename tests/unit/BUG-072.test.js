@@ -1,5 +1,5 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { createOverlay, OVERLAY_ID } from '../../src/content/content.js';
+import { createOverlay, OVERLAY_ID } from '../../extension/src/content/content.js';
 
 describe('BUG-072: Interactive Risk Explanations', () => {
     beforeEach(() => {

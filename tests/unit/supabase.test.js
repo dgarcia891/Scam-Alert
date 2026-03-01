@@ -40,7 +40,7 @@ describe('Supabase Service', () => {
 
     beforeAll(async () => {
         // Dynamic import after mock is established
-        const module = await import('../../src/lib/supabase.js');
+        const module = await import('../../extension/src/lib/supabase.js');
         submitReport = module.submitReport;
     });
 

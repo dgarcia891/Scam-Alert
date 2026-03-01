@@ -25,7 +25,7 @@ import { fileURLToPath } from 'url';
 import vm from 'vm';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const scriptPath = path.resolve(__dirname, '../../src/content/content-main.js');
+const scriptPath = path.resolve(__dirname, '../../extension/src/content/content-main.js');
 const scriptSource = fs.readFileSync(scriptPath, 'utf-8');
 
 // ── Helpers ────────────────────────────────────────────────────────

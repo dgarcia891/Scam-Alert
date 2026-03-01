@@ -18,7 +18,7 @@ describe('extractEmailText (parser.js)', () => {
     beforeEach(async () => {
         // Clean DOM between tests
         document.body.innerHTML = '';
-        const parser = await import('../../src/lib/scanner/parser.js');
+        const parser = await import('../../extension/src/lib/scanner/parser.js');
         extractEmailText = parser.extractEmailText;
         parseSenderInfo = parser.parseSenderInfo;
     });
@@ -88,7 +88,7 @@ describe('runHeuristics (heuristics.js)', () => {
     let runHeuristics;
 
     beforeEach(async () => {
-        const mod = await import('../../src/lib/scanner/heuristics.js');
+        const mod = await import('../../extension/src/lib/scanner/heuristics.js');
         runHeuristics = mod.runHeuristics;
     });
 
@@ -149,7 +149,7 @@ describe('isRiskyLink (link-interceptor.js)', () => {
     let isRiskyLink;
 
     beforeEach(async () => {
-        const mod = await import('../../src/content/email/link-interceptor.js');
+        const mod = await import('../../extension/src/content/email/link-interceptor.js');
         isRiskyLink = mod.isRiskyLink;
     });
 
@@ -220,7 +220,7 @@ describe('setupLinkInterceptor (link-interceptor.js)', () => {
 
     beforeEach(async () => {
         document.body.innerHTML = '';
-        const mod = await import('../../src/content/email/link-interceptor.js');
+        const mod = await import('../../extension/src/content/email/link-interceptor.js');
         setupLinkInterceptor = mod.setupLinkInterceptor;
     });
 
@@ -253,7 +253,7 @@ describe('getEmailSettings (extraction-logic.js)', () => {
     let getEmailSettings, shouldShowPrompt;
 
     beforeEach(async () => {
-        const mod = await import('../../src/content/email/extraction-logic.js');
+        const mod = await import('../../extension/src/content/email/extraction-logic.js');
         getEmailSettings = mod.getEmailSettings;
         shouldShowPrompt = mod.shouldShowPrompt;
 
@@ -316,7 +316,7 @@ describe('extractEmailData (extraction-logic.js)', () => {
 
     beforeEach(async () => {
         document.body.innerHTML = '';
-        const mod = await import('../../src/content/email/extraction-logic.js');
+        const mod = await import('../../extension/src/content/email/extraction-logic.js');
         extractEmailData = mod.extractEmailData;
     });
 

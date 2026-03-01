@@ -1,5 +1,5 @@
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { getCachedScan, cacheScan } from '../../src/lib/storage.js';
+import { getCachedScan, cacheScan } from '../../extension/src/lib/storage.js';
 
 describe('BUG-076: Detection Cache Backend Schema Regression', () => {
     beforeEach(() => {

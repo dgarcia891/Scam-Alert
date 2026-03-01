@@ -6,8 +6,8 @@
  */
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { syncIconForTabFromCache } from '../../src/background/lib/icon-manager.js';
-import { tabStateManager } from '../../src/lib/tab-state-manager.js';
+import { syncIconForTabFromCache } from '../../extension/src/background/lib/icon-manager.js';
+import { tabStateManager } from '../../extension/src/lib/tab-state-manager.js';
 
 describe('BUG-059: Ghost Badge Discrepancy', () => {
     let mockChrome;

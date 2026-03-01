@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ── Mock storage.js (normalizeUrl) before importing phishtank ──────
 // phishtank.js imports { normalizeUrl } from './storage.js'
 // We use absolute path resolution to avoid the Jest ESM setup.js bug
-const storagePath = path.resolve(__dirname, '../../src/lib/storage.js');
+const storagePath = path.resolve(__dirname, '../../extension/src/lib/storage.js');
 
 jest.unstable_mockModule(storagePath, () => ({
   normalizeUrl: jest.fn((url) => {
@@ -35,7 +35,7 @@ jest.unstable_mockModule(storagePath, () => ({
   })
 }));
 
-const modulePath = path.resolve(__dirname, '../../src/lib/phishtank.js');
+const modulePath = path.resolve(__dirname, '../../extension/src/lib/phishtank.js');
 const { checkUrlWithPhishTank, downloadPhishTankDatabase, checkUrlOffline } =
   await import(modulePath);
 

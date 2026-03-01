@@ -1,4 +1,4 @@
-import { shouldSuspendPattern, isProtectedDomain, detectAnomalies } from '../../src/lib/rollback-manager.js';
+import { shouldSuspendPattern, isProtectedDomain, detectAnomalies } from '../../extension/src/lib/rollback-manager.js';
 
 describe('Rollback Manager', () => {
     test('shouldSuspendPattern identifies high dismissal counts', () => {

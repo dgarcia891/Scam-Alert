@@ -15,7 +15,7 @@ import { dirname, resolve } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
-const lib = (rel) => resolve(__dirname, '../../src/lib', rel);
+const lib = (rel) => resolve(__dirname, '../../extension/src/lib', rel);
 
 let mockGetSettings, mockUpdateSettings;
 
@@ -60,7 +60,7 @@ beforeAll(async () => {
     buildOptionsDOM();
 
     // Import options.js — this registers the DOMContentLoaded listener
-    await import('../../src/options/options.js');
+    await import('../../extension/src/options/options.js');
 
     // Fire DOMContentLoaded to trigger initialization
     document.dispatchEvent(new Event('DOMContentLoaded'));

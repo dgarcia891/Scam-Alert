@@ -1,6 +1,6 @@
 import { jest, describe, it, expect } from '@jest/globals';
-import { extractEmailText } from '../../src/lib/scanner/parser.js';
-import { runHeuristics } from '../../src/lib/scanner/heuristics.js';
+import { extractEmailText } from '../../extension/src/lib/scanner/parser.js';
+import { runHeuristics } from '../../extension/src/lib/scanner/heuristics.js';
 
 describe('Scanner Logic (Refactored)', () => {
     it('parser extracts text correctly from a mock DOM', () => {

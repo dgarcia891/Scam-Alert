@@ -1,4 +1,4 @@
-import { calculateDecayedConfidence, shouldArchive, canRenew } from '../../src/lib/lifecycle.js';
+import { calculateDecayedConfidence, shouldArchive, canRenew } from '../../extension/src/lib/lifecycle.js';
 
 describe('Lifecycle Manager', () => {
     const DAY = 24 * 60 * 60 * 1000;

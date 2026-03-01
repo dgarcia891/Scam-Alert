@@ -1,6 +1,6 @@
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { applyInPageHighlighting, _resetTooltipManager } from '../../src/content/email/tooltip.js';
-import { MessageTypes } from '../../src/lib/messaging.js';
+import { applyInPageHighlighting, _resetTooltipManager } from '../../extension/src/content/email/tooltip.js';
+import { MessageTypes } from '../../extension/src/lib/messaging.js';
 import { chrome } from 'jest-chrome';
 
 describe('BUG-073: Interactive Highlighting & Reporting', () => {

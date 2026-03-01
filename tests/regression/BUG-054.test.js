@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { sendMessageToTab } from '../../src/lib/messaging.js';
+import { sendMessageToTab } from '../../extension/src/lib/messaging.js';
 
 describe('BUG-054: Tab ID Error Handling', () => {
     beforeEach(() => {

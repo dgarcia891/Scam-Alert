@@ -1,6 +1,6 @@
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { updateStats, getStats } from '../../src/lib/storage.js';
+import { updateStats, getStats } from '../../extension/src/lib/storage.js';
 
 describe('BUG-025: Activity Log Persistence Failure', () => {
 

@@ -8,7 +8,7 @@
  *   5. Vague Lure Detection
  */
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { checkEmailScams } from '../../src/lib/analyzer/email-heuristics.js';
+import { checkEmailScams } from '../../extension/src/lib/analyzer/email-heuristics.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

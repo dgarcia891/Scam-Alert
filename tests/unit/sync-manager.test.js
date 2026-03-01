@@ -12,8 +12,8 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const supabasePath = path.resolve(__dirname, '../../src/lib/supabase.js');
-const storagePath = path.resolve(__dirname, '../../src/lib/storage.js');
+const supabasePath = path.resolve(__dirname, '../../extension/src/lib/supabase.js');
+const storagePath = path.resolve(__dirname, '../../extension/src/lib/storage.js');
 
 // ESM Mocking - Use regex or absolute path to be sure
 jest.unstable_mockModule(supabasePath, () => ({
@@ -58,7 +58,7 @@ describe('Sync Manager', () => {
     let syncManager;
 
     beforeAll(async () => {
-        const module = await import('../../src/background/lib/sync-manager.js');
+        const module = await import('../../extension/src/background/lib/sync-manager.js');
         syncManager = module.syncManager;
     });
 

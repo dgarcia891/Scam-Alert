@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { setupEmailObserver } from '../../src/content/email/mutation-observer.js';
-import { OVERLAY_ID } from '../../src/content/content.js';
+import { setupEmailObserver } from '../../extension/src/content/email/mutation-observer.js';
+import { OVERLAY_ID } from '../../extension/src/content/content.js';
 
 describe('BUG-084: MutationObserver must not rescan when overlay is active', () => {
     let triggerScan;

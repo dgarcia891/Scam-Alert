@@ -25,8 +25,8 @@ Object.assign(global.chrome, {
     }
 });
 
-import { handleIncomingMessage } from '../../../src/background/messages/handler.js';
-import { MessageTypes } from '../../../src/lib/messaging.js';
+import { handleIncomingMessage } from '../../../extension/src/background/messages/handler.js';
+import { MessageTypes } from '../../../extension/src/lib/messaging.js';
 
 describe('Background Message Routing (Refactored)', () => {
     const mockContext = {

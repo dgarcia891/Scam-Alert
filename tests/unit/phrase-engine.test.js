@@ -11,7 +11,7 @@ import { dirname, resolve } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
-const src = (rel) => resolve(__dirname, '../../src/lib/analyzer', rel);
+const src = (rel) => resolve(__dirname, '../../extension/src/lib/analyzer', rel);
 
 // We need to mock local-matching and explanations before importing phrase-engine
 let checkSuspiciousKeywords, checkUrgencySignals, analyzePageContent;
@@ -30,7 +30,7 @@ beforeAll(async () => {
         }))
     }));
 
-    const mod = await import('../../src/lib/analyzer/phrase-engine.js');
+    const mod = await import('../../extension/src/lib/analyzer/phrase-engine.js');
     checkSuspiciousKeywords = mod.checkSuspiciousKeywords;
     checkUrgencySignals = mod.checkUrgencySignals;
     analyzePageContent = mod.analyzePageContent;

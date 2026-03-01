@@ -4,7 +4,7 @@
  * and populated by the detector layer.
  */
 import { describe, it, expect, jest } from '@jest/globals';
-import { scanUrl } from '../../src/lib/detector.js';
+import { scanUrl } from '../../extension/src/lib/detector.js';
 
 describe('Activity Log - Detailed Checks (Bug-066 / Enhancement)', () => {
     it('should include full checks object in scan result', async () => {

@@ -26,7 +26,7 @@ import {
     checkExcessiveSubdomains,
     checkAdvancedTyposquatting,
     checkSuspiciousPort
-} from '../../src/lib/analyzer/url-engine.js';
+} from '../../extension/src/lib/analyzer/url-engine.js';
 
 // ─── extractHostname ────────────────────────────────────────────────────────
 

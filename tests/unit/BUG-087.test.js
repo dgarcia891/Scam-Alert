@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { highlightDetections, removeHighlights } from '../../src/content/highlighter.js';
+import { highlightDetections, removeHighlights } from '../../extension/src/content/highlighter.js';
 
 describe('BUG-087: Tooltip Blinking and Orange Color', () => {
     beforeEach(() => {

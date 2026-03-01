@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { validateAIResponse, sanitizeForPrompt } from '../../src/lib/ai-verifier.js';
+import { validateAIResponse, sanitizeForPrompt } from '../../extension/src/lib/ai-verifier.js';
 
 describe('AI Verifier (FEAT-088)', () => {
 

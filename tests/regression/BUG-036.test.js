@@ -1,4 +1,4 @@
-import { analyzeUrl } from '../../src/lib/pattern-analyzer.js';
+import { analyzeUrl } from '../../extension/src/lib/pattern-analyzer.js';
 
 describe('Regression BUG-036: Truncated Evidence & Weak Scam Detection', () => {
     const scamEmailBody = `
@@ -21,8 +21,8 @@ describe('Regression BUG-036: Truncated Evidence & Weak Scam Detection', () => {
         senderName: 'Father Iván Melchor'
     };
 
-    test('should detect gift card scam in the user provided email text', () => {
-        const result = analyzeUrl('https://mail.google.com/mail/u/0/#inbox', pageContent, false);
+    test('should detect gift card scam in the user provided email text', async () => {
+        const result = await analyzeUrl('https://mail.google.com/mail/u/0/#inbox', pageContent, false);
 
         // check_email_scams should be flagged
         expect(result.checks.emailScams.flagged).toBe(true);
@@ -33,8 +33,8 @@ describe('Regression BUG-036: Truncated Evidence & Weak Scam Detection', () => {
         expect(result.checks.contentAnalysis.dataChecked).toContain('amount of each card');
     });
 
-    test('should trip urgency signal for "gift card for me"', () => {
-        const urgentResult = analyzeUrl('https://mail.google.com/mail/u/0/#inbox', {
+    test('should trip urgency signal for "gift card for me"', async () => {
+        const urgentResult = await analyzeUrl('https://mail.google.com/mail/u/0/#inbox', {
             ...pageContent,
             bodyText: 'Please buy a gift card for me immediately.'
         }, false);

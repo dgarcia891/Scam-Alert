@@ -1,6 +1,6 @@
 
 import { describe, test, expect, jest } from '@jest/globals';
-import { scanUrl } from '../../src/lib/detector.js';
+import { scanUrl } from '../../extension/src/lib/detector.js';
 
 describe('BUG-070: Email Heuristics Integration in Detector', () => {
     test('High-score email scam should result in CRITICAL/HIGH severity and RED icon', async () => {

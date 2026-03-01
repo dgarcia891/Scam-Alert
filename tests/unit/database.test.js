@@ -12,7 +12,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const modulePath = path.resolve(__dirname, '../../src/lib/database.js');
+const modulePath = path.resolve(__dirname, '../../extension/src/lib/database.js');
 
 // ── Global fetch mock ──────────────────────────────────────────────
 let fetchMock;

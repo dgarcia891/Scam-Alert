@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { checkAICanRun, incrementRateCounters } from '../../src/lib/ai-rate-limiter.js';
+import { checkAICanRun, incrementRateCounters } from '../../extension/src/lib/ai-rate-limiter.js';
 
 describe('AI Rate Limiter (FEAT-088)', () => {
     beforeEach(() => {

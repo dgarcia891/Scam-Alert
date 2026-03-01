@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { determineSeverity } from '../../src/lib/analysis/scoring.js';
+import { determineSeverity } from '../../extension/src/lib/analysis/scoring.js';
 
 describe('BUG-065: Single soft signal should not trigger MEDIUM badge', () => {
     it('should return LOW for a single SUSPICIOUS_TLD soft signal', () => {

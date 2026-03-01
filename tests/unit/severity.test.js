@@ -1,6 +1,6 @@
 
-import { determineSeverity } from '../../src/lib/analysis/scoring.js';
-import { SEVERITY } from '../../src/lib/scan-schema.js';
+import { determineSeverity } from '../../extension/src/lib/analysis/scoring.js';
+import { SEVERITY } from '../../extension/src/lib/scan-schema.js';
 
 describe('Severity Stacking Logic', () => {
 

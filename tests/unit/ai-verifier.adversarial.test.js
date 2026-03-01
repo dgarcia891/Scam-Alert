@@ -1,4 +1,4 @@
-import { validateAIResponse, sanitizeForPrompt } from '../../src/lib/ai-verifier.js';
+import { validateAIResponse, sanitizeForPrompt } from '../../extension/src/lib/ai-verifier.js';
 
 describe('AI Verifier Adversarial Protection (FEAT-088)', () => {
 

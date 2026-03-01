@@ -1,5 +1,5 @@
 import { jest, describe, it, expect } from '@jest/globals';
-import { isRiskyLink } from '../../src/content/email/link-interceptor.js';
+import { isRiskyLink } from '../../extension/src/content/email/link-interceptor.js';
 
 describe('Email Link Interceptor - isRiskyLink', () => {
     it('identifies risky file extensions', () => {

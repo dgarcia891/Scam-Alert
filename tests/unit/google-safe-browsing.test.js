@@ -13,7 +13,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const modulePath = path.resolve(__dirname, '../../src/lib/google-safe-browsing.js');
+const modulePath = path.resolve(__dirname, '../../extension/src/lib/google-safe-browsing.js');
 
 let fetchMock;
 

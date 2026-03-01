@@ -1,5 +1,5 @@
 import { jest, describe, beforeEach, test, expect } from '@jest/globals';
-import { createNavigationHandler } from '../../src/background/lib/navigation-handler.js';
+import { createNavigationHandler } from '../../extension/src/background/lib/navigation-handler.js';
 
 describe('BUG-062 Navigation Badge Flicker', () => {
     let mockContext;

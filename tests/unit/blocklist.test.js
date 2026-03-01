@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 
-import { addToBlocklist, removeFromBlocklist, getBlocklist, isBlocked } from '../../src/lib/storage.js';
+import { addToBlocklist, removeFromBlocklist, getBlocklist, isBlocked } from '../../extension/src/lib/storage.js';
 
 describe('Blocklist Storage', () => {
     beforeEach(() => {

@@ -1,8 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { handleIncomingMessage } from '../../src/background/lib/message-dispatcher.js';
-import { severityToIconState, shouldShowHttpNotification } from '../../src/background/lib/icon-manager.js';
-import { createNavigationHandler } from '../../src/background/lib/navigation-handler.js';
-import { MessageTypes } from '../../src/lib/messaging.js';
+import { handleIncomingMessage } from '../../extension/src/background/lib/message-dispatcher.js';
+import { severityToIconState, shouldShowHttpNotification } from '../../extension/src/background/lib/icon-manager.js';
+import { createNavigationHandler } from '../../extension/src/background/lib/navigation-handler.js';
+import { MessageTypes } from '../../extension/src/lib/messaging.js';
 
 describe('Background Module - Severity to Icon Mapping', () => {
     it('maps CRITICAL and HIGH to DANGER', () => {

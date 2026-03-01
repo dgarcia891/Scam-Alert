@@ -17,7 +17,7 @@ const {
   findBestScamMatch,
   generateNgrams
 } = await import(
-  new URL('../../src/lib/analyzer/local-matching.js', import.meta.url)
+  new URL('../../extension/src/lib/analyzer/local-matching.js', import.meta.url)
 );
 
 /* ════════════════════════════════════════════════════════════════════════

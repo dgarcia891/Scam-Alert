@@ -20,8 +20,8 @@ import {
     renderReport,
     renderPatternChecks,
     renderKeywordHighlights
-} from '../../src/popup/ui-renderers.js';
-import { clamp } from '../../src/popup/tooltip-helper.js';
+} from '../../extension/src/popup/ui-renderers.js';
+import { clamp } from '../../extension/src/popup/tooltip-helper.js';
 
 // ─── getClassNameForSeverity ────────────────────────────────────────────────
 

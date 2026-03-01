@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { createScanResult, SEVERITY } from '../../src/lib/scan-schema.js';
+import { createScanResult, SEVERITY } from '../../extension/src/lib/scan-schema.js';
 
 describe('BUG-066: createScanResult must expose overallSeverity', () => {
     it('should expose overallSeverity as an alias for severity', () => {

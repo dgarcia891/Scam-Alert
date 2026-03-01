@@ -6,7 +6,7 @@ import { jest, describe, beforeEach, it, expect } from '@jest/globals';
  * Tests chrome.storage.local wrapper functions
  */
 
-import { getSettings, updateSettings, updateStats, getCachedScan, cacheScan, isWhitelisted, normalizeUrl } from '../../src/lib/storage';
+import { getSettings, updateSettings, updateStats, getCachedScan, cacheScan, isWhitelisted, normalizeUrl } from '../../extension/src/lib/storage';
 
 describe('Storage Service', () => {
 

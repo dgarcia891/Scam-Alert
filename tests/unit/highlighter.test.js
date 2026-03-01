@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { highlightDetections, removeHighlights } from '../../src/content/highlighter.js';
-import { getExplanation } from '../../src/lib/analyzer/explanations.js';
+import { highlightDetections, removeHighlights } from '../../extension/src/content/highlighter.js';
+import { getExplanation } from '../../extension/src/lib/analyzer/explanations.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

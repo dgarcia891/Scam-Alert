@@ -1,4 +1,4 @@
-import { generateScanResults } from '../../src/lib/report-engine.js';
+import { generateScanResults } from '../../extension/src/lib/report-engine.js';
 
 describe('Report Engine', () => {
     test('generates transparent scan results correctly', () => {

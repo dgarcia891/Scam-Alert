@@ -5,8 +5,8 @@
 import { findBestScamMatch } from './local-matching.js';
 import { getExplanation } from './explanations.js';
 
-export function checkSuspiciousKeywords(url, isSuspiciousTLD) {
-    const keywords = ['login', 'signin', 'verify', 'update', 'secure', 'account', 'banking', 'suspend', 'locked', 'urgent', 'confirm', 'billing', 'payment', 'wallet', 'alert', 'warning'];
+export function checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent = null, customKeywords = null) {
+    const keywords = customKeywords || ['login', 'signin', 'verify', 'update', 'secure', 'account', 'banking', 'suspend', 'locked', 'urgent', 'confirm', 'billing', 'payment', 'wallet', 'alert', 'warning'];
     const keywordExplanations = {
         login: 'Common on real sites, but often used on fake sign-in pages to steal passwords.',
         signin: 'Common on real sites, but often used on fake sign-in pages to steal passwords.',
@@ -27,8 +27,18 @@ export function checkSuspiciousKeywords(url, isSuspiciousTLD) {
     };
 
     const lowerUrl = url.toLowerCase();
-    const found = keywords.filter(keyword => lowerUrl.includes(keyword));
-    const flagged = found.length >= 3 || (found.length >= 2 && (!url.startsWith('https://') || isSuspiciousTLD));
+    const pageVisibleText = ((pageContent?.title || '') + ' ' + (pageContent?.bodyText || '')).toLowerCase();
+
+    // Scan URL
+    const foundInUrl = keywords.filter(keyword => lowerUrl.includes(keyword));
+
+    // Scan Page Content
+    const foundInPage = keywords.filter(keyword => pageVisibleText.includes(keyword));
+
+    // Merge unique findings
+    const found = [...new Set([...foundInUrl, ...foundInPage])];
+
+    const flagged = found.length >= 3 || (foundInUrl.length >= 2 && (!url.startsWith('https://') || isSuspiciousTLD));
 
     let reasonSummary = '';
     if (!flagged && found.length > 0) {
@@ -42,18 +52,24 @@ export function checkSuspiciousKeywords(url, isSuspiciousTLD) {
     }
 
     const keywordReasons = {};
-    found.forEach(k => { keywordReasons[k] = keywordExplanations[k] || 'This keyword can appear in scam URLs.'; });
+    found.forEach(k => { keywordReasons[k] = keywordExplanations[k] || 'This keyword can appear in scam URLs or page content.'; });
+
+    // Build dataChecked description
+    let dataChecked = `URL: ${lowerUrl.substring(0, 500)}`;
+    if (foundInPage.length > 0) {
+        dataChecked += ` | Page: ...${foundInPage.join(', ')}...`;
+    }
 
     return {
         title: 'check_suspicious_keywords',
-        description: 'Scans the URL for high-risk words used in phishing attacks.',
+        description: 'Scans the URL and page for high-risk words used in phishing attacks.',
         flagged,
         severity: flagged ? 'MEDIUM' : 'NONE',
         details: flagged ? `Suspicious keywords: ${found.join(', ')}` : (found.length > 0 ? `Found keywords: ${found.join(', ')}` : 'No suspicious keywords'),
         keywords: found,
         keywordReasons,
         reasonSummary,
-        dataChecked: lowerUrl.substring(0, 5000),
+        dataChecked,
         matches: found,
         score: flagged ? found.length * 5 : 0
     };

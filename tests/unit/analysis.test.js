@@ -1,6 +1,6 @@
 import { jest, describe, it, expect } from '@jest/globals';
-import { matchRegex } from '../../src/lib/analysis/regex-engine.js';
-import { calculateRiskScore } from '../../src/lib/analysis/scoring.js';
+import { matchRegex } from '../../extension/src/lib/analysis/regex-engine.js';
+import { calculateRiskScore } from '../../extension/src/lib/analysis/scoring.js';
 
 describe('Analysis Engine (Refactored)', () => {
     it('regex engine matches patterns correctly', () => {

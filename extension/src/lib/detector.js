@@ -71,7 +71,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     if (usePatternDetection) {
         reportProgress(20, 'Analyzing URL patterns...');
         const customPhrases = await getMergedScamPhrases();
-        const patterns = analyzeUrl(url, pageContent, options.isPro, customPhrases);
+        const patterns = await analyzeUrl(url, pageContent, options.isPro, customPhrases);
 
         // Preserve all checks for the UI Activity Log
         finalChecks = { ...patterns.checks };

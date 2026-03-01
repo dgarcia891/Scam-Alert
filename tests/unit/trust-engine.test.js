@@ -1,4 +1,4 @@
-import { calculateUpdatedScore, applyDecay, getTrustTier, isThresholdMet } from '../../src/lib/trust-engine.js';
+import { calculateUpdatedScore, applyDecay, getTrustTier, isThresholdMet } from '../../extension/src/lib/trust-engine.js';
 
 describe('Trust Engine', () => {
     test('calculateUpdatedScore correctly increments for true positive', () => {
