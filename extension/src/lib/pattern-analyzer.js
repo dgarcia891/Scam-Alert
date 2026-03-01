@@ -22,8 +22,9 @@ import {
 } from './analyzer/phrase-engine.js';
 
 import { checkEmailScams } from './analyzer/email-heuristics.js';
-import { calculateRiskScore, determineRiskLevel } from './analysis/scoring.js';
+import { determineSeverity } from './analysis/scoring.js';
 import { getMergedScamPhrases, getMergedSuspiciousKeywords } from './database.js';
+import { SEVERITY } from './scan-schema.js';
 
 /**
  * Analyze URL for suspicious patterns
@@ -55,28 +56,54 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
         checks.contentAnalysis = analyzePageContent(pageContent, dynamicPhrases);
     }
 
-    // Convert checks to signals for the new scoring engine
-    const signals = Object.values(checks)
-        .filter(c => c && c.flagged)
-        .map(c => ({ score: c.score || 0, isProFeature: c.isProFeature }));
+    // Map checks to Hard/Soft signals (Layer 4 Decision Logic)
+    const hardSignals = [];
+    const softSignals = [];
 
-    const riskScore = calculateRiskScore(signals.filter(s => isPro || !s.isProFeature));
+    const HARD_SIGNAL_CHECKS = ['typosquatting', 'advancedTyposquatting', 'ipAddress', 'urlObfuscation'];
+    const SOFT_SIGNAL_CHECKS = ['nonHttps', 'suspiciousTLD', 'excessiveSubdomains', 'suspiciousPort', 'suspiciousKeywords', 'urgencySignals', 'emailScams'];
+
+    Object.entries(checks).forEach(([key, check]) => {
+        if (!check || !check.flagged) return;
+        if (check.isProFeature && !isPro) return;
+
+        // Map to signal object
+        const signal = {
+            code: key.toUpperCase(),
+            message: check.details || check.reason || check.description || 'Suspicious activity detected',
+            score: check.score || 0
+        };
+
+        // Promotion Logic: Typosquatting is a critical reputation indicator
+        if (key === 'typosquatting' || key === 'advancedTyposquatting') {
+            signal.code = 'REPUTATION_HIT';
+        }
+
+        if (HARD_SIGNAL_CHECKS.includes(key)) {
+            hardSignals.push(signal);
+        } else if (SOFT_SIGNAL_CHECKS.includes(key) || key === 'contentAnalysis') {
+            softSignals.push(signal);
+        }
+    });
+
+    const overallSeverity = determineSeverity({ hard: hardSignals, soft: softSignals });
 
     return {
         url,
-        riskScore,
-        riskLevel: determineRiskLevel(riskScore),
+        overallSeverity,
+        severity: overallSeverity, // Backward compatibility
+        signals: { hard: hardSignals, soft: softSignals },
         checks,
-        recommendation: getRecommendation(riskScore),
+        recommendations: [getRecommendation(overallSeverity)],
         timestamp: new Date().toISOString()
     };
 }
 
-export function getRecommendation(score) {
-    if (score >= 70) return 'DO NOT PROCEED - High risk of scam';
-    if (score >= 50) return 'Proceed with extreme caution';
-    if (score >= 30) return 'Be cautious - verify before entering any information';
-    if (score >= 15) return 'Exercise normal caution';
+export function getRecommendation(severity) {
+    if (severity === SEVERITY.CRITICAL) return 'DO NOT PROCEED - Known scam site or critical threat';
+    if (severity === SEVERITY.HIGH) return 'DO NOT PROCEED - High risk of scam';
+    if (severity === SEVERITY.MEDIUM) return 'Proceed with extreme caution - multiple suspicious signals';
+    if (severity === SEVERITY.LOW) return 'Be cautious - verify before entering any information';
     return 'Appears safe';
 }
 

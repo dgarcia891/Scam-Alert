@@ -9,454 +9,393 @@ console.log('[Scam Alert] Content script loaded (Hydra Guard)');
 const initialContext = detectContext();
 const initialMetadata = initialContext.type === 'email' ? detectEmailMetadata(initialContext) : null;
 
-// Report context to background hub
-chrome.runtime.sendMessage({
-    type: MessageTypes.CONTEXT_DETECTED,
-    payload: {
-        context: initialContext,
-        emailMetadata: initialMetadata
-    }
-});
+// Guard immediate execution for tests/environments without chrome.runtime
+if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({
+        type: MessageTypes.CONTEXT_DETECTED,
+        payload: {
+            context: initialContext,
+            emailMetadata: initialMetadata
+        }
+    });
+}
 
 // Export for unit testing
 export const OVERLAY_ID = 'scam-alert-overlay-root';
 let warningAcknowledged = false;
+let currentScanResult = null; // Track latest result for Layer 2 decisions
 
 export function resetWarningAcknowledgement() {
     warningAcknowledged = false;
 }
 
-export function createOverlay(result) {
-    if (warningAcknowledged) {
-        console.log('[Scam Alert] Warning overlay suppressed for this session (acknowledged).');
+/**
+ * Internal helper to apply highlights if allowed by settings
+ */
+async function _applyHighlightsIfEnabled(result) {
+    if (!result) return;
+    const { settings } = await chrome.storage.local.get(['settings']);
+    const highlightingEnabled = settings?.highlightingEnabled ?? true;
+    if (highlightingEnabled) {
+        highlightDetections(result);
+    }
+}
+
+// ============================================================================
+// Form Monitoring (Layer 2: Moment of Action)
+// ============================================================================
+document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    // 1. Identify Sensitive Fields
+    const hasPassword = form.querySelector('input[type="password"]');
+    const hasCreditCard = form.querySelector('input[autocomplete*="cc" i], input[name*="card" i]');
+    if (!hasPassword && !hasCreditCard) return;
+
+    // 2. Evaluate Risk
+    const isHttps = window.location.protocol === 'https:';
+
+    // Rule A: Warn on HTTP with sensitive fields
+    if (!isHttps) {
+        event.preventDefault();
+        showInlineInterceptionModal(form, {
+            headline: 'Connection not secure',
+            reason: 'You are about to send private information over an unencrypted connection.',
+            severity: 'MEDIUM'
+        });
         return;
     }
-    // Remove existing if any
+
+    // Rule B: Warn if latest scan flagged high risk
+    if (currentScanResult) {
+        const severity = currentScanResult.overallSeverity || currentScanResult.severity;
+        const isRisky = severity === 'MEDIUM' || severity === 'HIGH' || severity === 'CRITICAL';
+        if (isRisky) {
+            event.preventDefault();
+            showInlineInterceptionModal(form, {
+                headline: 'Wait! Are you sure?',
+                reason: `This site was flagged as ${severity}. Submitting information is risky.`,
+                severity: severity
+            });
+        }
+    }
+}, true);
+
+// ============================================================================
+// UI Components (Modals, Banners)
+// ============================================================================
+
+function showInlineInterceptionModal(form, { headline, reason, severity }) {
+    if (document.getElementById('sa-intercept-modal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'sa-intercept-modal';
+    modal.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: white; padding: 32px; border-radius: 12px;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); z-index: 2147483647;
+        width: 450px; font-family: system-ui, sans-serif; text-align: center;
+        border: 2px solid ${severity === 'CRITICAL' || severity === 'HIGH' ? '#ef4444' : '#f59e0b'};
+        animation: sa-fade-in 0.2s ease-out;
+    `;
+
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2147483646;`;
+
+    modal.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">✋</div>
+        <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 24px;">${headline}</h2>
+        <p style="margin: 0 0 24px 0; color: #4b5563; line-height: 1.5;">${reason}</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="sa-intercept-back" style="background: #111827; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; cursor: pointer;">Go Back</button>
+            <button id="sa-intercept-proceed" style="background: transparent; color: #6b7280; border: 1px solid #d1d5db; padding: 12px 24px; border-radius: 6px; cursor: pointer;">Proceed Anyway</button>
+        </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+
+    document.getElementById('sa-intercept-back').onclick = () => { modal.remove(); backdrop.remove(); };
+    document.getElementById('sa-intercept-proceed').onclick = () => { modal.remove(); backdrop.remove(); form.submit(); };
+}
+
+function showTopBanner(result) {
+    if (document.getElementById('sa-top-banner')) return;
+    const severity = result.overallSeverity || result.severity;
+    const isCaution = severity === 'MEDIUM' || severity === 'LOW';
+
+    const banner = document.createElement('div');
+    banner.id = 'sa-top-banner';
+    banner.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; z-index: 2147483647;
+        background: ${isCaution ? '#fef3c7' : '#fee2e2'}; color: ${isCaution ? '#92400e' : '#991b1b'};
+        padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+        font-family: system-ui, sans-serif; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-bottom: 1px solid ${isCaution ? '#f59e0b' : '#ef4444'};
+        animation: sa-slide-down 0.3s ease-out;
+    `;
+
+    banner.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 18px;">${isCaution ? '⚠️' : '🚨'}</span>
+            <span><strong>Scam Alert:</strong> ${result.reasons?.[0]?.message || 'Caution advised on this site.'}</span>
+        </div>
+        <button onclick="this.parentElement.remove()" style="background:transparent; border:none; color:inherit; font-weight:600; cursor:pointer; text-decoration:underline;">Dismiss</button>
+    `;
+    document.body.appendChild(banner);
+}
+
+function showReportModal() {
+    if (document.getElementById('scam-alert-report-modal')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'scam-alert-report-modal';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.7); z-index: 2147483647;
+        display: flex; align-items: center; justify-content: center;
+        font-family: system-ui, sans-serif;
+    `;
+
+    overlay.innerHTML = `
+        <div style="background: #1e1e1e; color: #fff; padding: 24px; border-radius: 12px; width: 400px; border: 1px solid #333;">
+            <h3 style="margin: 0 0 16px 0; font-size: 18px;">Report Suspicious Site</h3>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 4px;">URL</label>
+                <input type="text" value="${window.location.href}" readonly style="width:100%; padding:8px; border-radius:6px; background:#111; color:#888; border:1px solid #333; box-sizing:border-box;">
+            </div>
+            <textarea id="sa-report-desc" placeholder="What looks suspicious?" style="width:100%; padding:8px; height:80px; border-radius:6px; background:#2a2a2a; color:#fff; border:1px solid #444; box-sizing:border-box;"></textarea>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button id="sa-report-cancel" style="background:none; border:none; color:#aaa; cursor:pointer;">Cancel</button>
+                <button id="sa-report-submit" style="background:#ef4444; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer;">Submit Report</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('sa-report-cancel').onclick = () => overlay.remove();
+    document.getElementById('sa-report-submit').onclick = async () => {
+        const desc = document.getElementById('sa-report-desc').value;
+        const btn = document.getElementById('sa-report-submit');
+        btn.textContent = 'Submitting...';
+        btn.disabled = true;
+
+        chrome.runtime.sendMessage({
+            type: MessageTypes.REPORT_SCAM,
+            data: {
+                url: window.location.href,
+                description: desc,
+                metadata: { timestamp: new Date().toISOString(), title: document.title }
+            }
+        }, (response) => {
+            if (response?.success) {
+                overlay.querySelector('div').innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                        <h3 style="margin: 0 0 8px 0;">Report Submitted</h3>
+                        <p style="color: #aaa; font-size: 14px;">Thank you for helping keep the community safe.</p>
+                        <button onclick="document.getElementById('scam-alert-report-modal').remove()" style="margin-top: 20px; background:#ef4444; color:#fff; border:none; padding:8px 24px; border-radius:6px; cursor:pointer;">Close</button>
+                    </div>
+                `;
+            } else {
+                alert('Failed to submit report. Please try again.');
+                btn.textContent = 'Submit Report';
+                btn.disabled = false;
+            }
+        });
+    };
+}
+
+export function createOverlay(result) {
+    if (warningAcknowledged) return;
     const existing = document.getElementById(OVERLAY_ID);
     if (existing) existing.remove();
 
-    // Create container
     const container = document.createElement('div');
     container.id = OVERLAY_ID;
-
-    // Create Shadow DOM to isolate styles
+    container.style.zIndex = '2147483647';
     const shadow = container.attachShadow({ mode: 'open' });
 
-    // Inject styles
     const style = document.createElement('style');
     style.textContent = `
         :host {
-            all: initial;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
-            z-index: 2147483647; /* Max Z-Index */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: system-ui, -apple-system, sans-serif;
-            color: white;
-            backdrop-filter: blur(10px);
+            z-index: 2147483647; display: flex; align-items: center; justify-content: center;
+            font-family: system-ui, sans-serif; color: white; backdrop-filter: blur(10px);
         }
         .card {
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 3rem;
-            border-radius: 1.5rem;
-            max-width: 600px;
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 3rem; border-radius: 1.5rem; max-width: 600px; text-align: center;
             animation: fadeIn 0.3s ease-out;
         }
-        h1 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin: 0 0 1rem 0;
-            color: #fca5a5;
-        }
-        p {
-            font-size: 1.125rem;
-            line-height: 1.6;
-            color: #e5e7eb;
-            margin-bottom: 2rem;
-        }
-        .recommendation {
-            background: rgba(220, 38, 38, 0.2);
-            border: 1px solid #dc2626;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        .recommendation:hover {
-            background: rgba(220, 38, 38, 0.3);
-        }
-        .details {
-            display: none;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin-bottom: 2rem;
-            text-align: left;
-            font-size: 0.875rem;
-            color: #d1d5db;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .details.visible {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-        .details ul {
-            margin: 0;
-            padding-left: 1.25rem;
-        }
-        .details li {
-            margin-bottom: 0.5rem;
-        }
-        .actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-direction: column;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        button.primary {
-            background: #ef4444;
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            font-size: 1.125rem;
-            font-weight: 600;
-            border-radius: 0.75rem;
-            cursor: pointer;
-            transition: transform 0.1s, background 0.2s;
-        }
-        button.primary:hover {
-            background: #dc2626;
-            transform: scale(1.02);
-        }
-        button.secondary {
-            background: transparent;
-            border: none;
-            color: #9ca3af;
-            text-decoration: underline;
-            cursor: pointer;
-            font-size: 0.875rem;
-            margin-top: 1rem;
-        }
-        button.secondary:hover {
-            color: white;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
+        h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: #fca5a5; }
+        .details { display: none; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 0.5rem; text-align: left; }
+        .details.visible { display: block; }
+        button.primary { background: #ef4444; color: white; border: none; padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     `;
     shadow.appendChild(style);
 
-    // Content
     const wrapper = document.createElement('div');
     wrapper.className = 'card';
-
-    // Format technical details from checks
-    const findings = Object.values(result?.checks || {})
-        .filter(c => c.flagged)
-        .map(c => `<li><strong>${c.title || 'Indicator'}:</strong> ${c.details || c.description}</li>`)
-        .join('');
+    const findings = Object.values(result?.checks || {}).filter(c => c.flagged)
+        .map(c => `<li><strong>${c.title}:</strong> ${c.details || c.description}</li>`).join('');
 
     wrapper.innerHTML = `
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1.5rem;">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-            <line x1="12" y1="9" x2="12" y2="13"></line>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-        <h1>High Risk Detected</h1>
-        <p>We recommend leaving this page. Scam Alert blocked it because it matches known scam techniques.</p>
-        
-        <div class="recommendation" id="btn-reason" title="Click for technical details">
-            Reason: <strong>${result?.recommendations?.[0] || 'Suspicious Activity Detected'}</strong>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <h1 style="margin:0">High Risk Detected</h1>
+        <p>We recommend leaving this page immediately.</p>
+        <div id="btn-reason" style="background:rgba(220,38,38,0.2); border:1px solid #dc2626; padding:1rem; border-radius:0.5rem; margin-bottom:1rem; cursor:pointer;">
+            Reason: <strong>${result?.recommendations?.[0] || result?.reasons?.[0]?.message || 'Suspicious Activity'}</strong>
         </div>
-
-        <div class="details" id="pnl-details">
-            <div style="font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.75rem; letter-spacing: 0.05em;">Technical Indicators</div>
-            <ul>
-                ${findings || '<li>Multiple pattern matches found. Technical details restricted in Lite mode.</li>'}
-            </ul>
-        </div>
-
-        <div class="actions">
+        <div id="pnl-details" class="details"><ul>${findings}</ul></div>
+        <div style="display:flex; flex-direction:column; gap:1rem; margin-top:2rem;">
             <button class="primary" id="btn-back">Go back to safety</button>
-            <button class="secondary" id="btn-proceed">I understand the risks, proceed anyway</button>
+            <button style="background:none; border:none; color:#9ca3af; text-decoration:underline; cursor:pointer;" id="btn-proceed">I understand the risks, proceed anyway</button>
         </div>
     `;
-
     shadow.appendChild(wrapper);
 
-    // Handlers
-    const btnBack = shadow.getElementById('btn-back');
-    const btnProceed = shadow.getElementById('btn-proceed');
-    const btnReason = shadow.getElementById('btn-reason');
-    const pnlDetails = shadow.getElementById('pnl-details');
-
-    btnReason.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        pnlDetails.classList.toggle('visible');
-    });
-
-    btnBack.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        // Set up the local fallback timer (e.g. if script connection is broken)
-        const fallbackTimer = setTimeout(() => {
-            window.location.href = 'about:blank';
-        }, 500);
-
-        try {
-            // Use background script for more robust navigation (BUG-081/BUG-082)
-            const response = await chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
-
-            if (response && response.success) {
-                clearTimeout(fallbackTimer);
-                container.remove(); // Remove overlay so user can interact with the SPA
-                removeHighlights(); // Clean up any on-page highlights
-
-                // If the history is genuinely empty, goBack does nothing, so we should still fallback
-                if (window.history.length <= 1) {
+    shadow.getElementById('btn-reason').onclick = () => shadow.getElementById('pnl-details').classList.toggle('visible');
+    const originalUrl = window.location.href;
+    shadow.getElementById('btn-back').onclick = async () => {
+        container.remove();
+        chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
+        window.history.back();
+        // Fallback: if we're still on the same suspicious page after 500ms, go to about:blank
+        setTimeout(() => {
+            try {
+                if (window.location.href === originalUrl && window.location.href !== 'about:blank') {
                     window.location.href = 'about:blank';
                 }
+            } catch (e) {
+                // Ignore cross-origin errors
             }
-        } catch (e) {
-            // Allow fallback timer to execute
-            console.warn('[Scam Alert] Background navigation failed:', e);
-        }
-    });
-
-    btnProceed.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        e.preventDefault();
+        }, 500);
+    };
+    shadow.getElementById('btn-proceed').onclick = () => {
         container.remove();
         warningAcknowledged = true;
+        _applyHighlightsIfEnabled(result);
+    };
 
-        // Highlight triggers after acknowledging risk (BUG-085-ENHANCE)
-        chrome.storage.local.get(['settings'], (result_settings) => {
-            const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
-            if (highlightingEnabled) {
-                highlightDetections(result);
-            }
-        });
-
-        if (result?.url) {
-            // It was an intercepted link. Navigate to it directly.
-            window.location.href = result.url;
-        }
-    });
-
-    // BUG-080/BUG-084: Prevent any clicks within the overlay from bubbling up to
-    // the native app (e.g., Gmail) which could trigger a DOM mutation and
-    // lead to an infinite rescan loop.
-    container.addEventListener('click', (e) => {
-        e.stopPropagation();
-    });
-
+    container.onclick = (e) => e.stopPropagation();
     document.documentElement.appendChild(container);
 }
 
 function showDetectionToast(result) {
-    if (warningAcknowledged) return;
-
-    // Only show for High/Medium if not already handled by overlay
-    if (result.overallSeverity === 'SAFE' || result.overallSeverity === 'LOW') return;
-
-    // Remove existing
+    if (warningAcknowledged || result.overallSeverity === 'SAFE' || result.overallSeverity === 'LOW') return;
     const existing = document.getElementById('scam-alert-toast');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
     toast.id = 'scam-alert-toast';
     toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 2147483646;
-        background: #1e293b;
-        color: white;
-        padding: 16px;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-family: system-ui, sans-serif;
-        border-left: 4px solid ${result.overallSeverity === 'HIGH' ? '#ef4444' : '#f59e0b'};
-        min-width: 300px;
-        animation: slideIn 0.3s ease-out;
+        position: fixed; top: 20px; right: 20px; z-index: 2147483646;
+        background: #1e293b; color: white; padding: 16px; border-radius: 12px;
+        border-left: 4px solid ${result.overallSeverity === 'HIGH' || result.overallSeverity === 'CRITICAL' ? '#ef4444' : '#f59e0b'};
+        font-family: system-ui, sans-serif; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     `;
-
-    // Add slideIn animation
-    const styleElem = document.createElement('style');
-    styleElem.textContent = `@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`;
-    toast.appendChild(styleElem);
-
-    const icon = result.overallSeverity === 'HIGH' ? '⚠️' : '🛡️';
-    const title = result.overallSeverity === 'HIGH' ? 'High Risk Detected' : 'Caution Advised';
-
-    toast.innerHTML += `
-        <div style="font-size: 20px;">${icon}</div>
-        <div style="flex: 1;">
-            <div style="font-weight: bold; margin-bottom: 2px;">${title}</div>
-            <div style="font-size: 0.85em; opacity: 0.9;">Scam Alert reported ${result.score}% risk.</div>
-        </div>
-        <button id="sa-toast-close" style="background:none; border:none; color:white; cursor:pointer; padding:4px; opacity:0.6;">✕</button>
-    `;
-
+    toast.innerHTML = `<div><strong>${result.overallSeverity} Risk Detected</strong></div><div style="font-size:13px; opacity:0.8;">Action recommended.</div>`;
     document.body.appendChild(toast);
-
-    // Close handler
-    document.getElementById('sa-toast-close').onclick = () => toast.remove();
-
-    // Auto dismiss
-    setTimeout(() => {
-        if (toast.isConnected) {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(100%)';
-            toast.style.transition = 'all 0.3s ease-in';
-            setTimeout(() => toast.remove(), 300);
-        }
-    }, 6000);
+    setTimeout(() => toast.remove(), 6000);
 }
 
 // Listen for messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === MessageTypes.SHOW_WARNING) {
-        if (warningAcknowledged) {
-            chrome.storage.local.get(['settings'], (result_settings) => {
-                const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
-                if (highlightingEnabled) {
-                    highlightDetections(message.data.result);
-                }
-            });
-            sendResponse({ success: true, suppressed: true });
-            return;
-        }
-        console.warn('[Scam Alert] Received warning command', message.data);
-        createOverlay(message.data.result);
-        chrome.storage.local.get(['settings'], (result_settings) => {
-            const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
-            if (highlightingEnabled) {
-                highlightDetections(message.data.result);
-            }
-        });
-        sendResponse({ success: true });
-    } else if (message.type === MessageTypes.SCAN_RESULT && message.data?.result) {
-        if (warningAcknowledged) {
-            chrome.storage.local.get(['settings'], (result_settings) => {
-                const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
-                if (highlightingEnabled) {
-                    highlightDetections(message.data.result);
-                }
-            });
-            sendResponse({ success: true, suppressed: true });
-            return;
-        }
-        // Phase 25.0: Restored toast for High/Medium risks
-        showDetectionToast(message.data.result);
-        chrome.storage.local.get(['settings'], (result_settings) => {
-            const highlightingEnabled = result_settings.settings?.highlightingEnabled ?? true;
-            if (highlightingEnabled) {
-                highlightDetections(message.data.result);
-            }
-        });
-        sendResponse({ success: true });
-    } else if (message.type === 'OPEN_REPORT_MODAL') {
-        const url = window.location.href;
-        let domain = '';
-        try { domain = new URL(url).hostname; } catch (e) { }
+    const { type, data, payload } = message;
+    console.log('[Scam Alert] Message received:', type, { data, payload });
+    const result = data?.result || payload?.result;
 
-        const confirmReport = confirm(`Report this site as a scam?\n\nURL: ${url}`);
-        if (confirmReport) {
-            chrome.runtime.sendMessage({
-                type: MessageTypes.REPORT_SCAM,
-                data: {
-                    url: url,
-                    type: 'web_scam',
-                    description: 'Reported via browser popup',
-                    metadata: {
-                        timestamp: new Date().toISOString(),
-                        pageTitle: document.title,
-                        pageContent: document.body.innerText.substring(0, 10000), // Snapshot of content
-                        userAgent: navigator.userAgent
-                    }
-                }
-            }, async (response) => {
-                if (response && response.success) {
-                    alert('Thanks! Report submitted.');
-                    // Persist state by domain (hostname) as per BUG-060
-                    const { reportedSites = {} } = await chrome.storage.local.get('reportedSites');
-                    if (domain) reportedSites[domain] = Date.now();
-                    reportedSites[url] = Date.now(); // Keep URL for backward compatibility/granularity
-                    await chrome.storage.local.set({ reportedSites });
-                } else {
-                    alert('Submission failed: ' + (response?.error || 'Unknown error'));
-                }
-            });
-        }
-        sendResponse({ success: true });
-    } else if (message.type === 'HISTORY_BACK') {
-        // Robust navigation fallback for popup
-        removeHighlights();
-        window.history.back();
-        sendResponse({ success: true });
-    } else if (message.type === MessageTypes.EXECUTE_SCAN) {
-        handleExecuteScan(message.payload || message.data).then(sendResponse);
-        return true;
+    switch (type) {
+        case MessageTypes.CONTEXT_DETECTED:
+            break; // Handled by background
+        case MessageTypes.HIDE_WARNING:
+            const overlay = document.getElementById(OVERLAY_ID);
+            if (overlay) {
+                overlay.remove();
+            }
+            sendResponse({ success: true });
+            break;
+        case MessageTypes.SCAN_RESULT:
+        case MessageTypes.SCAN_RESULT_UPDATED:
+            currentScanResult = result;
+            if (!warningAcknowledged) {
+                showDetectionToast(result);
+                _applyHighlightsIfEnabled(result);
+            }
+            sendResponse({ success: true });
+            break;
+        case MessageTypes.SHOW_WARNING:
+            currentScanResult = result;
+            createOverlay(result);
+            _applyHighlightsIfEnabled(result);
+            sendResponse({ success: true });
+            break;
+        case MessageTypes.SHOW_BANNER:
+            showTopBanner(result);
+            sendResponse({ success: true });
+            break;
+        case MessageTypes.OPEN_REPORT_MODAL:
+            showReportModal();
+            sendResponse({ success: true });
+            break;
+        case MessageTypes.NAVIGATE_BACK:
+            removeHighlights();
+            window.history.back();
+            sendResponse({ success: true });
+            break;
+        case MessageTypes.ANALYZE_PAGE:
+            sendResponse({ success: true, data: collectPageSignals() });
+            break;
+        case MessageTypes.EXECUTE_SCAN:
+            handleExecuteScan(payload || data).then(sendResponse);
+            return true;
+        default:
+            sendResponse({ success: false, error: 'Unknown message type' });
+            break;
     }
+    return true;
 });
 
 async function handleExecuteScan(options = {}) {
-    console.log('[Scam Alert] Executing remote scan request', options);
-
-    // Refresh context before scan
     const context = detectContext();
     const emailMetadata = context.type === 'email' ? detectEmailMetadata(context) : null;
-
     const scanOptions = {
         ...options,
         pageContent: emailMetadata?.bodySnippet || document.body.innerText.substring(0, 10000),
         context: context
     };
-
     try {
         const result = await scanUrl(window.location.href, scanOptions, (progress) => {
-            chrome.runtime.sendMessage({
-                type: MessageTypes.SCAN_PROGRESS,
-                payload: progress
-            });
+            chrome.runtime.sendMessage({ type: MessageTypes.SCAN_PROGRESS, payload: progress });
         });
-
+        currentScanResult = result;
         return { success: true, result };
     } catch (error) {
-        console.error('[Scam Alert] Local scan failed:', error);
         return { success: false, error: error.message };
     }
+}
+
+function collectPageSignals() {
+    const isHttps = window.location.protocol === 'https:';
+    const forms = Array.from(document.forms).slice(0, 5).map(f => ({
+        hasPassword: !!f.querySelector('input[type="password"]'),
+        hasCreditCard: !!f.querySelector('input[autocomplete*="cc" i], input[name*="card" i]')
+    })).filter(f => f.hasPassword || f.hasCreditCard);
+
+    const linkMismatches = Array.from(document.links).slice(0, 50).map(a => {
+        const href = a.href.toLowerCase();
+        const text = (a.innerText || a.textContent || '').toLowerCase();
+        try {
+            const hrefHost = new URL(href).hostname.replace('www.', '');
+            const visibleHostMatch = text.match(/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}/);
+            const visibleHost = visibleHostMatch ? visibleHostMatch[0].replace('www.', '') : null;
+            if (visibleHost && visibleHost !== hrefHost && !hrefHost.endsWith('.' + visibleHost)) {
+                return { displayedHost: visibleHost, linkHost: hrefHost };
+            }
+        } catch (e) { }
+        return null;
+    }).filter(Boolean).slice(0, 5);
+
+    return { isHttps, forms, linkMismatches };
 }
 

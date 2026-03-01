@@ -40,25 +40,3 @@ export function determineSeverity(signals) {
 
     return SEVERITY.SAFE;
 }
-
-/**
- * Calculate Risk Score (Legacy Support - Deprecated)
- * Keeps backward compatibility for stats but not used for decision making.
- */
-export function calculateRiskScore(legacySignals) {
-    console.warn('[Scam Alert] calculateRiskScore() is deprecated and will be removed in a future release. Use determineSeverity() instead.');
-    if (!Array.isArray(legacySignals)) return 0;
-    return legacySignals.reduce((total, signal) => total + (signal.score || 0), 0);
-}
-
-/**
- * Determine Risk Level (Legacy Support - Deprecated)
- */
-export function determineRiskLevel(totalScore) {
-    console.warn('[Scam Alert] determineRiskLevel() is deprecated and will be removed in a future release. Use determineSeverity() instead.');
-    if (totalScore >= 75) return 'CRITICAL';
-    if (totalScore >= 50) return 'HIGH';
-    if (totalScore >= 25) return 'MEDIUM';
-    if (totalScore > 0) return 'LOW';
-    return 'SAFE';
-}

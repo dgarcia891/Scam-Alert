@@ -42,8 +42,8 @@ export function renderSources(detections) {
     for (const [key, name] of Object.entries(sourceNames)) {
         const d = detections[key];
         if (d === undefined) continue;
-        const icon = d.error ? '✗' : (d.flagged || d.riskScore > 0 ? '⚠️' : '✓');
-        const detail = d.error ? d.error : (key === 'pattern' ? `Risk score: ${d.riskScore}` : (d.safe ? 'Safe' : 'Threat found'));
+        const icon = d.error ? '✗' : (d.flagged || (d.overallSeverity && d.overallSeverity !== 'SAFE') ? '⚠️' : '✓');
+        const detail = d.error ? d.error : (key === 'pattern' ? `Severity: ${d.overallSeverity || 'SAFE'}` : (d.safe ? 'Safe' : 'Threat found'));
         items.push({ name, icon, detail, status: d.error ? 'error' : 'used' });
     }
 

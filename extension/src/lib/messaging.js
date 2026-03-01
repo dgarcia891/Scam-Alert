@@ -99,7 +99,8 @@ export const MessageTypes = {
     REPORT_SCAM: 'report_scam',
     REPORT_FALSE_POSITIVE: 'report_false_positive',
     SYNC_BLOCKLIST: 'sync_blocklist',
-    NAVIGATE_BACK: 'navigate_back'
+    NAVIGATE_BACK: 'navigate_back',
+    OPEN_REPORT_MODAL: 'open_report_modal'
 };
 
 /**
