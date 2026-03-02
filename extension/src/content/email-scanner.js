@@ -38,7 +38,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         // Extract sender information for authority impersonation detection
         const senderInfo = parseSenderInfo();
 
-        console.log('[Scam Alert] Intentional scan triggered...');
+        console.log('[Hydra Guard] Intentional scan triggered...');
 
         chrome.runtime.sendMessage({
             type: MessageTypes.SCAN_CURRENT_TAB,
@@ -83,11 +83,11 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                     highlightDetections(result);
                     showThreatDashboard(result);
                 } catch (e) {
-                    console.error('[Scam Alert] UI Orchestration failed:', e);
+                    console.error('[Hydra Guard] UI Orchestration failed:', e);
                 }
             }
         }
     });
 
-    console.log('[Scam Alert] Email scanner orchestrator active');
+    console.log('[Hydra Guard] Email scanner orchestrator active');
 })();

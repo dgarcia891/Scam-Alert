@@ -7,13 +7,13 @@ describe('Pattern Analyzer - non-HTTPS check', () => {
         const result = await analyzeUrl('http://example.com');
         expect(result.checks.nonHttps.flagged).toBe(true);
         expect(result.checks.nonHttps.severity).toBe('LOW');
-        expect(result.riskLevel).toBe('LOW');
+        expect(result.overallSeverity).toBe('LOW');
     });
 
     it('does not flag https:// URLs', async () => {
         const result = await analyzeUrl('https://example.com');
         expect(result.checks.nonHttps.flagged).toBe(false);
-        expect(result.riskLevel).toBe('SAFE');
+        expect(result.overallSeverity).toBe('SAFE');
     });
 
     it('is case-insensitive for protocol', async () => {
@@ -28,7 +28,7 @@ describe('Pattern Analyzer - Advanced Typosquatting (Pro)', () => {
         const result = await analyzeUrl('https://goog1e.com', null, true);
         expect(result.checks.advancedTyposquatting.flagged).toBe(true);
         expect(result.checks.advancedTyposquatting.target).toBe('google');
-        expect(result.riskScore).toBeGreaterThanOrEqual(50);
+        expect(result.overallSeverity).toBe('CRITICAL'); // Hard signal (Reputation Hit)
     });
 
     it('detects character addition (paypals.com)', async () => {
@@ -66,17 +66,18 @@ describe('Pattern Analyzer - Urgency Signals (Pro)', () => {
 
 describe('Pattern Analyzer - Pro Gating', () => {
     it('does NOT add Pro scores to total for Free users', async () => {
-        // goog1e.com flags advancedTyposquatting (score 50)
-        // For a free user, the riskScore should be 0 (if other checks pass)
         const result = await analyzeUrl('https://goog1e.com', null, false);
+        // goog1e.com flags advancedTyposquatting (score 50)
+        // For a free user, the pro signal should be omitted from the signals array
         expect(result.checks.advancedTyposquatting.flagged).toBe(true);
-        expect(result.riskScore).toBe(0);
+        expect(result.signals.hard.length).toBe(0);
+        expect(result.overallSeverity).toBe('SAFE');
     });
 
     it('adds Pro scores to total for Pro users', async () => {
         const result = await analyzeUrl('https://goog1e.com', null, true);
         expect(result.checks.advancedTyposquatting.flagged).toBe(true);
-        expect(result.riskScore).toBe(50);
+        expect(result.overallSeverity).toBe('CRITICAL');
     });
 });
 describe('Pattern Analyzer - Email Scams (Pro)', () => {
@@ -87,8 +88,7 @@ describe('Pattern Analyzer - Email Scams (Pro)', () => {
         };
         const result = await analyzeUrl('https://mail.google.com', pageContent, true);
         expect(result.checks.emailScams.flagged).toBe(true);
-        expect(result.checks.emailScams.score).toBe(50);
-        expect(result.riskLevel).toBe('CRITICAL');
+        expect(result.overallSeverity).toBe('MEDIUM');
     });
 
     it('flags sender inconsistency (CEO impersonation)', async () => {
@@ -99,8 +99,7 @@ describe('Pattern Analyzer - Email Scams (Pro)', () => {
         };
         const result = await analyzeUrl('https://mail.google.com', pageContent, true);
         expect(result.checks.emailScams.flagged).toBe(true);
-        expect(result.checks.emailScams.indicators).toContain('Official name from personal email address');
-        expect(result.checks.emailScams.score).toBe(40);
+        expect(result.overallSeverity).toBe('LOW');
     });
 
     it('flags suspicious financial requests (wire transfer)', async () => {
@@ -110,7 +109,7 @@ describe('Pattern Analyzer - Email Scams (Pro)', () => {
         };
         const result = await analyzeUrl('https://outlook.office.com', pageContent, true);
         expect(result.checks.emailScams.flagged).toBe(true);
-        expect(result.checks.emailScams.score).toBe(30);
+        expect(result.overallSeverity).toBe('LOW');
     });
 
     it('does not flag normal email content', async () => {

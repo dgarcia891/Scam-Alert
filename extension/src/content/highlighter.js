@@ -10,8 +10,8 @@
  *   highlights are cleaned up
  */
 
-const HIGHLIGHT_CLASS = 'scam-alert-highlight';
-const TOOLTIP_ID = 'scam-alert-tooltip';
+const HIGHLIGHT_CLASS = 'hydra-guard-highlight';
+const TOOLTIP_ID = 'hydra-guard-tooltip';
 const ANIMATION_STYLE_ID = 'sa-highlight-animation';
 
 let activeTooltip = null;
@@ -105,7 +105,7 @@ function _applyHighlight(indicator) {
                 if (!parent) return NodeFilter.FILTER_REJECT;
                 if (
                     parent.closest(`.${HIGHLIGHT_CLASS}`) ||
-                    parent.closest('#scam-alert-overlay-root') ||
+                    parent.closest('#hydra-guard-overlay-root') ||
                     parent.closest(`#${TOOLTIP_ID}`) ||
                     ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT'].includes(parent.tagName)
                 ) return NodeFilter.FILTER_REJECT;

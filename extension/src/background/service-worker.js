@@ -27,7 +27,7 @@ import { maybeShowHttpNotification, setActionIconForTab, syncIconForTabFromCache
 import { createNavigationHandler } from './lib/navigation-handler.js';
 import { tabStateManager } from '../lib/tab-state-manager.js';
 
-console.log('[Scam Alert] Service worker v1.0.59 initializing (Hydra Hub)...');
+console.log('[Hydra Guard] Service worker v1.0.59 initializing (Hydra Hub)...');
 
 // ============================================================================
 // Installation & Updates
@@ -90,7 +90,7 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                     const response = await sendMessageToTab(tabId, createMessage(MessageTypes.ANALYZE_PAGE, {}));
                     if (response?.data) pageContent = response.data;
                 } catch (err) {
-                    console.warn('[Scam Alert] Page signal collection failed:', err.message);
+                    console.warn('[Hydra Guard] Page signal collection failed:', err.message);
                 }
             }
 
@@ -157,7 +157,7 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         }
 
     } catch (error) {
-        console.error('[Scam Alert] Critical Scan Error:', error);
+        console.error('[Hydra Guard] Critical Scan Error:', error);
         try {
             const domain = (url && typeof url === 'string') ? new URL(url).hostname : 'unknown';
             await updateStats({
@@ -173,11 +173,11 @@ async function scanActiveTabs() {
         const tabs = await chrome.tabs.query({ active: true });
         for (const tab of tabs) {
             if (tab.url && shouldScanUrl(tab.url)) {
-                scanAndHandle(tab.id, tab.url).catch(err => console.error(`[Scam Alert] Failed to auto-scan tab ${tab.id}:`, err));
+                scanAndHandle(tab.id, tab.url).catch(err => console.error(`[Hydra Guard] Failed to auto-scan tab ${tab.id}:`, err));
             }
         }
     } catch (error) {
-        console.error('[Scam Alert] startup scan sweep failed:', error);
+        console.error('[Hydra Guard] startup scan sweep failed:', error);
     }
 }
 
@@ -213,7 +213,7 @@ async function handleThreat(tabId, url, result, settings) {
 
     if (type) {
         try { await sendMessageToTab(tabId, createMessage(type, { result })); }
-        catch (error) { console.warn(`[Scam Alert] Tab ${tabId} not ready for ${type}`); }
+        catch (error) { console.warn(`[Hydra Guard] Tab ${tabId} not ready for ${type}`); }
     }
 }
 
@@ -247,4 +247,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep channel open for async
 });
 
-console.log('[Scam Alert] Service worker ready');
+console.log('[Hydra Guard] Service worker ready');

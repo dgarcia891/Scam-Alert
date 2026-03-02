@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Scam Alert",
+  "name": "Hydra Guard",
+  "short_name": "Hydra Guard",
   "version": "1.0.113",
-  "description": "Real-time scam and phishing protection. Stay safe online with automatic threat detection.",
+  "description": "Real-time protection by Hydra Guard. Stay safe online with automatic threat detection.",
   "permissions": [
     "storage",
     "webNavigation",
@@ -17,7 +18,7 @@
     "https://*/*"
   ],
   "background": {
-    "service_worker": "assets/serviceWorker.js",
+    "service_worker": "dist/assets/serviceWorker.js",
     "type": "module"
   },
   "content_scripts": [
@@ -27,10 +28,10 @@
         "https://*/*"
       ],
       "js": [
-        "assets/content.js"
+        "dist/assets/content.js"
       ],
       "css": [
-        "assets/content.css"
+        "dist/assets/content.css"
       ],
       "run_at": "document_start"
     },
@@ -42,16 +43,16 @@
         "https://outlook.office365.com/*"
       ],
       "js": [
-        "assets/emailScanner.js"
+        "dist/assets/emailScanner.js"
       ],
       "css": [
-        "assets/content.css"
+        "dist/assets/content.css"
       ],
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_popup": "popup/index.html",
+    "default_popup": "dist/popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -59,7 +60,7 @@
       "128": "icons/icon128.png"
     }
   },
-  "options_page": "options/index.html",
+  "options_page": "dist/options/index.html",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -70,7 +71,7 @@
     {
       "resources": [
         "icons/*.png",
-        "assets/*"
+        "dist/assets/*"
       ],
       "matches": [
         "<all_urls>"

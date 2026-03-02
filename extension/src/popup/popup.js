@@ -14,7 +14,7 @@ import { BlocklistComponent } from './components/Blocklist.js';
 let cachedSettings = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Scam Alert] Popup initializing...');
+    console.log('[Hydra Guard] Popup initializing...');
 
     const bind = (id, event, fn) => {
         const el = document.getElementById(id);
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (msg.type === 'scan_progress') updateProgressUI(msg.data);
     });
 
-    initializePopup().catch(err => console.error('[Scam Alert] Init error:', err));
+    initializePopup().catch(err => console.error('[Hydra Guard] Init error:', err));
 });
 
 async function initializePopup() {

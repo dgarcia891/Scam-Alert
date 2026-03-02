@@ -1,7 +1,7 @@
 # Bug Log
 
 | ID | Status | Severity | Description | Fix |
-|----|--------|----------|-------------|-----|
+| :--- | :--- | :--- | :--- | :--- |
 | BUG-000 | CLOSED | Low | System Initialization | - |
 | BUG-001 | CLOSED | High | UI changes not visible in browser | Migrated logic from legacy `src/popup` to active `src/ui` (React) and fixed manifest paths. |
 | BUG-002 | CLOSED | Medium | Report Scam Modal fails "detection script not loaded" | Added `OPEN_REPORT_MODAL` handler and generic `showReportModal` function to `content-main.js`. |
@@ -34,7 +34,11 @@
 | BUG-082 | CLOSED | Medium | SPA Back Navigation Fallback (Gmail) | Updated `content.js` to await the `NAVIGATE_BACK` response, clear the fallback timeout upon success, and natively remove the overlay from the DOM to expose the restored SPA state. |
 | BUG-083 | CLOSED | High | False Negative: "Nostalgic Photos" email with suspicious URL | Added `checkSuspiciousPort` to `url-engine.js` (flags non-standard ports like `:8443`) and a Vague Lure heuristic to `email-heuristics.js` (flags "nostalgic/photos" lures combined with external links). |
 | BUG-084 | CLOSED | High | "More Info" button on red overlay causes page refresh and overlay reset | `mutation-observer.js` was observing all DOM changes; clicking "More Info" caused a layout reflow, triggering a rescan which reset the overlay. Added an overlay-presence guard (`document.getElementById(OVERLAY_ID)`) to `mutation-observer.js` to suppress rescans while overlay is visible. |
-| BUG-085 | CLOSED | Medium | Recurring warnings after selecting "I understand the risks" | Implemented session-level acknowledgement tracking in `content.js`. Any High/Medium risk UI (overlay and toast) is now suppressed in the current page session after the user clicks "Proceed anyway". |
+| BUG-084 | CLOSED | High | Unit test regressions after SPA fix | Resolved event propagation issues in `content.js` and fixed `content.test.js` to handle Shadow DOM and ESM modules. |
+| BUG-085 | CLOSED | High | Failed to load extension (Missing assets) | Updated source `manifest.json` with `dist/` prefixes and added build-time transformation to `vite.config.js`. |
+| BUG-089 | CLOSED | Medium | Recurring warnings after selecting "I understand the risks" | Implemented session-level acknowledgement tracking in `content.js`. |
+| BUG-090 | CLOSED | Critical | Hydra Guard Rebrand | Rebranded "Scam Alert" to "Hydra Guard" across all surfaces (UI, Metadata, Technical IDs, Docs). Verified via comprehensive audit and updated test suite. |
 | FEAT-086 | CLOSED | Enhancement | Visual DOM Highlighting & Tooltips | Implemented `highlighter.js` to visually mark scam triggers on the page with red dashed borders. Added hover tooltips explaining the category/reason for each detection. Enriched Phrase and Email engines with a new `visualIndicators` field. |
 | FEAT-077 | OPEN | Enhancement | Email Reputation API Integration (e.g., EmailRep.io) to check sender history, domain age, and disposable status. | - |
 | BUG-087 | CLOSED | Medium | Highlighting tooltip blinking and color mismatch | Changed highlight color to deep vibrant red (`#dc2626`). Fixed blinking by adding a `_showTooltip` guard (preventing redundant re-renders on the same element) and increasing the vertical offset from 10px to 14px. |
+| BUG-088 | CLOSED | Low | HIDE_WARNING message not logged | Added `console.log` to `HIDE_WARNING` case in `content.js` to log when the message is received and when the overlay is removed. |

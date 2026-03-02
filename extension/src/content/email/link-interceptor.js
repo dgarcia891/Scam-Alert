@@ -67,7 +67,7 @@ export function setupLinkInterceptor(onRiskyClick) {
             event.preventDefault(); // Halt navigation
             event.stopPropagation(); // Stop other handlers
 
-            console.warn('[Scam Alert] Intercepted risky email link:', href);
+            console.warn('[Hydra Guard] Intercepted risky email link:', href);
             onRiskyClick(href);
         }
     }, { capture: true }); // Use capture phase to intercept before React/Angular handlers

@@ -6,7 +6,7 @@ import { getSettings, updateSettings } from '../lib/storage.js';
 
 // Load settings on page load
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Scam Alert] Options initializing...');
+    console.log('[Hydra Guard] Options initializing...');
 
     const helpToggles = document.querySelectorAll('.help-toggle');
     helpToggles.forEach((btn) => {
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 2. Load settings without blocking
-    loadSettings().catch(err => console.error('[Scam Alert] Settings load error:', err));
+    loadSettings().catch(err => console.error('[Hydra Guard] Settings load error:', err));
 });
 
 async function loadSettings() {

@@ -9,21 +9,21 @@ const copyManifest = () => {
         name: 'copy-manifest',
         closeBundle: () => {
             const rootDir = __dirname;
-            fs.copyFileSync(resolve(rootDir, 'manifest.json'), resolve(rootDir, 'dist/manifest.json'));
+            const manifestPath = resolve(rootDir, 'manifest.json');
+            const distManifestPath = resolve(rootDir, 'dist/manifest.json');
+
+            if (fs.existsSync(manifestPath)) {
+                let manifest = fs.readFileSync(manifestPath, 'utf8');
+                // Strip "dist/" from paths for the distribution manifest
+                manifest = manifest.replace(/"dist\//g, '"');
+                fs.writeFileSync(distManifestPath, manifest);
+                console.log(' ✅ Manifest transformed and copied to dist/');
+            }
+
             // Copy icons if they exist
             if (fs.existsSync(resolve(rootDir, 'icons'))) {
                 fs.cpSync(resolve(rootDir, 'icons'), resolve(rootDir, 'dist/icons'), { recursive: true });
             }
-            // Copy Core Extension Scripts (Background, Content, Libs)
-            // Manifest and icons are handled below.
-            // Core scripts are now bundled via rollupOptions.input.
-            // Copy services/libs that might be needed by background script if not bundled
-            // But for now, we assume background script is handled separately or we bundle it here?
-            // The current project has a 'node build/build.js' which does manual bundling.
-            // We should probably rely on this vite config to replace that eventualy, 
-            // OR make this vite config ONLY for the UI parts (popup/options).
-            // Let's make this ONLY for UI parts to start, and keep existing build process for background if needed,
-            // OR migrate everything. The plan said "specialized build for extension".
         }
     };
 };

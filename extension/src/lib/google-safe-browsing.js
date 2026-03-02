@@ -29,7 +29,7 @@ async function checkUrlsWithSafeBrowsing(urls, apiKey) {
   try {
     const requestBody = {
       client: {
-        clientId: 'scam-alert-extension',
+        clientId: 'hydra-guard-extension',
         clientVersion: '1.0.0'
       },
       threatInfo: {

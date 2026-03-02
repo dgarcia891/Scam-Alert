@@ -4,7 +4,7 @@
  * Monitors page content and forms for suspicious activity
  */
 
-console.log('[Scam Alert] Content script loaded');
+console.log('[Hydra Guard] Content script loaded');
 
 // Monitor form submissions
 document.addEventListener('submit', async (event) => {
@@ -45,7 +45,7 @@ setInterval(() => {
         redirectCount++;
 
         if (redirectCount >= 3) {
-            console.warn('[Scam Alert] Multiple redirects detected - possible scam');
+            console.warn('[Hydra Guard] Multiple redirects detected - possible scam');
 
             // Notify background script
             chrome.runtime.sendMessage({
@@ -60,7 +60,7 @@ setInterval(() => {
 // Monitor clipboard hijacking
 document.addEventListener('copy', (event) => {
     // Log clipboard access (scams sometimes replace copied crypto addresses)
-    console.log('[Scam Alert] Clipboard access detected');
+    console.log('[Hydra Guard] Clipboard access detected');
 });
 
-console.log('[Scam Alert] Content script monitoring active');
+console.log('[Hydra Guard] Content script monitoring active');

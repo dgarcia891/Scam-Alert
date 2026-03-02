@@ -1,50 +1,105 @@
-import { jest } from '@jest/globals';
-import { createOverlay } from '../../extension/src/content/content.js';
+import { jest, describe, beforeEach, afterEach, test, expect } from '@jest/globals';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const EXT = (rel) => path.resolve(__dirname, '../../extension/src', rel);
 
 describe('BUG-082: SPA Back Navigation Fallback', () => {
-    let mockSendMessage;
+    let messageListeners = [];
+    let submitListeners = [];
+
+    function loadContentScript() {
+        // Reset DOM
+        document.body.innerHTML = '';
+
+        messageListeners = [];
+        submitListeners = [];
+
+        const scriptSource = fs.readFileSync(EXT('content/content.js'), 'utf-8')
+            .replace(/^import\s+.*from\s+['"].*['"];?\s*/gm, '') // Strip imports
+            .replace(/^export\s+/gm, ''); // Strip exports
+
+        const wrappedSource = `(function() {
+            const MessageTypes = {
+                CONTEXT_DETECTED: 'context_detected',
+                NAVIGATE_BACK: 'navigate_back',
+                SCAN_RESULT: 'scan_result',
+                SHOW_WARNING: 'show_warning'
+            };
+            
+            // Mocks for dependencies that were stripped
+            const detectContext = () => ({ type: 'web' });
+            const detectEmailMetadata = () => null;
+            const scanUrl = () => Promise.resolve({ overallSeverity: 'SAFE' });
+            const highlightDetections = () => {};
+            const removeHighlights = () => {};
+
+            ${scriptSource}
+            
+            // Export to global for test access
+            window.createOverlay = createOverlay;
+        })();`;
+
+        const fn = new Function('chrome', 'document', 'window', wrappedSource);
+        fn(chrome, document, window);
+    }
 
     beforeEach(() => {
-        document.body.innerHTML = '';
         jest.useFakeTimers();
-
-        mockSendMessage = jest.fn().mockResolvedValue({ success: true });
+        const mockSendMessage = jest.fn().mockResolvedValue({ success: true });
 
         global.chrome = {
             runtime: {
+                onMessage: { addListener: jest.fn((fn) => messageListeners.push(fn)) },
                 sendMessage: mockSendMessage,
-                getURL: (path) => path
+                getURL: (path) => path,
+                onConnect: { addListener: jest.fn() }
+            },
+            storage: {
+                local: {
+                    get: jest.fn().mockResolvedValue({ settings: { highlightingEnabled: true } }),
+                    set: jest.fn().mockResolvedValue(undefined)
+                }
             }
         };
 
         // Mock window.location and history
         delete window.location;
         window.location = { href: 'https://mail.google.com/mail/u/0/#inbox' };
-
         delete window.history;
-        window.history = { length: 5 };
+        window.history = {
+            length: 5,
+            back: jest.fn(() => {
+                window.location.href = 'https://mail.google.com/mail/u/0/safe-page';
+            })
+        };
+
+        loadContentScript();
     });
 
     afterEach(() => {
         jest.useRealTimers();
+        delete window.createOverlay;
     });
 
     test('Overlay is removed and fallback is cancelled if NAVIGATE_BACK succeeds', async () => {
-        createOverlay({
+        window.createOverlay({
             recommendations: ['Danger'],
-            checks: { phishing: { details: 'Phishing domain' } }
+            checks: { phishing: { flagged: true, title: 'Phishing', details: 'Phishing domain' } }
         });
 
-        const root = document.getElementById('scam-alert-overlay-root');
+        const root = document.getElementById('hydra-guard-overlay-root');
         const shadow = root.shadowRoot;
         const btnBack = shadow.getElementById('btn-back');
 
-        // Click is async now, so we need to wait for the microtasks
-        const clickPromise = btnBack.click();
+        // Click is async now
+        btnBack.click();
 
-        // Wait for all promises (like our mocked sendMessage) to resolve
+        // Wait for microtasks
         await Promise.resolve();
-        await Promise.resolve(); // extra tick just to be safe for microtasks
+        await Promise.resolve();
 
         expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith(
             expect.objectContaining({ type: 'navigate_back' })
@@ -56,7 +111,7 @@ describe('BUG-082: SPA Back Navigation Fallback', () => {
         // Location should NOT be about:blank because it succeeded
         expect(window.location.href).not.toBe('about:blank');
 
-        // Overlay should be removed so user can see the previous SPA state
-        expect(document.getElementById('scam-alert-overlay-root')).toBeNull();
+        // Overlay should be removed
+        expect(document.getElementById('hydra-guard-overlay-root')).toBeNull();
     });
 });

@@ -31,9 +31,9 @@ describe('BUG-083: False Negative on "Nostalgic Photos" Scam', () => {
         expect(result.indicators).toContain('Vague social lure with external link');
     });
 
-    test('analyzeUrl should produce a non-zero risk score for the scam URL', async () => {
+    test('analyzeUrl should produce a non-SAFE severity for the scam URL', async () => {
         const result = await analyzeUrl(SCAM_URL, null, true);
         expect(result.checks.suspiciousPort.flagged).toBe(true);
-        expect(result.riskScore).toBeGreaterThan(0);
+        expect(result.overallSeverity).not.toBe('SAFE');
     });
 });

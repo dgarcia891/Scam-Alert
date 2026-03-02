@@ -12,15 +12,15 @@ importScripts(
     'api-integrations/unified-detector.js'
 );
 
-console.log('[Scam Alert] Background service worker initialized');
+console.log('[Hydra Guard] Background service worker initialized');
 
 // Extension installation
 chrome.runtime.onInstalled.addListener(async (details) => {
-    console.log('[Scam Alert] Extension installed:', details.reason);
+    console.log('[Hydra Guard] Extension installed:', details.reason);
 
     if (details.reason === 'install') {
         // Download PhishTank database on first install
-        console.log('[Scam Alert] Downloading PhishTank database...');
+        console.log('[Hydra Guard] Downloading PhishTank database...');
         await downloadPhishTankDatabase();
 
         // Set default options
@@ -36,7 +36,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         chrome.notifications.create({
             type: 'basic',
             iconUrl: 'icons/icon48.png',
-            title: 'Scam Alert Installed',
+            title: 'Hydra Guard Installed',
             message: 'You\'re now protected from scams. The extension will scan websites in the background.',
             priority: 2
         });
@@ -50,7 +50,7 @@ chrome.alarms.create('updatePhishTankDB', {
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === 'updatePhishTankDB') {
-        console.log('[Scam Alert] Updating PhishTank database...');
+        console.log('[Hydra Guard] Updating PhishTank database...');
         await downloadPhishTankDatabase();
     }
 });
@@ -71,17 +71,17 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     ]);
 
     if (!settings.scanningEnabled) {
-        console.log('[Scam Alert] Scanning disabled');
+        console.log('[Hydra Guard] Scanning disabled');
         return;
     }
 
     // Check if URL should be scanned
     if (!shouldScanUrl(url)) {
-        console.log('[Scam Alert] Skipping safe/internal URL:', url);
+        console.log('[Hydra Guard] Skipping safe/internal URL:', url);
         return;
     }
 
-    console.log('[Scam Alert] Scanning URL before navigation:', url);
+    console.log('[Hydra Guard] Scanning URL before navigation:', url);
 
     // Scan the URL
     const result = await scanUrlWithCache(url, {
@@ -135,7 +135,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             }
         }
     } catch (error) {
-        console.error('[Scam Alert] Content analysis error:', error);
+        console.error('[Hydra Guard] Content analysis error:', error);
     }
 });
 
@@ -167,7 +167,7 @@ function analyzePageContent() {
  * @param {Object} result - Scan result
  */
 async function handleThreatDetected(tabId, url, result) {
-    console.warn('[Scam Alert] THREAT DETECTED:', url, result);
+    console.warn('[Hydra Guard] THREAT DETECTED:', url, result);
 
     // Store threat info for the tab
     await chrome.storage.session.set({
@@ -204,7 +204,7 @@ async function handleThreatDetected(tabId, url, result) {
             args: [result]
         });
     } catch (error) {
-        console.error('[Scam Alert] Failed to inject warning:', error);
+        console.error('[Hydra Guard] Failed to inject warning:', error);
     }
 }
 
@@ -214,10 +214,10 @@ async function handleThreatDetected(tabId, url, result) {
  */
 function showWarningOverlay(result) {
     // Don't show multiple overlays
-    if (document.getElementById('scam-alert-overlay')) return;
+    if (document.getElementById('hydra-guard-overlay')) return;
 
     const overlay = document.createElement('div');
-    overlay.id = 'scam-alert-overlay';
+    overlay.id = 'hydra-guard-overlay';
     overlay.style.cssText = `
     position: fixed;
     top: 0;
@@ -258,7 +258,7 @@ function showWarningOverlay(result) {
         </div>
       </div>
       <div style="display: flex; gap: 16px; justify-content: center;">
-        <button id="scam-alert-go-back" style="
+        <button id="hydra-guard-go-back" style="
           background: #dc2626;
           color: white;
           border: none;
@@ -271,7 +271,7 @@ function showWarningOverlay(result) {
         ">
           ← Go Back to Safety
         </button>
-        <button id="scam-alert-proceed" style="
+        <button id="hydra-guard-proceed" style="
           background: transparent;
           color: #6b7280;
           border: 2px solid #d1d5db;
@@ -291,20 +291,20 @@ function showWarningOverlay(result) {
     document.body.appendChild(overlay);
 
     // Add event listeners
-    document.getElementById('scam-alert-go-back').onclick = () => {
+    document.getElementById('hydra-guard-go-back').onclick = () => {
         window.history.back();
     };
 
-    document.getElementById('scam-alert-proceed').onclick = () => {
+    document.getElementById('hydra-guard-proceed').onclick = () => {
         overlay.remove();
     };
 
     // Hover effects
-    const goBackBtn = document.getElementById('scam-alert-go-back');
+    const goBackBtn = document.getElementById('hydra-guard-go-back');
     goBackBtn.onmouseenter = () => goBackBtn.style.background = '#b91c1c';
     goBackBtn.onmouseleave = () => goBackBtn.style.background = '#dc2626';
 
-    const proceedBtn = document.getElementById('scam-alert-proceed');
+    const proceedBtn = document.getElementById('hydra-guard-proceed');
     proceedBtn.onmouseenter = () => {
         proceedBtn.style.background = '#f3f4f6';
         proceedBtn.style.borderColor = '#9ca3af';
@@ -338,4 +338,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-console.log('[Scam Alert] Background service worker ready');
+console.log('[Hydra Guard] Background service worker ready');

@@ -91,7 +91,7 @@ describe('checkUrlsWithSafeBrowsing', () => {
     expect(options.method).toBe('POST');
 
     const body = JSON.parse(options.body);
-    expect(body.client.clientId).toBe('scam-alert-extension');
+    expect(body.client.clientId).toBe('hydra-guard-extension');
     expect(body.threatInfo.threatTypes).toHaveLength(4);
     expect(body.threatInfo.threatEntries).toEqual([
       { url: 'https://example.com' },

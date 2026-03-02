@@ -1,8 +1,8 @@
-# Product Requirements Document: Scam Alert
+# Product Requirements Document: Hydra Guard
 
 ## Overview
 
-**Name**: Scam Alert  
+**Name**: Hydra Guard  
 **Type**: Chrome Extension (Manifest V3)  
 **Purpose**: Real-time scam and phishing protection for seniors and all web users
 
@@ -72,7 +72,7 @@ A Chrome extension that combines multiple detection methods:
 
 ## Feature Checklist (Backlog)
 
-This list is intended to be explicit about what Scam Alert should:
+This list is intended to be explicit about what Hydra Guard should:
 
 - check for
 - alert on
@@ -400,22 +400,22 @@ User navigates → webNavigation event → Service Worker
 
 This section is intended to be plain and explicit.
 
-1. **What Scam Alert reads**
+1. **What Hydra Guard reads**
    - The website address (URL) of the active tab when scanning.
    - Basic scan signals produced by the extension’s own logic (e.g., "non-HTTPS", "suspicious TLD").
-   - If optional content scanning features are enabled in the future, Scam Alert may read limited page signals (e.g., presence of a password field) as described in the Settings.
+   - If optional content scanning features are enabled in the future, Hydra Guard may read limited page signals (e.g., presence of a password field) as described in the Settings.
 
-2. **What Scam Alert does NOT read**
+2. **What Hydra Guard does NOT read**
    - It does not read or store typed passwords.
    - It does not read or store form field values.
    - It does not record a full browsing history timeline.
 
-3. **What Scam Alert stores locally**
+3. **What Hydra Guard stores locally**
    - User settings (feature toggles, API key presence, preferences).
    - Short-lived scan cache entries for performance (implementation-defined TTL).
    - Optional statistics counters (e.g., number of warnings shown), if enabled.
 
-4. **What Scam Alert sends off-device (third-party services)**
+4. **What Hydra Guard sends off-device (third-party services)**
    - **Google Safe Browsing (optional)**: sends the current page URL as part of a reputation query when enabled.
    - Other services must be explicitly listed here before being added.
 

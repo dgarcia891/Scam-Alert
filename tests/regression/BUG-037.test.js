@@ -15,7 +15,7 @@ describe('BUG-037: Missing sendResponse in Content Script', () => {
                     break;
                 default:
                     // logic in content-main.js just logs warn
-                    console.warn('[Scam Alert Content] Unknown message:', type);
+                    console.warn('[Hydra Guard Content] Unknown message:', type);
                     sendResponse({ success: false, error: 'Unknown message type' }); // Fixed
             }
             return true;

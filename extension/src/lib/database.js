@@ -5,7 +5,7 @@
  * This replaces the Supabase implementation for a zero-cost architecture.
  */
 
-const REMOTE_PATTERNS_URL = 'https://raw.githubusercontent.com/dgarcia891/Scam-Alert/main/public/patterns.json';
+const REMOTE_PATTERNS_URL = 'https://raw.githubusercontent.com/dgarcia891/Hydra-Guard/main/public/patterns.json';
 
 /**
  * Fetch latest scam patterns from remote JSON

@@ -30,7 +30,7 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
         highlightDetections(mockResult([
             { phrase: 'claim your prize', category: 'Fake Prize', reason: 'Scam lure.' }
         ]));
-        const marks = document.querySelectorAll('.scam-alert-highlight');
+        const marks = document.querySelectorAll('.hydra-guard-highlight');
         expect(marks).toHaveLength(1);
         expect(marks[0].textContent).toBe('Claim your prize');
     });
@@ -40,7 +40,7 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
         highlightDetections(mockResult([
             { phrase: 'claim your prize', category: 'Fake Prize', reason: 'Lure.' }
         ]));
-        const mark = document.querySelector('.scam-alert-highlight');
+        const mark = document.querySelector('.hydra-guard-highlight');
         expect(mark.style.display).toBe('inline');
     });
 
@@ -49,7 +49,7 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
         highlightDetections(mockResult([
             { phrase: 'claim your prize', category: '<b>XSS</b>', reason: '<script>alert(1)</script>' }
         ]));
-        const mark = document.querySelector('.scam-alert-highlight');
+        const mark = document.querySelector('.hydra-guard-highlight');
         expect(mark).not.toBeNull();
         // The mark itself is safe — textContent only
         expect(mark.textContent).toBe('Claim your prize');
@@ -60,10 +60,10 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
         highlightDetections(mockResult([
             { phrase: 'claim your prize', category: '<img src=x onerror=alert(1)>', reason: 'safe' }
         ]));
-        const mark = document.querySelector('.scam-alert-highlight');
+        const mark = document.querySelector('.hydra-guard-highlight');
         mark.dispatchEvent(new MouseEvent('mouseenter'));
 
-        const tooltip = document.getElementById('scam-alert-tooltip');
+        const tooltip = document.getElementById('hydra-guard-tooltip');
         expect(tooltip).not.toBeNull();
         // Should contain literal angle brackets as text, not rendered tags
         expect(tooltip.querySelector('img')).toBeNull();
@@ -85,12 +85,12 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
         highlightDetections(mockResult([
             { phrase: 'claim your prize', category: 'A', reason: 'B' }
         ]));
-        expect(document.querySelectorAll('.scam-alert-highlight')).toHaveLength(1);
+        expect(document.querySelectorAll('.hydra-guard-highlight')).toHaveLength(1);
         expect(document.getElementById('sa-highlight-animation')).not.toBeNull();
 
         removeHighlights();
 
-        expect(document.querySelectorAll('.scam-alert-highlight')).toHaveLength(0);
+        expect(document.querySelectorAll('.hydra-guard-highlight')).toHaveLength(0);
         expect(document.getElementById('sa-highlight-animation')).toBeNull();
         expect(document.body.textContent).toContain('Claim your prize!');
     });
@@ -102,7 +102,7 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
             { phrase: 'claim your prize', category: 'C', reason: 'D' }
         ]));
         // Only 1 mark — the longer phrase consumed the shorter
-        const marks = document.querySelectorAll('.scam-alert-highlight');
+        const marks = document.querySelectorAll('.hydra-guard-highlight');
         expect(marks).toHaveLength(1);
         expect(marks[0].textContent).toBe('Claim your prize');
     });
@@ -116,7 +116,7 @@ describe('Scam Highlighter (FEAT-086 polish)', () => {
         highlightDetections(mockResult([
             { phrase: 'claim your prize', category: 'A', reason: 'B' }
         ]));
-        expect(document.querySelectorAll('.scam-alert-highlight')).toHaveLength(0);
+        expect(document.querySelectorAll('.hydra-guard-highlight')).toHaveLength(0);
     });
 
     // ── Explanations ──────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ export async function checkProStatus() {
     try {
         return await isPro();
     } catch (err) {
-        console.warn('[Scam Alert] Pro status check failed:', err);
+        console.warn('[Hydra Guard] Pro status check failed:', err);
         return false;
     }
 }

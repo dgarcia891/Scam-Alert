@@ -15,7 +15,7 @@ const metadataMap = new Map();
 class TooltipManager {
     constructor() {
         this.container = document.createElement('div');
-        this.container.id = 'scam-alert-tooltip-root';
+        this.container.id = 'hydra-guard-tooltip-root';
         Object.assign(this.container.style, {
             position: 'absolute',
             top: '0',
@@ -366,7 +366,7 @@ function initTooltipManager() {
 
             // Setup global event delegation for highlights
             document.addEventListener('mouseover', (e) => {
-                const span = e.target.closest('.scam-alert-highlight');
+                const span = e.target.closest('.hydra-guard-highlight');
                 if (span && tooltipManager) {
                     const issueId = span.getAttribute('data-scam-issue-id');
                     tooltipManager.show(span, issueId, false);
@@ -374,14 +374,14 @@ function initTooltipManager() {
             });
 
             document.addEventListener('mouseout', (e) => {
-                const span = e.target.closest('.scam-alert-highlight');
+                const span = e.target.closest('.hydra-guard-highlight');
                 if (span && tooltipManager && !tooltipManager.isLocked) {
                     tooltipManager.hide(false);
                 }
             });
 
             document.addEventListener('click', (e) => {
-                const span = e.target.closest('.scam-alert-highlight');
+                const span = e.target.closest('.hydra-guard-highlight');
                 if (span && tooltipManager) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -399,18 +399,18 @@ export function applyInPageHighlighting(result) {
     initTooltipManager();
 
     // Generate stable CSS for the highlights
-    if (!document.getElementById('scam-alert-highlight-styles')) {
+    if (!document.getElementById('hydra-guard-highlight-styles')) {
         const style = document.createElement('style');
-        style.id = 'scam-alert-highlight-styles';
+        style.id = 'hydra-guard-highlight-styles';
         style.textContent = `
-            .scam-alert-highlight {
+            .hydra-guard-highlight {
                 background-color: rgba(225, 29, 72, 0.2) !important;
                 border-bottom: 2px solid #e11d48 !important;
                 cursor: pointer !important;
                 border-radius: 2px;
                 transition: background-color 0.2s;
             }
-            .scam-alert-highlight:hover {
+            .hydra-guard-highlight:hover {
                 background-color: rgba(225, 29, 72, 0.4) !important;
             }
         `;
@@ -442,7 +442,7 @@ export function applyInPageHighlighting(result) {
             const replacements = [];
 
             while (node = walker.nextNode()) {
-                if (node.parentElement && node.parentElement.closest('.scam-alert-highlight')) continue;
+                if (node.parentElement && node.parentElement.closest('.hydra-guard-highlight')) continue;
                 if (node.parentElement && ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(node.parentElement.tagName)) continue;
 
                 const text = node.textContent;
@@ -461,7 +461,7 @@ export function applyInPageHighlighting(result) {
                     range.setEnd(node, index + length);
 
                     const span = document.createElement('span');
-                    span.className = 'scam-alert-highlight';
+                    span.className = 'hydra-guard-highlight';
                     span.setAttribute('data-scam-issue-id', issueId);
 
                     range.surroundContents(span);

@@ -52,7 +52,7 @@ describe('BUG-073: Interactive Highlighting & Reporting', () => {
 
         applyInPageHighlighting(mockResult);
 
-        const highlightSpans = document.querySelectorAll('span.scam-alert-highlight');
+        const highlightSpans = document.querySelectorAll('span.hydra-guard-highlight');
         expect(highlightSpans.length).toBe(1);
 
         const span = highlightSpans[0];
@@ -60,15 +60,15 @@ describe('BUG-073: Interactive Highlighting & Reporting', () => {
         expect(span.getAttribute('data-scam-issue-id')).toBe('scam-issue-1');
 
         // Ensure Shadow DOM host is injected
-        expect(document.getElementById('scam-alert-tooltip-root')).not.toBeNull();
+        expect(document.getElementById('hydra-guard-tooltip-root')).not.toBeNull();
     });
 
     test('Tooltip interaction states (Hover, Click Lock, Form Submit)', async () => {
         setupDOM('action required immediately');
         applyInPageHighlighting(mockResult);
 
-        const span = document.querySelector('.scam-alert-highlight');
-        const overlayRoot = document.getElementById('scam-alert-tooltip-root');
+        const span = document.querySelector('.hydra-guard-highlight');
+        const overlayRoot = document.getElementById('hydra-guard-tooltip-root');
         const shadow = overlayRoot.shadowRoot;
         const tooltip = shadow.querySelector('.tooltip');
 
@@ -138,8 +138,8 @@ describe('BUG-073: Interactive Highlighting & Reporting', () => {
         setupDOM('action required immediately');
         applyInPageHighlighting(mockResult);
 
-        const span = document.querySelector('.scam-alert-highlight');
-        const tooltip = document.getElementById('scam-alert-tooltip-root').shadowRoot.querySelector('.tooltip');
+        const span = document.querySelector('.hydra-guard-highlight');
+        const tooltip = document.getElementById('hydra-guard-tooltip-root').shadowRoot.querySelector('.tooltip');
 
         // Lock
         span.dispatchEvent(new MouseEvent('click', { bubbles: true }));

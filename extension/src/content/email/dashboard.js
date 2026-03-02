@@ -6,7 +6,7 @@ import { MessageTypes } from '../../lib/messaging.js';
 import { extractEmailData } from './extraction-logic.js';
 
 export function showThreatDashboard(result) {
-    const DASHBOARD_ID = 'scam-alert-threat-dashboard';
+    const DASHBOARD_ID = 'hydra-guard-threat-dashboard';
     const existing = document.getElementById(DASHBOARD_ID);
     if (existing) existing.remove();
 
@@ -56,7 +56,7 @@ export function showThreatDashboard(result) {
     card.className = 'sa-card';
     card.innerHTML = `
         <div class="sa-header">
-            <div class="sa-title">SCAM ALERT</div>
+            <div class="sa-title">HYDRA GUARD</div>
             <button class="sa-close" id="sa-close-btn">✕</button>
         </div>
         <div class="sa-content">

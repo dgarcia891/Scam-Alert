@@ -15,7 +15,7 @@ describe('BUG-087: Tooltip Blinking and Orange Color', () => {
             }
         });
 
-        const mark = document.querySelector('.scam-alert-highlight');
+        const mark = document.querySelector('.hydra-guard-highlight');
         expect(mark.style.borderBottom).toContain('#dc2626');
     });
 
@@ -28,10 +28,10 @@ describe('BUG-087: Tooltip Blinking and Orange Color', () => {
             }
         });
 
-        const mark = document.querySelector('.scam-alert-highlight');
+        const mark = document.querySelector('.hydra-guard-highlight');
         mark.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
 
-        const tooltip = document.getElementById('scam-alert-tooltip');
+        const tooltip = document.getElementById('hydra-guard-tooltip');
         expect(tooltip.style.pointerEvents).toBe('none');
     });
 
@@ -46,15 +46,15 @@ describe('BUG-087: Tooltip Blinking and Orange Color', () => {
             }
         });
 
-        const mark = document.querySelector('.scam-alert-highlight');
+        const mark = document.querySelector('.hydra-guard-highlight');
 
         // First hover
         mark.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-        const t1 = document.getElementById('scam-alert-tooltip');
+        const t1 = document.getElementById('hydra-guard-tooltip');
 
         // Second hover on the same element
         mark.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-        const t2 = document.getElementById('scam-alert-tooltip');
+        const t2 = document.getElementById('hydra-guard-tooltip');
 
         expect(t1).toBe(t2); // Should be the exact same element, not replaced
     });

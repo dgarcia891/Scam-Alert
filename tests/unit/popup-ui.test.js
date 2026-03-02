@@ -123,21 +123,21 @@ describe('renderSources', () => {
         `;
     });
 
-    test('renders pattern analysis source with risk score', () => {
+    test('renders pattern analysis source with severity', () => {
         renderSources({
-            pattern: { riskScore: 45, flagged: true }
+            pattern: { overallSeverity: 'HIGH', flagged: true }
         });
 
         const section = document.getElementById('sourcesSection');
         const list = document.getElementById('sourcesList');
         expect(section.style.display).toBe('block');
         expect(list.innerHTML).toContain('Pattern Analysis');
-        expect(list.innerHTML).toContain('45');
+        expect(list.innerHTML).toContain('HIGH');
     });
 
     test('renders safe Google Safe Browsing source', () => {
         renderSources({
-            pattern: { riskScore: 0 },
+            pattern: { overallSeverity: 'SAFE' },
             googleSafeBrowsing: { safe: true }
         });
 
@@ -166,7 +166,7 @@ describe('renderSources', () => {
     test('returns early when elements are missing', () => {
         document.body.innerHTML = '';
         // Should not throw
-        expect(() => renderSources({ pattern: { riskScore: 0 } })).not.toThrow();
+        expect(() => renderSources({ pattern: { overallSeverity: 'SAFE' } })).not.toThrow();
     });
 });
 

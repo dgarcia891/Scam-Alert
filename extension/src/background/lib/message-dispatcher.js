@@ -49,7 +49,7 @@ export function handleIncomingMessage(message, sender, context) {
             return handleSyncBlocklist(data);
 
         default:
-            console.warn('[Scam Alert] Unknown message type:', type);
+            console.warn('[Hydra Guard] Unknown message type:', type);
             return { error: 'Unknown message type' };
     }
 }
@@ -66,13 +66,13 @@ async function handleGetTabStatus() {
 async function handleScanCurrentTab(sender, data, scanAndHandle) {
     const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (tab) {
-        console.log('[Scam Alert] Triggering scan from message for:', tab.url);
+        console.log('[Hydra Guard] Triggering scan from message for:', tab.url);
         await scanAndHandle(tab.id, tab.url, {
             forceRefresh: Boolean(data?.forceRefresh),
             pageContent: data?.pageContent
         });
     } else {
-        console.warn('[Scam Alert] SCAN_CURRENT_TAB received but no tab found');
+        console.warn('[Hydra Guard] SCAN_CURRENT_TAB received but no tab found');
     }
     return { success: true };
 }
@@ -101,7 +101,7 @@ async function handleAddToWhitelist(data, getWhitelist) {
 }
 
 async function handleResetStats() {
-    console.log('[Scam Alert] Manual stats reset requested');
+    console.log('[Hydra Guard] Manual stats reset requested');
     await chrome.storage.local.remove('statistics');
     await repairStatistics();
     await repairStatistics(); // Double repair to ensure consistency
@@ -109,13 +109,13 @@ async function handleResetStats() {
 }
 
 async function handleReportScam(data) {
-    console.log('[Scam Alert] Processing report from content script:', data);
+    console.log('[Hydra Guard] Processing report from content script:', data);
     try {
         const { url, type, description, metadata } = data;
         const reportResult = await submitReport(url, type, description, metadata);
         return { success: reportResult.success, error: reportResult.error };
     } catch (error) {
-        console.error('[Scam Alert] Report submission failed:', error);
+        console.error('[Hydra Guard] Report submission failed:', error);
         return { success: false, error: error.message };
     }
 }
@@ -138,7 +138,7 @@ async function handleRemoveFromBlocklist(data) {
 }
 
 async function handleSyncBlocklist(data) {
-    console.log('[Scam Alert] Manual blocklist sync requested');
+    console.log('[Hydra Guard] Manual blocklist sync requested');
     const result = await syncManager.sync(!!data?.force);
     return result;
 }

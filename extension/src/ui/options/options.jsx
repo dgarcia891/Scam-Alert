@@ -22,7 +22,7 @@ const Navbar = ({ activeTab, onTabChange, isPro, onUpgrade }) => {
                     <Shield className="text-white w-6 h-6" />
                 </div>
                 <div className="flex flex-col">
-                    <span className="font-bold text-white text-lg tracking-tight">Scam Alert</span>
+                    <span className="font-bold text-white text-lg tracking-tight">Hydra Guard</span>
                     <span className="text-xs text-slate-400 font-medium tracking-wide">SAFE BROWSING</span>
                 </div>
             </div>
@@ -752,7 +752,7 @@ const WhitelistSettings = () => {
 
             <Card className="bg-indigo-500/5 border-indigo-500/10">
                 <CardHeader>
-                    <CardTitle className="text-indigo-300">Help Improve Scam Alert</CardTitle>
+                    <CardTitle className="text-indigo-300">Help Improve Hydra Guard</CardTitle>
                 </CardHeader>
                 <div className="p-4">
                     <p className="text-slate-400 text-sm mb-4">
@@ -762,7 +762,7 @@ const WhitelistSettings = () => {
                         <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => window.open('https://github.com/dgarcia891/Scam-Alert/issues/new?title=False+Positive+Report')}
+                            onClick={() => window.open('https://github.com/dgarcia891/Hydra-Guard/issues/new?title=False+Positive+Report')}
                         >
                             Report False Positive
                         </Button>
@@ -770,7 +770,7 @@ const WhitelistSettings = () => {
                             variant="ghost"
                             size="sm"
                             className="text-indigo-400"
-                            onClick={() => window.open('https://github.com/dgarcia891/Scam-Alert/issues/new?title=New+Scam+Report')}
+                            onClick={() => window.open('https://github.com/dgarcia891/Hydra-Guard/issues/new?title=New+Scam+Report')}
                         >
                             Report Missed Scam
                         </Button>

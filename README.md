@@ -1,9 +1,9 @@
-# Scam Alert - Developer Guide
+# Hydra Guard
 
 ## 🏗️ Project Structure
 
 ```
-Scam Alert/
+Hydra Guard/
 ├── dist/                             # 🚀 LOAD THIS FOLDER IN CHROME
 │   ├── manifest.json
 │   ├── popup/

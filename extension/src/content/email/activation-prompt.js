@@ -2,7 +2,7 @@
  * Activation Prompt UI
  */
 export function showActivationPrompt(triggerScan) {
-    const PROMPT_ID = 'scam-alert-activation-prompt';
+    const PROMPT_ID = 'hydra-guard-activation-prompt';
     if (document.getElementById(PROMPT_ID)) return;
 
     const container = document.createElement('div');

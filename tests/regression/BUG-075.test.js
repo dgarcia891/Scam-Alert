@@ -42,7 +42,7 @@ describe('BUG-075: "Go back to safety" Button Fallback Navigation', () => {
             checks: { phishing: { details: 'Phishing domain' } }
         });
 
-        const root = document.getElementById('scam-alert-overlay-root');
+        const root = document.getElementById('hydra-guard-overlay-root');
         const shadow = root.shadowRoot;
         const btnBack = shadow.getElementById('btn-back');
 

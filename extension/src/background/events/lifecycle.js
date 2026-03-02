@@ -5,7 +5,7 @@ import { repairStatistics, getSettings, updateSettings, clearCache } from '../..
 import { syncPatterns } from '../../lib/database.js';
 
 export async function onInstalled(details, scanActiveTabs) {
-    console.log('[Scam Alert] Extension installed/updated:', details.reason);
+    console.log('[Hydra Guard] Extension installed/updated:', details.reason);
     try {
         await repairStatistics();
         const settings = await getSettings();
@@ -18,7 +18,7 @@ export async function onInstalled(details, scanActiveTabs) {
             chrome.notifications.create({
                 type: 'basic',
                 iconUrl: chrome.runtime.getURL('icons/icon48.png'),
-                title: 'Scam Alert Installed',
+                title: 'Hydra Guard Installed',
                 message: 'You\'re now protected from scams.',
                 priority: 2
             });
@@ -29,7 +29,7 @@ export async function onInstalled(details, scanActiveTabs) {
         await syncPatterns();
         await scanActiveTabs();
     } catch (err) {
-        console.error('[Scam Alert] onInstalled error:', err);
+        console.error('[Hydra Guard] onInstalled error:', err);
     }
 }
 

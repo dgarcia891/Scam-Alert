@@ -3,7 +3,7 @@ import { detectContext, detectEmailMetadata } from '../lib/context-detector.js';
 import { scanUrl } from '../lib/detector.js';
 import { highlightDetections, removeHighlights } from './highlighter.js';
 
-console.log('[Scam Alert] Content script loaded (Hydra Guard)');
+console.log('[Hydra Guard] Content script loaded (Hydra Guard)');
 
 // Immediate Context Detection
 const initialContext = detectContext();
@@ -21,7 +21,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
 }
 
 // Export for unit testing
-export const OVERLAY_ID = 'scam-alert-overlay-root';
+export const OVERLAY_ID = 'hydra-guard-overlay-root';
 let warningAcknowledged = false;
 let currentScanResult = null; // Track latest result for Layer 2 decisions
 
@@ -136,7 +136,7 @@ function showTopBanner(result) {
     banner.innerHTML = `
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 18px;">${isCaution ? '⚠️' : '🚨'}</span>
-            <span><strong>Scam Alert:</strong> ${result.reasons?.[0]?.message || 'Caution advised on this site.'}</span>
+            <span><strong>Hydra Guard:</strong> ${result.reasons?.[0]?.message || 'Caution advised on this site.'}</span>
         </div>
         <button onclick="this.parentElement.remove()" style="background:transparent; border:none; color:inherit; font-weight:600; cursor:pointer; text-decoration:underline;">Dismiss</button>
     `;
@@ -144,9 +144,9 @@ function showTopBanner(result) {
 }
 
 function showReportModal() {
-    if (document.getElementById('scam-alert-report-modal')) return;
+    if (document.getElementById('hydra-guard-report-modal')) return;
     const overlay = document.createElement('div');
-    overlay.id = 'scam-alert-report-modal';
+    overlay.id = 'hydra-guard-report-modal';
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.7); z-index: 2147483647;
@@ -192,7 +192,7 @@ function showReportModal() {
                         <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
                         <h3 style="margin: 0 0 8px 0;">Report Submitted</h3>
                         <p style="color: #aaa; font-size: 14px;">Thank you for helping keep the community safe.</p>
-                        <button onclick="document.getElementById('scam-alert-report-modal').remove()" style="margin-top: 20px; background:#ef4444; color:#fff; border:none; padding:8px 24px; border-radius:6px; cursor:pointer;">Close</button>
+                        <button onclick="document.getElementById('hydra-guard-report-modal').remove()" style="margin-top: 20px; background:#ef4444; color:#fff; border:none; padding:8px 24px; border-radius:6px; cursor:pointer;">Close</button>
                     </div>
                 `;
             } else {
@@ -283,11 +283,11 @@ export function createOverlay(result) {
 
 function showDetectionToast(result) {
     if (warningAcknowledged || result.overallSeverity === 'SAFE' || result.overallSeverity === 'LOW') return;
-    const existing = document.getElementById('scam-alert-toast');
+    const existing = document.getElementById('hydra-guard-toast');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
-    toast.id = 'scam-alert-toast';
+    toast.id = 'hydra-guard-toast';
     toast.style.cssText = `
         position: fixed; top: 20px; right: 20px; z-index: 2147483646;
         background: #1e293b; color: white; padding: 16px; border-radius: 12px;
@@ -302,7 +302,6 @@ function showDetectionToast(result) {
 // Listen for messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const { type, data, payload } = message;
-    console.log('[Scam Alert] Message received:', type, { data, payload });
     const result = data?.result || payload?.result;
 
     switch (type) {

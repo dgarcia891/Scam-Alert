@@ -18,7 +18,7 @@ export function createNavigationHandler(context) {
         if (!shouldScanUrl(url)) return;
 
         const tabId = details.tabId;
-        console.log(`[Scam Alert] Navigation detected on tab ${tabId}:`, url);
+        console.log(`[Hydra Guard] Navigation detected on tab ${tabId}:`, url);
 
         // Immediate: Clear stale badge state to prevent flickers (BUG-062)
         try {
@@ -30,7 +30,7 @@ export function createNavigationHandler(context) {
         try {
             await scanAndHandle(tabId, url);
         } catch (error) {
-            console.error('[Scam Alert] Navigation scan failed:', error);
+            console.error('[Hydra Guard] Navigation scan failed:', error);
             // Fallback: sync icon from cache if available (BUG-059: pass tabStateManager)
             await syncIconForTabFromCache(tabId, url, shouldScanUrl, context.tabStateManager);
         }

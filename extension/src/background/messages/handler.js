@@ -34,7 +34,7 @@ export async function handleIncomingMessage(message, sender, context) {
         case MessageTypes.NAVIGATE_BACK:
             return handleNavigateBack(sender);
         default:
-            console.log('[Scam Alert] Unknown message type:', type);
+            console.log('[Hydra Guard] Unknown message type:', type);
             return { error: 'Unknown message type' };
     }
 }
@@ -123,7 +123,7 @@ async function handleGetScanResults(msgData, tabStateManager, getCachedScan) {
                 }
             }
         } catch (e) {
-            console.warn('[Scam Alert] Cache fallback for tab state failed', e);
+            console.warn('[Hydra Guard] Cache fallback for tab state failed', e);
         }
     }
 
@@ -169,7 +169,7 @@ async function handleReportFalsePositive(data, submitFalsePositive) {
 
         return result;
     } catch (error) {
-        console.error('[Scam Alert] False positive handler error:', error);
+        console.error('[Hydra Guard] False positive handler error:', error);
         return { success: false, error: error.message };
     }
 }

@@ -35,7 +35,7 @@ async function checkUrlWithPhishTank(url, options = {}) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'scam-alert-extension/1.0'
+                'User-Agent': 'hydra-guard-extension/1.0'
             },
             body: formData.toString()
         });
@@ -95,7 +95,7 @@ async function downloadPhishTankDatabase(apiKey = '') {
 
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'scam-alert-extension/1.0',
+                'User-Agent': 'hydra-guard-extension/1.0',
                 'Accept': 'application/json'
             }
         });

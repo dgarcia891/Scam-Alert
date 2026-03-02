@@ -55,7 +55,7 @@ export async function maybeShowHttpNotification(url, result, settings) {
             priority: 0
         });
     } catch (error) {
-        console.warn('[Scam Alert] Failed to show HTTP notification:', error);
+        console.warn('[Hydra Guard] Failed to show HTTP notification:', error);
     }
 }
 
@@ -106,7 +106,7 @@ export function ignoreTabError(error) {
         error.message?.includes('Tabs cannot be edited')) {
         return; // Expected race condition
     }
-    console.warn('[Scam Alert] Tab action failed:', error);
+    console.warn('[Hydra Guard] Tab action failed:', error);
 }
 
 export async function setActionIconForTab(tabId, severity) {
@@ -168,7 +168,7 @@ export async function syncIconForTabFromCache(tabId, url, shouldScanUrl, tabStat
             } catch (error) { ignoreTabError(error); }
         }
     } catch (error) {
-        console.warn('[Scam Alert] Failed to sync action icon from cache:', error);
+        console.warn('[Hydra Guard] Failed to sync action icon from cache:', error);
     }
 }
 

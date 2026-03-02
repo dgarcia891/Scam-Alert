@@ -44,7 +44,7 @@ export async function submitReport(url, type, description = '', metadata = {}) {
         if (error) throw error;
         return { success: true, data };
     } catch (error) {
-        console.error('[Scam Alert] Failed to submit report:', error);
+        console.error('[Hydra Guard] Failed to submit report:', error);
         return { success: false, error: error.message };
     }
 }
@@ -92,7 +92,7 @@ export async function submitFalsePositive(payload) {
         if (error) throw error;
         return { success: true, data };
     } catch (error) {
-        console.error('[Scam Alert] Failed to submit false positive:', error);
+        console.error('[Hydra Guard] Failed to submit false positive:', error);
         return { success: false, error: error.message };
     }
 }
@@ -113,7 +113,7 @@ export async function getVerifiedScams() {
         if (error) throw error;
         return data || [];
     } catch (error) {
-        console.warn('[Scam Alert] Failed to fetch verified scams:', error);
+        console.warn('[Hydra Guard] Failed to fetch verified scams:', error);
         return [];
     }
 }
