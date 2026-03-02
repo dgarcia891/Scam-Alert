@@ -325,8 +325,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
         case MessageTypes.SHOW_WARNING:
             currentScanResult = result;
-            createOverlay(result);
-            _applyHighlightsIfEnabled(result);
+            if (!warningAcknowledged) {
+                createOverlay(result);
+                _applyHighlightsIfEnabled(result);
+            }
             sendResponse({ success: true });
             break;
         case MessageTypes.SHOW_BANNER:
