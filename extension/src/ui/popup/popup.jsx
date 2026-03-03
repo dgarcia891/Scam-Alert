@@ -183,8 +183,9 @@ const Popup = () => {
     };
 
     const handleOpenTab = (hash) => {
-        const page = `options/index.html#${hash}`;
-        const url = chrome.runtime?.getURL ? chrome.runtime.getURL(page) : page;
+        const manifest = chrome.runtime.getManifest();
+        const optionsPath = manifest.options_page || 'dist/options/index.html';
+        const url = chrome.runtime.getURL(`${optionsPath}#${hash}`);
         chrome.tabs.create({ url });
     };
 

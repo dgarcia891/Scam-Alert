@@ -92,6 +92,7 @@ export function checkEmailScams(pageContent) {
         'remember when', 'i found this', 'been meaning to send', 'had to share this',
         'check out this', 'look at this', 'wanted you to see this',
         'voice message', 'voicemail', 'shared a document', 'review this document',
+        'those pics', 'those pictures', 'remember them', 'open this', 'photos'
     ];
     const hasVagueLure = vagueLureKeywords.some(k => emailBody.includes(k));
     const hasExternalLinks = pageContent?.links?.length > 0 || pageContent?.rawUrls?.length > 0;

@@ -10,7 +10,7 @@ import { showActivationPrompt } from './email/activation-prompt.js';
 import { showThreatDashboard } from './email/dashboard.js';
 import { setupEmailObserver } from './email/mutation-observer.js';
 import { highlightDetections } from './highlighter.js';
-import { extractEmailText, parseSenderInfo } from '../lib/scanner/parser.js';
+import { extractEmailText, parseSenderInfo, extractEmailLinks } from '../lib/scanner/parser.js';
 import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
 
@@ -38,6 +38,8 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         // Extract sender information for authority impersonation detection
         const senderInfo = parseSenderInfo();
 
+        const linkData = extractEmailLinks();
+
         console.log('[Hydra Guard] Intentional scan triggered...');
 
         chrome.runtime.sendMessage({
@@ -48,7 +50,9 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                     bodyText: data,
                     isEmailView: true,
                     senderName: senderInfo.name,
-                    senderEmail: senderInfo.email
+                    senderEmail: senderInfo.email,
+                    links: linkData.links,
+                    rawUrls: linkData.rawUrls
                 }
             }
         });
