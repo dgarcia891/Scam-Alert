@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Hydra Guard",
   "short_name": "Hydra Guard",
-  "version": "1.0.116",
+  "version": "1.0.117",
   "description": "Real-time protection by Hydra Guard. Stay safe online with automatic threat detection.",
   "permissions": [
     "storage",

@@ -67,6 +67,11 @@ async function updateStatus() {
         const reportSection = document.getElementById('reportSection');
         const results = response?.data?.results;
 
+        // Store results for feedback submission
+        if (typeof storeScanResults === 'function') {
+            storeScanResults(results);
+        }
+
         if (results) {
             statusDiv.className = 'status ' + getClassNameForSeverity(results.overallSeverity);
             statusDiv.textContent = getStatusTextForSeverity(results.overallSeverity);
@@ -177,3 +182,162 @@ function updatePrivacyNote() {
             : 'Page signals are currently inactive.';
     }
 }
+
+// ============================================
+// FEEDBACK SUBMISSION LOGIC
+// ============================================
+
+let currentScanResults = null;
+
+// Store scan results when status updates
+function storeScanResults(results) {
+    currentScanResults = results;
+
+    // Show feedback section if there's a detection (not SAFE)
+    const feedbackSection = document.getElementById('feedbackSection');
+    if (feedbackSection && results && results.overallSeverity && results.overallSeverity !== 'SAFE') {
+        feedbackSection.style.display = 'block';
+    }
+}
+
+async function submitFeedback() {
+    const selectedFeedback = document.querySelector('input[name="feedbackType"]:checked');
+    if (!selectedFeedback) {
+        alert('Please select a feedback option');
+        return;
+    }
+
+    const comment = document.getElementById('feedbackComment')?.value.trim() || '';
+    const feedbackStatus = document.getElementById('feedbackStatus');
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+
+    // Show loading state
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+    }
+
+    try {
+        // Get current tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.url) throw new Error('No active tab found');
+
+        // Get current scan results
+        if (!currentScanResults) {
+            throw new Error('No scan results available');
+        }
+
+        const response = await chrome.runtime.sendMessage({
+            type: 'SUBMIT_CORRECTION',
+            data: {
+                url: tab.url,
+                feedback: selectedFeedback.value,
+                comment: comment,
+                detectionResult: currentScanResults
+            }
+        });
+
+        if (response?.success) {
+            if (feedbackStatus) {
+                feedbackStatus.style.display = 'block';
+                feedbackStatus.style.color = '#10b981';
+                feedbackStatus.textContent = '✓ Feedback submitted successfully! Thank you.';
+            }
+
+            // Clear form
+            document.querySelectorAll('input[name="feedbackType"]').forEach(input => input.checked = false);
+            const commentBox = document.getElementById('feedbackComment');
+            if (commentBox) commentBox.value = '';
+
+            // Hide success message after 3 seconds
+            setTimeout(() => {
+                if (feedbackStatus) feedbackStatus.style.display = 'none';
+                const feedbackSection = document.getElementById('feedbackSection');
+                if (feedbackSection) feedbackSection.style.display = 'none';
+            }, 3000);
+        } else {
+            throw new Error(response?.error || 'Submission failed');
+        }
+    } catch (err) {
+        console.error('[Hydra Guard] Feedback submission failed:', err);
+        if (feedbackStatus) {
+            feedbackStatus.style.display = 'block';
+            feedbackStatus.style.color = '#ef4444';
+            feedbackStatus.textContent = `✗ ${err.message || 'Failed to submit feedback'}`;
+        }
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Feedback';
+        }
+    }
+}
+
+// Wire up the submit button
+document.addEventListener('DOMContentLoaded', () => {
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', submitFeedback);
+    }
+});
+
+// ============================================
+// DEBUG MODE
+// ============================================
+
+let versionClickCount = 0;
+let versionClickTimer = null;
+
+function enableDebugMode() {
+    const debugSection = document.getElementById('debugSection');
+    if (debugSection) {
+        debugSection.style.display = 'block';
+        updateDebugOutput();
+    }
+}
+
+function updateDebugOutput() {
+    const debugOutput = document.getElementById('debugOutput');
+    if (!debugOutput) return;
+
+    const manifest = chrome.runtime.getManifest();
+    const debugData = {
+        extension_version: manifest.version,
+        extension_name: manifest.name,
+        current_url: window.location.href,
+        scan_results: currentScanResults || null,
+        timestamp: new Date().toISOString(),
+        storage_keys: Object.keys(localStorage)
+    };
+
+    debugOutput.textContent = JSON.stringify(debugData, null, 2);
+}
+
+// Version number easter egg (5 fast clicks = debug mode)
+document.addEventListener('DOMContentLoaded', () => {
+    const h1 = document.querySelector('h1');
+    if (h1) {
+        h1.addEventListener('click', () => {
+            versionClickCount++;
+            clearTimeout(versionClickTimer);
+
+            if (versionClickCount >= 5) {
+                enableDebugMode();
+                versionClickCount = 0;
+            }
+
+            versionClickTimer = setTimeout(() => {
+                versionClickCount = 0;
+            }, 1000);
+        });
+    }
+
+    // Close debug button
+    const closeDebugBtn = document.getElementById('closeDebugBtn');
+    if (closeDebugBtn) {
+        closeDebugBtn.addEventListener('click', () => {
+            const debugSection = document.getElementById('debugSection');
+            if (debugSection) debugSection.style.display = 'none';
+        });
+    }
+});

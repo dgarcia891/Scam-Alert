@@ -33,6 +33,8 @@ export async function handleIncomingMessage(message, sender, context) {
             return handleReportFalsePositive(data, submitFalsePositive);
         case MessageTypes.NAVIGATE_BACK:
             return handleNavigateBack(sender);
+        case 'SUBMIT_CORRECTION':
+            return handleSubmitCorrection(msgData);
         default:
             console.log('[Hydra Guard] Unknown message type:', type);
             return { error: 'Unknown message type' };
@@ -189,6 +191,52 @@ async function handleNavigateBack(sender) {
         }
     } catch (error) {
         return { error: error.message };
+    }
+}
+
+async function handleSubmitCorrection(msgData) {
+    try {
+        const { url, feedback, comment, detectionResult } = msgData;
+
+        // Hash the URL (ensure simple crypto subtle hash)
+        const encoder = new TextEncoder();
+        const data = encoder.encode(url);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const urlHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        // Get detection ID if we have stored results
+        const detectionId = detectionResult?.detectionId || null;
+
+        // Get Supabase vars safely using Phase 24.0 logic or fallback
+        const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://kuwglmwaresvmodypnnv.supabase.co';
+        const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1d2dsbXdhcmVzdm1vZHlwbm52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE4NzksImV4cCI6MjA4NTM4Nzg3OX0.uwQxqIWfsDzr8SZIYj_wrlAL5wPHtfWGPhBg-LYC25o';
+
+        // Submit to Supabase edge function
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/sa-submit-correction`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({
+                url_hash: urlHash,
+                feedback: feedback,
+                user_comment: comment || null,
+                detection_id: detectionId,
+                detection_result: detectionResult
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('[Hydra Guard] Failed to submit correction:', error);
+        return { success: false, error: error.message };
     }
 }
 

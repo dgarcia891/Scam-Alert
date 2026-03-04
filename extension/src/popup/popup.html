@@ -553,6 +553,52 @@
 
     <a href="#" id="settingsLink" class="settings-link">⚙️ Settings</a>
 
+    <!-- Feedback Section -->
+    <div id="feedbackSection"
+        style="display: none; margin-top: 16px; padding: 16px; border-top: 1px solid #e5e7eb; background: #f9fafb; border-radius: 8px;">
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #374151;">Report Detection Issue</h3>
+        <p style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">
+            Help improve accuracy by reporting false positives or missed threats.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="radio" name="feedbackType" value="false_positive" style="cursor: pointer;" />
+                <span>This is safe (false positive)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="radio" name="feedbackType" value="missed_threat" style="cursor: pointer;" />
+                <span>This is a threat (missed detection)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="radio" name="feedbackType" value="unsure" style="cursor: pointer;" />
+                <span>I'm not sure</span>
+            </label>
+        </div>
+
+        <textarea id="feedbackComment" placeholder="Optional: Provide additional context..."
+            style="width: calc(100% - 16px); margin-bottom: 12px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; min-height: 60px; resize: vertical; font-family: inherit;"></textarea>
+
+        <button id="submitFeedbackBtn"
+            style="width: 100%; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; margin-bottom: 8px;">
+            Submit Feedback
+        </button>
+
+        <div id="feedbackStatus" style="font-size: 12px; text-align: center; display: none;"></div>
+    </div>
+
+    <!-- Debug Mode (hidden by default) -->
+    <div id="debugSection"
+        style="display: none; margin-top: 16px; padding: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="font-size: 12px; font-weight: 600; color: #6b7280; margin: 0;">Debug Information</h3>
+            <button id="closeDebugBtn"
+                style="background: none; border: none; color: #6b7280; cursor: pointer; font-size: 18px; padding: 0; width: auto; margin: 0;">×</button>
+        </div>
+        <pre id="debugOutput"
+            style="font-size: 10px; font-family: monospace; background: white; padding: 8px; border-radius: 4px; max-height: 200px; overflow-y: auto; margin: 0; white-space: pre-wrap; word-break: break-all;"></pre>
+    </div>
+
     <div id="floatingTooltip" role="tooltip"></div>
 
     <script type="module" src="popup.js"></script>
