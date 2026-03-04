@@ -33,6 +33,15 @@ export async function handleIncomingMessage(message, sender, context) {
             return handleReportFalsePositive(data, submitFalsePositive);
         case MessageTypes.NAVIGATE_BACK:
             return handleNavigateBack(sender);
+        case MessageTypes.SHOW_WARNING:
+        case MessageTypes.SHOW_BANNER:
+        case MessageTypes.SCAN_RESULT:
+        case MessageTypes.SCAN_RESULT_UPDATED:
+            // Reflect these back to the tab to allow inter-content-script communication (e.g. Email Scanner to Content Overlay)
+            if (sender.tab?.id) {
+                chrome.tabs.sendMessage(sender.tab.id, message);
+            }
+            return { success: true };
         case 'SUBMIT_CORRECTION':
             return handleSubmitCorrection(msgData);
         default:

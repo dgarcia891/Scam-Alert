@@ -313,6 +313,8 @@ function showDetectionToast(result) {
     setTimeout(() => toast.remove(), 6000);
 }
 
+console.log('[Hydra Guard] Content script initialization complete. Ready for messages.');
+
 // Listen for messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const { type, data, payload } = message;

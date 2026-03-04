@@ -80,7 +80,9 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     chrome.runtime.onMessage.addListener((message) => {
         if (!chrome.runtime?.id) return;
 
-        if (message.type === MessageTypes.SCAN_RESULT && message.data?.result) {
+        // Support both types for robustness
+        const type = message.type || message.action;
+        if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
             const result = message.data.result;
             if (result.overallThreat || result.overallSeverity !== 'SAFE') {
                 try {
