@@ -133,9 +133,16 @@ beforeEach(() => {
     }
   };
 
+  // Clear sessionStorage to prevent warningAcknowledged state leakage across tests
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.clear();
+  }
+
   const result = loadContentScript();
   messageListeners = result.messageListeners;
   submitListeners = result.submitListeners;
+
+  if (window.resetWarningAcknowledgement) window.resetWarningAcknowledgement();
 });
 
 /** Dispatch a message to the registered onMessage listener */

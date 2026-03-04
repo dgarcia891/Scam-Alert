@@ -23,6 +23,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
 // Export for unit testing
 export const OVERLAY_ID = 'hydra-guard-overlay-root';
 let warningAcknowledged = false;
+try {
+    if (window.sessionStorage.getItem('hydra_guard_suppressed') === 'true') {
+        warningAcknowledged = true;
+    }
+} catch (e) {
+    // Ignore Storage access errors (e.g. strict third-party cookie settings)
+}
 let currentScanResult = null; // Track latest result for Layer 2 decisions
 
 export function resetWarningAcknowledgement() {
@@ -274,6 +281,11 @@ export function createOverlay(result) {
     shadow.getElementById('btn-proceed').onclick = () => {
         container.remove();
         warningAcknowledged = true;
+        try {
+            window.sessionStorage.setItem('hydra_guard_suppressed', 'true');
+        } catch (e) {
+            // Ignore Storage access errors
+        }
         _applyHighlightsIfEnabled(result);
     };
 

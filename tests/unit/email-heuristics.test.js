@@ -270,6 +270,15 @@ describe('checkEmailScams — Vague Lure Detection', () => {
         expect(result.score).toBeGreaterThanOrEqual(35);
     });
 
+    test('flags "those pics" + "remember them" lure with external link', () => {
+        const result = checkEmailScams(makeEmail({
+            bodyText: "I hope you still remember them — those pics.",
+            rawUrls: ['https://bwrjz.neaccola.com:8443/AQUACAAM']
+        }));
+        expect(result.flagged).toBe(true);
+        expect(result.indicators).toContain('Vague social lure with external link');
+    });
+
     test('flags "check out this" lure with links', () => {
         const result = checkEmailScams(makeEmail({
             bodyText: 'Hey! Check out this amazing document I found.',

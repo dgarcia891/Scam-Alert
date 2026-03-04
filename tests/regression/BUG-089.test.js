@@ -62,6 +62,15 @@ describe('BUG-089: "Proceed anyway" double popup issue', () => {
             }
         };
 
+        // Mock sessionStorage
+        let store = {};
+        const mockSessionStorage = {
+            getItem: jest.fn((key) => store[key] || null),
+            setItem: jest.fn((key, value) => { store[key] = value.toString(); }),
+            clear: jest.fn(() => { store = {}; })
+        };
+        Object.defineProperty(window, 'sessionStorage', { value: mockSessionStorage });
+
         messageListeners = loadContentScript();
 
         // reset global state in content.js for test isolation
@@ -99,6 +108,35 @@ describe('BUG-089: "Proceed anyway" double popup issue', () => {
         expect(overlay).toBeNull();
 
         // 2nd warning message comes in (e.g. from a delayed background scan or navigation fallback)
+        sendMessage('show_warning', { result: testResult });
+
+        // Overlay should NOT be created again
+        overlay = document.getElementById('hydra-guard-overlay-root');
+        expect(overlay).toBeNull();
+    });
+
+    test('BUG-093: clicking proceed anyway prevents future SHOW_WARNING messages across simulated page reloads', () => {
+        const testResult = { severity: 'CRITICAL', reasons: [{ message: 'Phishing' }] };
+
+        // 1st warning message comes in
+        sendMessage('show_warning', { result: testResult });
+
+        // Ensure overlay exists
+        let overlay = document.getElementById('hydra-guard-overlay-root');
+        expect(overlay).not.toBeNull();
+
+        // User clicks proceed
+        const proceedBtn = overlay.shadowRoot.getElementById('btn-proceed');
+        proceedBtn.click();
+
+        // Overlay should be gone
+        overlay = document.getElementById('hydra-guard-overlay-root');
+        expect(overlay).toBeNull();
+
+        // Simulate page reload (re-evaluate content script while keeping sessionStorage)
+        messageListeners = loadContentScript();
+
+        // 2nd warning message comes in after 'reload'
         sendMessage('show_warning', { result: testResult });
 
         // Overlay should NOT be created again
