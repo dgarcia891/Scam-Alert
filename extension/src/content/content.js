@@ -2,15 +2,18 @@ import { MessageTypes } from '../lib/messaging.js';
 import { detectContext, detectEmailMetadata } from '../lib/context-detector.js';
 import { scanUrl } from '../lib/detector.js';
 import { highlightDetections, removeHighlights } from './highlighter.js';
+import { OVERLAY_ID } from '../lib/constants.js';
+
+
 
 console.log('[Hydra Guard] Content script loaded (Hydra Guard)');
 
-// Immediate Context Detection
-const initialContext = detectContext();
-const initialMetadata = initialContext.type === 'email' ? detectEmailMetadata(initialContext) : null;
-
 // Guard immediate execution for tests/environments without chrome.runtime
 if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    // Immediate Context Detection
+    const initialContext = detectContext();
+    const initialMetadata = initialContext.type === 'email' ? detectEmailMetadata(initialContext) : null;
+
     chrome.runtime.sendMessage({
         type: MessageTypes.CONTEXT_DETECTED,
         payload: {
@@ -21,7 +24,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
 }
 
 // Export for unit testing
-export const OVERLAY_ID = 'hydra-guard-overlay-root';
 let warningAcknowledged = false;
 try {
     if (window.sessionStorage.getItem('hydra_guard_suppressed') === 'true') {

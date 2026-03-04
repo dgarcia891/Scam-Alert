@@ -2,7 +2,7 @@
  * DOM Mutation Observer for Email Scanning
  */
 
-import { OVERLAY_ID } from '../content.js';
+import { OVERLAY_ID } from '../../lib/constants.js';
 
 export function setupEmailObserver(triggerScan) {
     let scanThrottleTimeout = null;
