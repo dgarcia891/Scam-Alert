@@ -29,6 +29,8 @@ import { recordAICall } from './ai-telemetry.js';
  * @returns {Promise<Object>} - Canonical ScanResult
  */
 export async function scanUrl(url, options = {}, onProgress = null) {
+    const scanStartTime = Date.now();
+
     const {
         useGoogleSafeBrowsing = true,
         usePhishTank = true,
@@ -46,16 +48,30 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     console.log(`[Scam Detector] Scanning: ${url}`);
     reportProgress(10, 'Initializing scan...');
 
+    const timing = {
+        total: 0,
+        blocklist: 0,
+        patterns: 0,
+        phishtank: 0,
+        gsb: 0,
+        ai: 0,
+    };
+
     // 1. Check Blocklist (User Override)
+    const blocklistStart = Date.now();
     if (await isBlocked(url)) {
+        timing.blocklist = Date.now() - blocklistStart;
+        timing.total = Date.now() - scanStartTime;
         return createScanResult({
             severity: SEVERITY.CRITICAL,
             confidence: 'CERTAIN',
             action: ACTION.BLOCK,
             reasons: [{ code: 'USER_BLOCK', message: 'Site is in your personal blocklist' }],
-            signals: { hard: ['USER_BLOCK'], soft: [] }
+            signals: { hard: ['USER_BLOCK'], soft: [] },
+            meta: { timing }
         });
     }
+    timing.blocklist = Date.now() - blocklistStart;
 
     const hardSignals = [];
     const softSignals = [];
@@ -68,6 +84,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     let finalChecks = {};
 
     // 2. Local Pattern Analysis
+    const patternsStart = Date.now();
     if (usePatternDetection) {
         reportProgress(20, 'Analyzing URL patterns...');
         const customPhrases = await getMergedScamPhrases();
@@ -120,8 +137,10 @@ export async function scanUrl(url, options = {}, onProgress = null) {
             reasons.push(patterns.checks.urgencySignals);
         }
     }
+    timing.patterns = Date.now() - patternsStart;
 
     // 3. Check PhishTank (Offline/Online)
+    const phishtankStart = Date.now();
     if (usePhishTank) {
         reportProgress(40, 'Checking threat database...');
         try {
@@ -154,8 +173,10 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     } else {
         sources.push({ id: 'phishtank', status: 'skipped', reason: 'disabled' });
     }
+    timing.phishtank = Date.now() - phishtankStart;
 
     // 4. Check Google Safe Browsing
+    const gsbStart = Date.now();
     if (useGoogleSafeBrowsing) {
         if (gsbApiKey) {
             reportProgress(60, 'Consulting Google Safe Browsing...');
@@ -186,11 +207,13 @@ export async function scanUrl(url, options = {}, onProgress = null) {
     } else {
         sources.push({ id: 'gsb', status: 'skipped', reason: 'disabled' });
     }
+    timing.gsb = Date.now() - gsbStart;
 
     // 5. Determine Severity & Action
     let severity = determineSeverity({ hard: hardSignals, soft: softSignals });
 
     // 5.5 AI Second Opinion (FEAT-088)
+    const aiStart = Date.now();
     let aiVerification = null;
     if (options.aiEnabled && options.aiApiKey &&
         severity !== SEVERITY.SAFE && severity !== SEVERITY.LOW) {
@@ -248,8 +271,11 @@ export async function scanUrl(url, options = {}, onProgress = null) {
             console.log('[Detector] AI skipped:', rateCheck.reason);
         }
     }
+    timing.ai = Date.now() - aiStart;
 
     const action = determineAction(severity, pageContent);
+
+    timing.total = Date.now() - scanStartTime;
 
     reportProgress(100, 'Scan complete');
 
@@ -260,7 +286,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         reasons,
         signals: { hard: hardSignals, soft: softSignals },
         checks: finalChecks,
-        meta: { sources, aiVerification }
+        meta: { sources, aiVerification, timing }
     });
 }
 
@@ -317,7 +343,7 @@ export async function getCachedResult(url) {
                     }
                 }
 
-                return result;
+                return { result, timestamp };
             }
         }
     } catch (error) {
@@ -350,9 +376,15 @@ export async function cacheResult(url, result) {
 export async function scanUrlWithCache(url, options = {}) {
     const cached = await getCachedResult(url);
     if (cached && !options.forceRefresh) {
-        return { ...cached, fromCache: true };
+        const { result, timestamp } = cached;
+        if (!result.meta) result.meta = {};
+        result.meta.cached = true;
+        result.meta.cacheAge = Date.now() - timestamp;
+        return { ...result, fromCache: true };
     }
     const result = await scanUrl(url, options);
+    if (!result.meta) result.meta = {};
+    result.meta.cached = false;
     await cacheResult(url, result);
     return { ...result, fromCache: false };
 }
