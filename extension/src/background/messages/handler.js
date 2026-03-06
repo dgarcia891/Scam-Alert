@@ -2,7 +2,7 @@
  * Background Message Handler (v19.2 Refactored)
  */
 import { MessageTypes } from '../../lib/messaging.js';
-import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist } from '../../lib/storage.js';
+import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
 import { submitReport } from '../../lib/supabase.js';
 
 export async function handleIncomingMessage(message, sender, context) {
@@ -44,6 +44,10 @@ export async function handleIncomingMessage(message, sender, context) {
             return { success: true };
         case 'SUBMIT_CORRECTION':
             return handleSubmitCorrection(msgData);
+        case MessageTypes.FORCE_RESCAN:
+            return handleForceRescan(sender, msgData, scanAndHandle);
+        case MessageTypes.CLEAR_URL_CACHE:
+            return handleClearUrlCache(msgData);
         default:
             console.log('[Hydra Guard] Unknown message type:', type);
             return { error: 'Unknown message type' };
@@ -76,7 +80,7 @@ async function handleUpdateSettings(data, updateSettings) {
 
 async function handleAddToWhitelist(data, addToWhitelist) {
     let identity = data.domain.toLowerCase();
-    if (!identity.includes('@')) identity = identity.replace(/^www\./, '');
+    if (!identity.includes('@')) identity = identity.replace(/^www\\./, '');
     await addToWhitelist(identity);
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (activeTab) chrome.action.setBadgeText({ tabId: activeTab.id, text: '' });
@@ -249,3 +253,16 @@ async function handleSubmitCorrection(msgData) {
     }
 }
 
+async function handleForceRescan(sender, msgData, scanAndHandle) {
+    const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (tab) {
+        await scanAndHandle(tab.id, tab.url, { forceRefresh: true });
+    }
+    return { success: true };
+}
+
+async function handleClearUrlCache(msgData) {
+    const normalized = normalizeUrl(msgData.url);
+    await chrome.storage.local.remove(`scan_cache_${normalized}`);
+    return { success: true };
+}
