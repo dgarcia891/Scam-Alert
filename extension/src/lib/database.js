@@ -151,3 +151,54 @@ export async function getMergedSuspiciousKeywords() {
 
     return [...new Set([...localKeywords, ...remoteKeywords])];
 }
+
+/**
+ * Get merged email-specific keywords by category (local + remote cache)
+ * Used by email-heuristics.js to augment its hardcoded lists with DB entries.
+ */
+export async function getMergedEmailKeywords() {
+    const result = (await chrome.storage.local.get(['remoteScamPatterns'])) || {};
+    const remotePatterns = result.remoteScamPatterns || [];
+
+    return {
+        giftCardKeywords: remotePatterns
+            .filter(p => p.category === 'gift_card')
+            .map(p => p.phrase),
+        commandWords: remotePatterns
+            .filter(p => p.category === 'command')
+            .map(p => p.phrase),
+        financeKeywords: remotePatterns
+            .filter(p => p.category === 'finance')
+            .map(p => p.phrase),
+        vagueLureKeywords: remotePatterns
+            .filter(p => p.category === 'vague_lure')
+            .map(p => p.phrase),
+        authorityPressureSignals: remotePatterns
+            .filter(p => p.category === 'authority_pressure')
+            .map(p => p.phrase),
+    };
+}
+
+/**
+ * Get merged urgency-specific keywords (local + remote cache)
+ * Used by phrase-engine.js checkUrgencySignals() — separate from general scam phrases.
+ */
+export async function getMergedUrgencyKeywords() {
+    const result = (await chrome.storage.local.get(['remoteScamPatterns'])) || {};
+    const remotePatterns = result.remoteScamPatterns || [];
+
+    const remoteUrgency = remotePatterns
+        .filter(p => p.category === 'urgency')
+        .map(p => p.phrase);
+
+    // Base urgency keywords (mirrors phrase-engine.js baseUrgency)
+    const localUrgency = [
+        'immediately', 'suspended', 'unauthorized', 'urgent', 'action required',
+        'verify now', 'account locked', 'suspicious activity', 'security alert',
+        'gift card', 'google play', 'apple card', 'steam card', 'vanilla',
+        'picture of the back', 'scratch the back', 'scratch and send',
+        'gift card for me', 'pick up gift cards', 'amount of each card', 'reveal the code'
+    ];
+
+    return [...new Set([...localUrgency, ...remoteUrgency])];
+}

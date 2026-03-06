@@ -23,7 +23,7 @@ import {
 
 import { checkEmailScams } from './analyzer/email-heuristics.js';
 import { determineSeverity } from './analysis/scoring.js';
-import { getMergedScamPhrases, getMergedSuspiciousKeywords } from './database.js';
+import { getMergedScamPhrases, getMergedSuspiciousKeywords, getMergedEmailKeywords, getMergedUrgencyKeywords } from './database.js';
 import { SEVERITY } from './scan-schema.js';
 
 /**
@@ -35,6 +35,8 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
     // Fetch dynamic keywords and phrases
     const dynamicKeywords = await getMergedSuspiciousKeywords();
     const dynamicPhrases = customPhrases || await getMergedScamPhrases();
+    const dynamicEmailKeywords = await getMergedEmailKeywords();
+    const dynamicUrgencyKeywords = await getMergedUrgencyKeywords();
 
     const checks = {
         nonHttps: checkNonHttps(url),
@@ -48,8 +50,8 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
 
         // Pro Features
         advancedTyposquatting: { ...checkAdvancedTyposquatting(url), isProFeature: true },
-        urgencySignals: { ...checkUrgencySignals(pageContent, customPhrases), isProFeature: true },
-        emailScams: { ...checkEmailScams(pageContent), isProFeature: true }
+        urgencySignals: { ...checkUrgencySignals(pageContent, dynamicUrgencyKeywords), isProFeature: true },
+        emailScams: { ...checkEmailScams(pageContent, dynamicEmailKeywords), isProFeature: true }
     };
 
     if (pageContent) {

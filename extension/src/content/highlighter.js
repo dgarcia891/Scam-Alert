@@ -27,10 +27,10 @@ let _hideTimer = null;  // Debounce timer for mouseleave
 export function highlightDetections(scanResult) {
     if (!scanResult || !scanResult.checks) return;
 
-    // 1. Collect all visualIndicators from every flagged check
+    // 1. Collect visualIndicators only from FLAGGED checks
     const allIndicators = [];
     Object.values(scanResult.checks).forEach(check => {
-        if (check.visualIndicators && Array.isArray(check.visualIndicators)) {
+        if (check.flagged && check.visualIndicators && Array.isArray(check.visualIndicators)) {
             allIndicators.push(...check.visualIndicators);
         }
     });

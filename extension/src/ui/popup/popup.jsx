@@ -169,8 +169,8 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     // Check entries sorted: flagged first
     const checkEntries = Object.entries(checks).filter(([k]) => k !== 'aiVerification');
     const flaggedChecks = checkEntries.filter(([, v]) => v.flagged);
-    const passedChecks = checkEntries.filter(([, v]) => !v.flagged && (userIsPro || v.isProFeature !== true));
-    const skippedChecks = checkEntries.filter(([, v]) => !v.flagged && !userIsPro && v.isProFeature === true);
+    const passedChecks = checkEntries.filter(([, v]) => !v.flagged && (v.isProFeature !== true || userIsPro));
+    const skippedChecks = checkEntries.filter(([, v]) => !v.flagged && v.isProFeature === true && !userIsPro);
 
     // Pipeline summary counts
     const totalChecks = checkEntries.length + (aiVerification ? 1 : 0);
@@ -390,7 +390,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                                     <span className="text-slate-500">Verdict</span>
                                     <span className={cn("font-bold",
                                         aiVerification.verdict === 'ESCALATED' ? "text-rose-400" :
-                                            aiVerification.verdict === 'DOWNGRADED' ? "text-emerald-400" : "text-slate-300"
+                                        aiVerification.verdict === 'DOWNGRADED' ? "text-emerald-400" : "text-slate-300"
                                     )}>{aiVerification.verdict}</span>
                                     <span className="text-slate-500">Confidence</span>
                                     <span className="text-slate-300">{aiVerification.confidence != null ? `${aiVerification.confidence}%` : 'N/A'}</span>
