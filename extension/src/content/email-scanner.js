@@ -18,13 +18,15 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     let currentEmailId = null;
 
     // BUG-085: Track the last scan result signature to prevent redundant dashboard re-renders.
-    // When a MutationObserver-triggered rescan returns the same result, we skip the UI update
-    // to break the scan → dashboard → DOM mutation → scan infinite loop.
     let lastDashboardSignature = null;
 
+    // BUG-085b: Track whether the user actively dismissed the dashboard.
+    // Once dismissed, we suppress re-rendering until the email content changes
+    // (i.e. the user navigates to a different email).
+    let dashboardDismissed = false;
+    let dismissedForSignature = null;
+
     function getScanSignature(result) {
-        // Create a lightweight fingerprint from the scan result.
-        // We use severity + flagged check keys since those determine the dashboard content.
         const severity = result.overallSeverity || 'SAFE';
         const flaggedKeys = Object.entries(result.checks || {})
             .filter(([, v]) => v.flagged)
@@ -32,6 +34,16 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
             .sort()
             .join(',');
         return `${severity}|${flaggedKeys}`;
+    }
+
+    /**
+     * Called by the dashboard when the user clicks X or the backdrop.
+     * Sets a suppression flag so we don't immediately re-show it.
+     */
+    function handleDashboardDismiss() {
+        dashboardDismissed = true;
+        dismissedForSignature = lastDashboardSignature;
+        console.log('[Hydra Guard] Dashboard dismissed by user — suppressing until email changes');
     }
 
     /**
@@ -49,12 +61,10 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
             return;
         }
 
-        const data = extractEmailText(); // Should be from parser now
+        const data = extractEmailText();
         if (!data) return;
 
-        // Extract sender information for authority impersonation detection
         const senderInfo = parseSenderInfo();
-
         const linkData = extractEmailLinks();
 
         console.log('[Hydra Guard] Intentional scan triggered...');
@@ -80,7 +90,6 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
     // Initialize Link Interceptor
     setupLinkInterceptor((href) => {
-        // Send a message to content.js to display the danger overlay
         chrome.runtime.sendMessage({
             type: MessageTypes.SHOW_WARNING,
             data: {
@@ -97,32 +106,46 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     chrome.runtime.onMessage.addListener((message) => {
         if (!chrome.runtime?.id) return;
 
-        // Support both types for robustness
         const type = message.type || message.action;
         if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
             const result = message.data.result;
             if (result.overallThreat || result.overallSeverity !== 'SAFE') {
-                // BUG-085: Skip redundant dashboard renders.
-                // If the scan result produces the same signature as what's already displayed,
-                // there's no need to tear down and rebuild the dashboard — doing so would
-                // trigger the MutationObserver and start the loop again.
                 const sig = getScanSignature(result);
+
+                // BUG-085: Skip if identical result is already displayed
                 if (sig === lastDashboardSignature && document.getElementById('hydra-guard-threat-dashboard')) {
                     console.log('[Hydra Guard] Skipping redundant dashboard render (same result)');
                     return;
                 }
 
+                // BUG-085b: Skip if user dismissed the dashboard for this same result.
+                // The dashboard should only reappear when the email content actually changes
+                // (which will produce a different signature).
+                if (dashboardDismissed && sig === dismissedForSignature) {
+                    console.log('[Hydra Guard] Skipping dashboard — user dismissed for this result');
+                    // Still apply highlights (non-intrusive)
+                    try { highlightDetections(result); } catch (e) { /* ignore */ }
+                    return;
+                }
+
+                // New/different result — clear dismissal state and show
+                if (sig !== dismissedForSignature) {
+                    dashboardDismissed = false;
+                    dismissedForSignature = null;
+                }
+
                 try {
                     highlightDetections(result);
-                    showThreatDashboard(result);
+                    showThreatDashboard(result, { onDismiss: handleDashboardDismiss });
                     lastDashboardSignature = sig;
                 } catch (e) {
                     console.error('[Hydra Guard] UI Orchestration failed:', e);
                 }
             } else {
-                // Result is SAFE — clear any stale signature so the dashboard
-                // can reappear if the user navigates to a new threatening email.
+                // Result is SAFE — clear all state so dashboard can appear for new threats
                 lastDashboardSignature = null;
+                dashboardDismissed = false;
+                dismissedForSignature = null;
             }
         }
     });
