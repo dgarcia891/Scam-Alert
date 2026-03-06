@@ -15,6 +15,7 @@ const TOOLTIP_ID = 'hydra-guard-tooltip';
 const ANIMATION_STYLE_ID = 'sa-highlight-animation';
 
 let activeTooltip = null;
+let _hideTimer = null;  // Debounce timer for mouseleave
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
@@ -157,8 +158,13 @@ function _applyHighlight(indicator) {
                 transition: 'background-color 0.2s'
             });
 
-            mark.addEventListener('mouseenter', (e) => _showTooltip(e, { phrase: match, category, reason }));
-            mark.addEventListener('mouseleave', _hideTooltip);
+            mark.addEventListener('mouseenter', (e) => {
+                clearTimeout(_hideTimer);
+                _showTooltip(e, { phrase: match, category, reason });
+            });
+            mark.addEventListener('mouseleave', () => {
+                _hideTimer = setTimeout(_hideTooltip, 120);
+            });
 
             fragment.appendChild(mark);
             lastIdx = offset + match.length;
@@ -174,11 +180,12 @@ function _applyHighlight(indicator) {
 }
 
 function _showTooltip(event, { phrase, category, reason }) {
-    // If we're already showing a tooltip for this specific element, ignore
+    // If we're already showing a tooltip for this exact phrase+target, keep it — don't flicker
     if (activeTooltip && activeTooltip.dataset.phrase === phrase && activeTooltip.dataset.target === event.target.textContent) {
         return;
     }
 
+    // Different target or no tooltip — destroy old one first
     _hideTooltip();
 
     const tooltip = document.createElement('div');
@@ -270,6 +277,7 @@ function _showTooltip(event, { phrase, category, reason }) {
 }
 
 function _hideTooltip() {
+    clearTimeout(_hideTimer);
     if (activeTooltip) {
         activeTooltip.remove();
         activeTooltip = null;

@@ -246,7 +246,7 @@ function _applyPersistentHighlight(el, finding, matchedPhrase) {
     };
     const onLeave = () => {
         // Delay hide so user can move mouse into the tooltip itself
-        _tooltipHideTimer = setTimeout(() => _hideLocateTooltip(), 250);
+        _tooltipHideTimer = setTimeout(() => _hideLocateTooltip(), 400);
     };
 
     el.addEventListener('mouseenter', onEnter);
@@ -375,7 +375,7 @@ function _showLocateTooltip(el, finding, matchedPhrase) {
     // Hover-intent: keep tooltip open when mouse moves into it
     tooltip.addEventListener('mouseenter', () => clearTimeout(_tooltipHideTimer));
     tooltip.addEventListener('mouseleave', () => {
-        _tooltipHideTimer = setTimeout(() => _hideLocateTooltip(), 250);
+        _tooltipHideTimer = setTimeout(() => _hideLocateTooltip(), 400);
     });
 
     document.body.appendChild(tooltip);

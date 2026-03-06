@@ -156,6 +156,15 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             // Tab might be closed or inactive, not critical
         }
 
+        // Layer 3: Broadcast to extension popup (if open) so DevPanel updates live
+        try {
+            chrome.runtime.sendMessage(createMessage(MessageTypes.SCAN_RESULT_UPDATED, { result }), () => {
+                void chrome.runtime.lastError; // Suppress "no listener" error when popup is closed
+            });
+        } catch (error) {
+            // Popup might not be open, not critical
+        }
+
     } catch (error) {
         console.error('[Hydra Guard] Critical Scan Error:', error);
         try {

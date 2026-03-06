@@ -606,6 +606,23 @@ const Popup = () => {
         });
     }, []);
 
+    // Live scan result listener — updates popup when email scan completes
+    useEffect(() => {
+        const handleScanUpdate = (message) => {
+            const type = message.type || message.action;
+            if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
+                const res = message.data.result;
+                setScanResults(res);
+                if (res.whitelisted) { setIsWhitelisted(true); setStatus('secure'); }
+                else if (['CRITICAL', 'HIGH'].includes(res.overallSeverity)) setStatus('danger');
+                else if (['MEDIUM'].includes(res.overallSeverity)) setStatus('caution');
+                else setStatus('secure');
+            }
+        };
+        chrome.runtime.onMessage.addListener(handleScanUpdate);
+        return () => chrome.runtime.onMessage.removeListener(handleScanUpdate);
+    }, []);
+
     const handleGoBack = async () => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) return;
