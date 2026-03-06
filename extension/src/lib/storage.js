@@ -83,8 +83,9 @@ export async function getSettings() {
  * @returns {Promise<boolean>} True if Pro
  */
 export async function isPro() {
-    const settings = await getSettings();
-    return settings.planType === 'pro';
+    const result = await chrome.storage.local.get(['settings', 'pro_user']);
+    const settings = result.settings || {};
+    return settings.planType === 'pro' || !!result.pro_user;
 }
 
 /**
