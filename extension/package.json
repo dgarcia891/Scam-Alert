@@ -1,6 +1,6 @@
 {
   "name": "hydra-guard-extension",
-  "version": "1.0.119",
+  "version": "1.0.121",
   "private": true,
   "type": "module",
   "scripts": {

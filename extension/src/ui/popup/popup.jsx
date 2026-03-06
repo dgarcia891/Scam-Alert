@@ -172,6 +172,14 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     const passedChecks = checkEntries.filter(([, v]) => !v.flagged && v.isProFeature !== true);
     const skippedChecks = checkEntries.filter(([, v]) => !v.flagged && v.isProFeature === true);
 
+    // Pipeline summary counts
+    const totalChecks = checkEntries.length + (aiVerification ? 1 : 0);
+    const totalFlagged = flaggedChecks.length + (aiVerification?.flagged ? 1 : 0);
+    const totalPassed = passedChecks.length + (aiVerification && !aiVerification.flagged ? 1 : 0);
+    const totalSkipped = skippedChecks.length;
+    const stageCount = 5; // Blocklist, Patterns, PhishTank, GSB, AI
+    const activeStages = sources.filter(s => s.status === 'success').length + 1; // +1 for blocklist always
+
     return (
         <div className="space-y-2 mt-3 custom-scrollbar" style={{ maxHeight: '480px', overflowY: 'auto', paddingRight: '2px' }}>
             <style>{scrollbarStyles}</style>
@@ -199,6 +207,36 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 )}
             </div>
 
+            {/* ── A2. PIPELINE SUMMARY ──────────────────────────────────────────── */}
+            <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg px-2.5 py-2">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                    <Activity size={10} className="text-violet-400 shrink-0" />
+                    <span className="text-[9px] font-bold text-violet-300 uppercase tracking-wider">Pipeline Overview</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-[10px] text-slate-300">
+                        <span className="font-bold text-white">{totalChecks}</span> checks run
+                    </span>
+                    {totalFlagged > 0 && (
+                        <span className="text-[10px] text-rose-400">
+                            <span className="font-bold">{totalFlagged}</span> flagged
+                        </span>
+                    )}
+                    <span className="text-[10px] text-emerald-400/70">
+                        <span className="font-bold">{totalPassed}</span> passed
+                    </span>
+                    {totalSkipped > 0 && (
+                        <span className="text-[10px] text-slate-500">
+                            <span className="font-bold">{totalSkipped}</span> skipped
+                        </span>
+                    )}
+                    <span className="text-slate-700">|</span>
+                    <span className="text-[10px] text-slate-400">
+                        <span className="font-bold text-slate-300">{activeStages}</span>/{stageCount} stages active
+                    </span>
+                </div>
+            </div>
+
             {/* ── B. URL & CONTEXT ──────────────────────────────────────────── */}
             <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg px-2.5 py-2 space-y-1">
                 <div className="flex items-center gap-1.5">
@@ -223,6 +261,11 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             </div>
 
             {/* ── C. PIPELINE STAGES ──────────────────────────────────────────── */}
+            <div className="flex items-center gap-1.5 px-1 pt-1">
+                <Cpu size={10} className="text-slate-500" />
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Pipeline Stages</span>
+                <div className="flex-1 h-px bg-slate-800" />
+            </div>
 
             {/* Stage 1: Blocklist */}
             <StageHeader
@@ -230,6 +273,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 title="1. Blocklist"
                 status={scanResults?.overallSeverity === 'CRITICAL' && signals.hard?.some(s => (typeof s === 'string' ? s : s.code) === 'USER_BLOCK') ? 'flag' : 'pass'}
                 timing={timing.blocklist}
+                defaultOpen={timing.blocklist != null}
             >
                 <div className="text-[10px] text-slate-400">
                     {signals.hard?.some(s => (typeof s === 'string' ? s : s.code) === 'USER_BLOCK')
@@ -242,10 +286,10 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             {/* Stage 2: Local Patterns */}
             <StageHeader
                 icon={Eye}
-                title="2. Local Patterns"
+                title={`2. Local Patterns (${checkEntries.length} checks)`}
                 status={flaggedChecks.length > 0 ? 'flag' : 'pass'}
                 timing={timing.patterns}
-                defaultOpen={true}
+                defaultOpen={checkEntries.length > 0}
             >
                 <div className="space-y-0.5">
                     {/* Flagged checks first */}
@@ -291,7 +335,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 const ptCheck = checks.phishTank;
                 const ptStatus = !pt ? 'skip' : pt.status === 'success' ? (ptCheck?.flagged ? 'flag' : 'pass') : pt.status === 'failed' ? 'error' : 'skip';
                 return (
-                    <StageHeader icon={Database} title="3. PhishTank" status={ptStatus} timing={timing.phishtank}>
+                    <StageHeader icon={Database} title="3. PhishTank" status={ptStatus} timing={timing.phishtank} defaultOpen={pt?.status === 'success' || ptCheck?.flagged}>
                         {!pt ? (
                             <div className="text-[10px] text-slate-600 italic">Not in scan data</div>
                         ) : pt.status === 'skipped' ? (
@@ -313,7 +357,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 const gsbCheck = checks.googleSafeBrowsing;
                 const gsbStatus = !gsb ? 'skip' : gsb.status === 'success' ? (gsbCheck?.flagged ? 'flag' : 'pass') : gsb.status === 'failed' ? 'error' : 'skip';
                 return (
-                    <StageHeader icon={Globe} title="4. Google Safe Browsing" status={gsbStatus} timing={timing.gsb}>
+                    <StageHeader icon={Globe} title="4. Google Safe Browsing" status={gsbStatus} timing={timing.gsb} defaultOpen={gsb?.status === 'success' || gsbCheck?.flagged}>
                         {!gsb ? (
                             <div className="text-[10px] text-slate-600 italic">Not in scan data</div>
                         ) : gsb.status === 'skipped' ? (
@@ -364,6 +408,11 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             })()}
 
             {/* ── D. SEVERITY TRACE ──────────────────────────────────────────── */}
+            <div className="flex items-center gap-1.5 px-1 pt-1">
+                <Zap size={10} className="text-slate-500" />
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Analysis</span>
+                <div className="flex-1 h-px bg-slate-800" />
+            </div>
             <StageHeader icon={Zap} title="Severity Trace" defaultOpen={signals.hard?.length > 0 || signals.soft?.length > 0}>
                 <div className="space-y-1.5 text-[10px]">
                     {/* Signals collected */}
@@ -453,6 +502,11 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             </div>
 
             {/* ── F. CONFIGURATION STATUS ──────────────────────────────────────────── */}
+            <div className="flex items-center gap-1.5 px-1 pt-1">
+                <Settings size={10} className="text-slate-500" />
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">System</span>
+                <div className="flex-1 h-px bg-slate-800" />
+            </div>
             <StageHeader icon={Settings} title="Configuration">
                 <div className="space-y-0.5">
                     {[
