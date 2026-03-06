@@ -1,6 +1,6 @@
 {
   "name": "hydra-guard-root",
-  "version": "1.0.111",
+  "version": "1.0.120",
   "private": true,
   "type": "module",
   "workspaces": [
