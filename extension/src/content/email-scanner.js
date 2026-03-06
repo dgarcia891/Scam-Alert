@@ -17,6 +17,23 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 (function () {
     let currentEmailId = null;
 
+    // BUG-085: Track the last scan result signature to prevent redundant dashboard re-renders.
+    // When a MutationObserver-triggered rescan returns the same result, we skip the UI update
+    // to break the scan → dashboard → DOM mutation → scan infinite loop.
+    let lastDashboardSignature = null;
+
+    function getScanSignature(result) {
+        // Create a lightweight fingerprint from the scan result.
+        // We use severity + flagged check keys since those determine the dashboard content.
+        const severity = result.overallSeverity || 'SAFE';
+        const flaggedKeys = Object.entries(result.checks || {})
+            .filter(([, v]) => v.flagged)
+            .map(([k]) => k)
+            .sort()
+            .join(',');
+        return `${severity}|${flaggedKeys}`;
+    }
+
     /**
      * Main Trigger Logic
      */
@@ -85,12 +102,27 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
             const result = message.data.result;
             if (result.overallThreat || result.overallSeverity !== 'SAFE') {
+                // BUG-085: Skip redundant dashboard renders.
+                // If the scan result produces the same signature as what's already displayed,
+                // there's no need to tear down and rebuild the dashboard — doing so would
+                // trigger the MutationObserver and start the loop again.
+                const sig = getScanSignature(result);
+                if (sig === lastDashboardSignature && document.getElementById('hydra-guard-threat-dashboard')) {
+                    console.log('[Hydra Guard] Skipping redundant dashboard render (same result)');
+                    return;
+                }
+
                 try {
                     highlightDetections(result);
                     showThreatDashboard(result);
+                    lastDashboardSignature = sig;
                 } catch (e) {
                     console.error('[Hydra Guard] UI Orchestration failed:', e);
                 }
+            } else {
+                // Result is SAFE — clear any stale signature so the dashboard
+                // can reappear if the user navigates to a new threatening email.
+                lastDashboardSignature = null;
             }
         }
     });
