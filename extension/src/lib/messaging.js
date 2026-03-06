@@ -89,6 +89,8 @@ export const MessageTypes = {
     REMOVE_FROM_BLOCKLIST: 'remove_from_blocklist',
     GET_BLOCKLIST: 'get_blocklist',
     GET_SCAN_RESULTS: 'get_scan_results', // NEW
+    FORCE_RESCAN: 'force_rescan',
+    CLEAR_URL_CACHE: 'clear_url_cache',
 
     // Responses
     STATUS_RESPONSE: 'status_response',
