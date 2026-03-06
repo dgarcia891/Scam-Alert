@@ -10,6 +10,7 @@ describe('BUG-087: Tooltip Blinking and Orange Color', () => {
         highlightDetections({
             checks: {
                 test: {
+                    flagged: true,
                     visualIndicators: [{ phrase: 'claim your prize', category: 'A', reason: 'B' }]
                 }
             }
@@ -23,6 +24,7 @@ describe('BUG-087: Tooltip Blinking and Orange Color', () => {
         highlightDetections({
             checks: {
                 test: {
+                    flagged: true,
                     visualIndicators: [{ phrase: 'claim your prize', category: 'A', reason: 'B' }]
                 }
             }
@@ -36,11 +38,10 @@ describe('BUG-087: Tooltip Blinking and Orange Color', () => {
     });
 
     test('showTooltip guard prevents redundant re-renders', () => {
-        // Spy on remove (part of _hideTooltip which _showTooltip calls)
-        // Since we can't easily spy on internal functions, we check the DOM
         highlightDetections({
             checks: {
                 test: {
+                    flagged: true,
                     visualIndicators: [{ phrase: 'claim your prize', category: 'A', reason: 'B' }]
                 }
             }

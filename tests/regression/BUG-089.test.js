@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const scriptPath = path.resolve(__dirname, '../../extension/src/content/content.js');
 const scriptSource = fs.readFileSync(scriptPath, 'utf-8')
     .replace(/^import\s+.*from\s+['"].*['"];?\s*/gm, '') // Strip imports
+    .replace(/^export\s+\{[^}]*\}\s*;?\s*/gm, '') // Strip re-exports like export { OVERLAY_ID };
     .replace(/^export\s+/gm, ''); // Strip exports
 
 function loadContentScript() {
@@ -22,7 +23,19 @@ function loadContentScript() {
     try {
       const MessageTypes = {
         SHOW_WARNING: 'show_warning',
+        CONTEXT_DETECTED: 'context_detected',
+        SCAN_RESULT: 'scan_result',
+        SCAN_RESULT_UPDATED: 'scan_result_updated',
+        HIDE_WARNING: 'hide_warning',
+        SHOW_BANNER: 'show_banner',
+        OPEN_REPORT_MODAL: 'open_report_modal',
+        EXECUTE_SCAN: 'execute_scan',
+        SCAN_PROGRESS: 'scan_progress',
+        REPORT_SCAM: 'report_scam',
+        ANALYZE_PAGE: 'analyze_page',
+        NAVIGATE_BACK: 'navigate_back'
       };
+      const OVERLAY_ID = 'hydra-guard-overlay-root';
       
       const detectContext = () => ({ type: 'web' });
       const detectEmailMetadata = () => null;

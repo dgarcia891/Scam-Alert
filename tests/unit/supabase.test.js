@@ -1,93 +1,183 @@
 
 import { jest } from '@jest/globals';
 
-// Define mocks first
-const mockInsert = jest.fn();
-const mockSelect = jest.fn();
-const mockEq = jest.fn();
-const mockOrder = jest.fn();
-const mockLimit = jest.fn();
-
-// Silence console error for clean test runs (Expected in error tests)
+// Silence console warnings/errors for clean test runs
+jest.spyOn(console, 'warn').mockImplementation(() => { });
 jest.spyOn(console, 'error').mockImplementation(() => { });
 
+// Mock chrome.runtime.getManifest
+globalThis.chrome = {
+    runtime: {
+        getManifest: () => ({ version: '1.0.125' })
+    },
+    storage: {
+        local: {
+            get: jest.fn((keys, cb) => {
+                if (cb) cb({ settings: { saApiKey: 'test-api-key' } });
+                return Promise.resolve({ settings: { saApiKey: 'test-api-key' } });
+            })
+        }
+    }
+};
 
-const mockFrom = jest.fn(() => ({
-    insert: mockInsert,
-    select: mockSelect
-}));
-
-// Mock chaining setup
-mockSelect.mockReturnValue({
-    eq: mockEq
-});
-mockEq.mockReturnValue({
-    order: mockOrder
-});
-mockOrder.mockReturnValue({
-    limit: mockLimit
-});
-
-// ESM Mocking must happen before import
-jest.unstable_mockModule('@supabase/supabase-js', () => ({
-    createClient: () => ({
-        from: mockFrom
-    })
-}));
+// Mock fetch globally (supabase.js uses fetch via postEdgeFunction)
+const mockFetch = jest.fn();
+globalThis.fetch = mockFetch;
 
 describe('Supabase Service', () => {
-    let submitReport;
+    let submitReport, submitUserReport, reportDetection, submitCorrection;
 
     beforeAll(async () => {
-        // Dynamic import after mock is established
         const module = await import('../../extension/src/lib/supabase.js');
         submitReport = module.submitReport;
+        submitUserReport = module.submitUserReport;
+        reportDetection = module.reportDetection;
+        submitCorrection = module.submitCorrection;
     });
 
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    describe('submitReport', () => {
-        it('should submit a report successfully', async () => {
-            const mockData = [{ id: '123' }];
+    describe('submitUserReport', () => {
+        it('should submit a user report successfully via edge function', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ ok: true, id: 'report-123' })
+            });
 
-            // Adjust mock for: .insert -> returns object with .select
-            // The client code does: await supabase.from(...).insert(...).select()
-            const mockBuilder = {
-                select: jest.fn().mockResolvedValue({ data: mockData, error: null })
-            };
-            mockInsert.mockReturnValue(mockBuilder);
+            const result = await submitUserReport(
+                'https://scam.com',
+                'phishing',
+                'Suspicious email',
+                { sender: 'scammer@evil.com', subject: 'You won!', body_text: 'Click here...' }
+            );
+
+            expect(result.success).toBe(true);
+            expect(result.id).toBe('report-123');
+
+            // Verify fetch was called with correct endpoint and payload
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+            const [url, options] = mockFetch.mock.calls[0];
+            expect(url).toContain('sa-report-user');
+            expect(options.method).toBe('POST');
+
+            const body = JSON.parse(options.body);
+            expect(body.url).toBe('https://scam.com');
+            expect(body.report_type).toBe('phishing');
+            expect(body.description).toBe('Suspicious email');
+            expect(body.sender_email).toBe('scammer@evil.com');
+            expect(body.subject).toBe('You won!');
+            expect(body.extension_version).toBe('1.0.125');
+        });
+
+        it('should handle edge function errors gracefully', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                json: () => Promise.resolve({ message: 'Internal server error' })
+            });
+
+            const result = await submitUserReport('https://scam.com', 'scam');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Internal server error');
+        });
+
+        it('should handle network failures gracefully', async () => {
+            mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+            const result = await submitUserReport('https://scam.com', 'scam');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('Network error');
+        });
+
+        it('should default report_type to scam when not provided', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ ok: true, id: 'report-456' })
+            });
+
+            await submitUserReport('https://example.com');
+
+            const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+            expect(body.report_type).toBe('scam');
+        });
+
+        it('should truncate body_preview to 4000 chars', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ ok: true, id: 'report-789' })
+            });
+
+            const longBody = 'x'.repeat(10000);
+            await submitUserReport('https://example.com', 'scam', '', { body_text: longBody });
+
+            const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+            expect(body.body_preview.length).toBe(4000);
+        });
+    });
+
+    describe('submitReport (deprecated shim)', () => {
+        it('should delegate to submitUserReport', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ ok: true, id: 'shim-123' })
+            });
 
             const result = await submitReport('https://scam.com', 'phishing', 'Bad site');
 
-            // Verify table name
-            expect(mockFrom).toHaveBeenCalledWith('reported_scams');
-
-            // Verify payload
-            // Note: We check that the first argument to insert contains our data
-            expect(mockInsert).toHaveBeenCalledWith([expect.objectContaining({
-                url: 'https://scam.com',
-                scam_type: 'phishing',
-                description: 'Bad site',
-                status: 'pending'
-            })]);
-
-            // Verify function return
             expect(result.success).toBe(true);
-            expect(result.data).toEqual(mockData);
+            // Should have called the sa-report-user endpoint (not sa-report-detection)
+            const [url] = mockFetch.mock.calls[0];
+            expect(url).toContain('sa-report-user');
         });
+    });
 
-        it('should handle submission errors', async () => {
-            const mockBuilder = {
-                select: jest.fn().mockResolvedValue({ data: null, error: { message: 'DB Error' } })
-            };
-            mockInsert.mockReturnValue(mockBuilder);
+    describe('reportDetection', () => {
+        it('should report a detection via edge function', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ id: 'det-123' })
+            });
 
-            const result = await submitReport('https://scam.com', 'phishing');
+            const result = await reportDetection(
+                'abc123hash',
+                { hard: ['phishing_url'], soft: ['suspicious_domain'] },
+                'HIGH'
+            );
 
-            expect(result.success).toBe(false);
-            expect(result.error).toBe('DB Error');
+            expect(result.success).toBe(true);
+            expect(result.id).toBe('det-123');
+
+            const [url, options] = mockFetch.mock.calls[0];
+            expect(url).toContain('sa-report-detection');
+            const body = JSON.parse(options.body);
+            expect(body.url_hash).toBe('abc123hash');
+            expect(body.severity).toBe('HIGH');
+        });
+    });
+
+    describe('submitCorrection', () => {
+        it('should submit a correction via edge function', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ review_triggered: true, verdict: 'pending' })
+            });
+
+            const result = await submitCorrection('abc123hash', 'false_positive', {
+                userComment: 'This is a legitimate site'
+            });
+
+            expect(result.success).toBe(true);
+            expect(result.reviewTriggered).toBe(true);
+
+            const [url, options] = mockFetch.mock.calls[0];
+            expect(url).toContain('sa-submit-correction');
+            const body = JSON.parse(options.body);
+            expect(body.feedback).toBe('false_positive');
+            expect(body.user_comment).toBe('This is a legitimate site');
         });
     });
 });

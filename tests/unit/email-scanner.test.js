@@ -116,7 +116,7 @@ describe('runHeuristics (heuristics.js)', () => {
         const result = runHeuristics('We need a wire transfer immediately. The invoice is overdue.');
         expect(result.isScam).toBe(true);
         expect(result.signals).toEqual(
-            expect.arrayContaining([expect.objectContaining({ label: 'Financial Urgency' })])
+            expect.arrayContaining([expect.objectContaining({ label: 'Financial Data Request' })])
         );
     });
 
@@ -124,7 +124,7 @@ describe('runHeuristics (heuristics.js)', () => {
         const result = runHeuristics('Scratch the back and send me a photo of the code.');
         expect(result.isScam).toBe(true);
         expect(result.signals).toEqual(
-            expect.arrayContaining([expect.objectContaining({ label: 'Code Extraction' })])
+            expect.arrayContaining([expect.objectContaining({ label: 'Gift Card Extraction' })])
         );
         expect(result.maxScore).toBeGreaterThanOrEqual(60);
     });

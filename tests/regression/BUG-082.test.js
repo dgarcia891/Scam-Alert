@@ -19,6 +19,7 @@ describe('BUG-082: SPA Back Navigation Fallback', () => {
 
         const scriptSource = fs.readFileSync(EXT('content/content.js'), 'utf-8')
             .replace(/^import\s+.*from\s+['"].*['"];?\s*/gm, '') // Strip imports
+            .replace(/^export\s+\{[^}]*\}\s*;?\s*/gm, '') // Strip re-exports like export { OVERLAY_ID };
             .replace(/^export\s+/gm, ''); // Strip exports
 
         const wrappedSource = `(function() {
@@ -26,8 +27,17 @@ describe('BUG-082: SPA Back Navigation Fallback', () => {
                 CONTEXT_DETECTED: 'context_detected',
                 NAVIGATE_BACK: 'navigate_back',
                 SCAN_RESULT: 'scan_result',
-                SHOW_WARNING: 'show_warning'
+                SCAN_RESULT_UPDATED: 'scan_result_updated',
+                SHOW_WARNING: 'show_warning',
+                HIDE_WARNING: 'hide_warning',
+                SHOW_BANNER: 'show_banner',
+                OPEN_REPORT_MODAL: 'open_report_modal',
+                EXECUTE_SCAN: 'execute_scan',
+                SCAN_PROGRESS: 'scan_progress',
+                REPORT_SCAM: 'report_scam',
+                ANALYZE_PAGE: 'analyze_page'
             };
+            const OVERLAY_ID = 'hydra-guard-overlay-root';
             
             // Mocks for dependencies that were stripped
             const detectContext = () => ({ type: 'web' });

@@ -28,7 +28,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const scriptPath = path.resolve(__dirname, '../../extension/src/content/content.js');
 const scriptSource = fs.readFileSync(scriptPath, 'utf-8')
   .replace(/^import\s+.*from\s+['"].*['"];?\s*/gm, '') // Strip imports
-  .replace(/^export\s+/gm, ''); // Strip exports
+  .replace(/^export\s+\{[^}]*\}\s+from\s+['"].*['"];?\s*/gm, '') // Strip re-exports (export { X } from 'Y')
+  .replace(/^export\s+/gm, ''); // Strip export keyword from declarations
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -79,9 +80,10 @@ function loadContentScript() {
         EXECUTE_SCAN: 'execute_scan',
         SCAN_PROGRESS: 'scan_progress',
         REPORT_SCAM: 'report_scam',
-        ANALYZE_PAGE: 'analyze_page'
+        ANALYZE_PAGE: 'analyze_page',
+        NAVIGATE_BACK: 'navigate_back'
       };
-      const OVERLAY_ID = 'hydra-guard-warning-overlay';
+      const OVERLAY_ID = 'hydra-guard-overlay-root';
       
       // Mocks for dependencies that were stripped
       const detectContext = () => ({ type: 'web' });

@@ -2,7 +2,8 @@ import { MessageTypes } from '../lib/messaging.js';
 import { detectContext, detectEmailMetadata } from '../lib/context-detector.js';
 import { scanUrl } from '../lib/detector.js';
 import { highlightDetections, removeHighlights } from './highlighter.js';
-export { OVERLAY_ID } from '../lib/constants.js';
+import { OVERLAY_ID } from '../lib/constants.js';
+export { OVERLAY_ID };
 
 
 

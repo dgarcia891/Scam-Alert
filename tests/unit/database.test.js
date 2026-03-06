@@ -48,22 +48,25 @@ beforeAll(async () => {
  * ════════════════════════════════════════════════════════════════════ */
 describe('fetchScamPatterns', () => {
   test('fetches from remote URL without lastSync param when lastSync is 0', async () => {
+    // Mock must match edge function response format: { ok: true, patterns: [...], count: N }
     fetchMock.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([{ phrase: 'test scam' }])
+      json: () => Promise.resolve({ ok: true, patterns: [{ phrase: 'test scam' }], count: 1 })
     });
 
     const result = await fetchScamPatterns();
+    // Primary source (edge function) should be called first
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const calledUrl = fetchMock.mock.calls[0][0];
+    expect(calledUrl).toContain('sa-sync-patterns');
     expect(calledUrl).not.toContain('?since=');
-    expect(result).toEqual([{ phrase: 'test scam' }]);
+    expect(result).toEqual({ ok: true, patterns: [{ phrase: 'test scam' }], count: 1 });
   });
 
   test('appends ?since= param when lastSync > 0', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([])
+      json: () => Promise.resolve({ ok: true, patterns: [], count: 0 })
     });
 
     await fetchScamPatterns(12345);
@@ -71,13 +74,13 @@ describe('fetchScamPatterns', () => {
     expect(calledUrl).toContain('?since=12345');
   });
 
-  test('returns null on non-ok response (fallback behavior)', async () => {
+  test('returns null on non-ok response from both sources', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 500 });
     const result = await fetchScamPatterns();
     expect(result).toBeNull();
   });
 
-  test('returns null on network error (fallback behavior)', async () => {
+  test('returns null on network error from both sources', async () => {
     fetchMock.mockRejectedValue(new Error('Network failure'));
     const result = await fetchScamPatterns();
     expect(result).toBeNull();
@@ -86,7 +89,7 @@ describe('fetchScamPatterns', () => {
   test('uses AbortController with a signal', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([])
+      json: () => Promise.resolve({ ok: true, patterns: [], count: 0 })
     });
 
     await fetchScamPatterns();
