@@ -1,27 +1,41 @@
 /**
- * Threat Dashboard UI
+ * Threat Dashboard UI (Locate Indicator V2)
+ *
+ * Phases:
+ *   1. Persistent highlight — stays until user closes the minimized card
+ *   2. Hover tooltip — explains why text was flagged, with "Not a threat?" link
+ *   3. False-positive feedback — form → transparency preview → submit
+ *   4. Cleanup on close — clears all highlights, tooltips, popovers
  */
 import { openReportWorkflow } from './report-modal.js';
 import { MessageTypes } from '../../lib/messaging.js';
 import { extractEmailData } from './extraction-logic.js';
 
 const DASHBOARD_ID = 'hydra-guard-threat-dashboard';
+const LOCATE_TOOLTIP_ID = 'hydra-guard-locate-tooltip';
+const LOCATE_FEEDBACK_ID = 'hydra-guard-locate-feedback';
+const HIGHLIGHT_ATTR = 'data-hydra-locate';
 
-// Gmail and Outlook email body selectors — used to scope "Locate Indicator"
-// searches to the actual email content rather than the full document.
+// Gmail and Outlook email body selectors
 const EMAIL_BODY_SELECTORS = [
-    '.a3s.aiL',                          // Gmail primary body
-    '.ii.gt',                            // Gmail alternate body
-    '[role="gridcell"] .a3s',            // Gmail conversation view
-    '.rps_2003',                         // Outlook (old)
-    '.rps_2016',                         // Outlook (new)
-    '[aria-label="Message body"]',       // Outlook generic
-    '.BodyFragment',                     // Outlook fragment
-    '[data-test-id="message-view-body"]' // Outlook test-id
+    '.a3s.aiL',
+    '.ii.gt',
+    '[role="gridcell"] .a3s',
+    '.rps_2003',
+    '.rps_2016',
+    '[aria-label="Message body"]',
+    '.BodyFragment',
+    '[data-test-id="message-view-body"]'
 ];
 
+// ─── Module-level state for persistent highlights ────────────────────────────
+let _locateHighlights = [];  // { el, prevStyle, listeners }
+let _tooltipHideTimer = null;
+
+// ─── Public API ──────────────────────────────────────────────────────────────
+
 /**
- * Show the threat dashboard. Returns nothing.
+ * Show the threat dashboard.
  * @param {object} result - Scan result
  * @param {object} options
  * @param {Function} [options.onDismiss] - Called when the user actively closes the dashboard
@@ -64,7 +78,6 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         .sa-btn-primary:hover { background: rgba(225, 29, 72, 0.2); }
         .sa-btn-secondary { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
         .sa-btn-secondary:hover { background: rgba(16, 185, 129, 0.2); }
-        @keyframes sa-flash { 0%,100% { background-color: transparent; } 50% { background-color: rgba(239, 68, 68, 0.3); } }
     `;
     shadow.appendChild(style);
 
@@ -73,11 +86,7 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
     shadow.appendChild(backdrop);
 
     const findings = Object.values(result.checks || {}).filter(c => c.flagged);
-
-    // Build the search phrases for each finding's Locate button.
-    // Prefer visualIndicators (richer, more specific) over raw matches (often single generic words).
     const findingSearchPhrases = findings.map(f => _buildSearchPhrases(f));
-    const hasLocatable = findingSearchPhrases.some(phrases => phrases.length > 0);
 
     const findingsHtml = findings.map((f, idx) => `
         <div class="sa-finding">
@@ -110,37 +119,40 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
 
     shadow.appendChild(card);
 
-    // ── Close / Dismiss ──────────────────────────────────────────────
+    // ── Close / Dismiss (Phase 4: full cleanup) ──────────────────────
     const close = () => {
+        _clearLocateHighlights();
+        _hideLocateTooltip();
+        _hideLocateFeedback();
         container.remove();
         if (onDismiss) onDismiss();
     };
     shadow.getElementById('sa-close-btn').onclick = close;
     backdrop.onclick = close;
 
-    // ── Locate Indicator buttons ─────────────────────────────────────
-    // Strategy:
-    // 1. Minimize the dashboard (hide backdrop, shrink card) so the email is visible.
-    // 2. Scope the text search to the email body container (Gmail/Outlook selectors).
-    // 3. First try existing Hydra Guard highlight marks inside the email body.
-    // 4. Fall back to a TreeWalker scoped to the email body element.
-    // 5. If nothing is found there, fall back to the full document.body.
-    // 6. Show user feedback if the indicator couldn't be found.
+    // ── Locate Indicator buttons (Phase 1 + 2) ──────────────────────
     const jumpButtons = shadow.querySelectorAll('.sa-jump-btn[data-jump-idx]');
     jumpButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const idx = parseInt(btn.dataset.jumpIdx, 10);
             const phrases = findingSearchPhrases[idx];
+            const finding = findings[idx];
             if (!phrases || phrases.length === 0) return;
 
-            // Minimize the dashboard so the user can see the highlighted text
+            // Clear any previous locate highlights before applying new ones
+            _clearLocateHighlights();
+            _hideLocateTooltip();
+            _hideLocateFeedback();
+
+            // Minimize the dashboard
             _minimizeDashboard(shadow, card, backdrop);
 
             // Find the email body container
             const emailBody = _findEmailBody();
 
-            // Try each phrase (longest first — more specific = better)
+            // Try each phrase (longest first)
             let found = false;
+            let matchedPhrase = '';
             for (const phrase of phrases) {
                 const searchText = phrase
                     .replace(/\s*\(fuzzy\s+match\)/i, '')
@@ -149,32 +161,36 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
 
                 if (!searchText || searchText.length < 3) continue;
 
-                // 1. Try Hydra Guard highlight marks inside email body
                 const searchRoot = emailBody || document.body;
+
+                // 1. Try Hydra Guard highlight marks inside email body
                 const highlights = searchRoot.querySelectorAll('.hydra-guard-highlight');
                 for (const el of highlights) {
                     if (el.textContent.toLowerCase().includes(searchText)) {
-                        _scrollAndFlash(el, container);
+                        _applyPersistentHighlight(el, finding, phrase);
                         found = true;
+                        matchedPhrase = phrase;
                         break;
                     }
                 }
                 if (found) break;
 
-                // 2. TreeWalker on the email body (or document.body as last resort)
-                const targetEl = _findTextInElement(searchRoot, searchText, container);
+                // 2. TreeWalker on the email body
+                const targetEl = _findTextInElement(searchRoot, searchText);
                 if (targetEl) {
-                    _scrollAndFlash(targetEl, container);
+                    _applyPersistentHighlight(targetEl, finding, phrase);
                     found = true;
+                    matchedPhrase = phrase;
                     break;
                 }
 
-                // 3. If we used emailBody, also try full document.body as fallback
+                // 3. Fallback to full document.body
                 if (emailBody && emailBody !== document.body) {
-                    const fallbackEl = _findTextInElement(document.body, searchText, container);
+                    const fallbackEl = _findTextInElement(document.body, searchText);
                     if (fallbackEl) {
-                        _scrollAndFlash(fallbackEl, container);
+                        _applyPersistentHighlight(fallbackEl, finding, phrase);
                         found = true;
+                        matchedPhrase = phrase;
                         break;
                     }
                 }
@@ -204,19 +220,426 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
     document.body.appendChild(container);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Phase 1: Persistent Highlight ──────────────────────────────────────────
 
 /**
- * Build an ordered list of search phrases for a finding.
- * Prefers visualIndicators phrases (longer, more specific) over raw matches.
- * Filters out overly short/generic words (< 4 chars) that would false-match UI elements.
- * Returns longest phrases first.
+ * Apply a persistent red highlight to an element. Stays until _clearLocateHighlights().
+ * Also wires up hover tooltip (Phase 2).
  */
+function _applyPersistentHighlight(el, finding, matchedPhrase) {
+    // Save original style so we can restore it
+    const prevStyle = el.style.cssText;
+
+    el.style.outline = '3px solid #ef4444';
+    el.style.outlineOffset = '2px';
+    el.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+    el.style.borderRadius = '4px';
+    el.setAttribute(HIGHLIGHT_ATTR, 'true');
+
+    // Scroll into view
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // ── Phase 2: Wire hover tooltip ──────────────────────────────────
+    const onEnter = () => {
+        clearTimeout(_tooltipHideTimer);
+        _showLocateTooltip(el, finding, matchedPhrase);
+    };
+    const onLeave = () => {
+        // Delay hide so user can move mouse into the tooltip itself
+        _tooltipHideTimer = setTimeout(() => _hideLocateTooltip(), 250);
+    };
+
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+
+    _locateHighlights.push({ el, prevStyle, listeners: { onEnter, onLeave } });
+}
+
+/**
+ * Clear all persistent locate highlights and restore original styles.
+ */
+function _clearLocateHighlights() {
+    for (const item of _locateHighlights) {
+        item.el.style.cssText = item.prevStyle;
+        item.el.removeAttribute(HIGHLIGHT_ATTR);
+        item.el.removeEventListener('mouseenter', item.listeners.onEnter);
+        item.el.removeEventListener('mouseleave', item.listeners.onLeave);
+    }
+    _locateHighlights = [];
+}
+
+// ─── Phase 2: Hover Tooltip ─────────────────────────────────────────────────
+
+/**
+ * Show a tooltip near the highlighted element explaining why it was flagged.
+ * Includes a "Not a threat? Let us know" link that opens the feedback form.
+ */
+function _showLocateTooltip(el, finding, matchedPhrase) {
+    _hideLocateTooltip(); // Remove any existing tooltip first
+
+    // Resolve explanation data
+    const viMatch = (finding.visualIndicators || []).find(vi =>
+        vi.phrase && matchedPhrase.toLowerCase().includes(vi.phrase.toLowerCase())
+    );
+    const category = viMatch?.category || _humanizeTitle(finding.title) || 'Scam Indicator';
+    const reason = viMatch?.reason || finding.details || finding.description || 'This was flagged based on known scam patterns.';
+    const displayPhrase = matchedPhrase.replace(/\s*\(fuzzy\s+match\)/i, '').trim();
+
+    const tooltip = document.createElement('div');
+    tooltip.id = LOCATE_TOOLTIP_ID;
+
+    Object.assign(tooltip.style, {
+        position: 'fixed',
+        zIndex: '2147483647',
+        background: 'linear-gradient(145deg, #1e293b, #0f172a)',
+        color: 'white',
+        padding: '16px 18px',
+        borderRadius: '12px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontSize: '13px',
+        lineHeight: '1.5',
+        maxWidth: '300px',
+        boxShadow: '0 16px 32px -4px rgba(0,0,0,0.6), 0 0 0 1px rgba(239,68,68,0.3)',
+        border: '1px solid rgba(239, 68, 68, 0.3)',
+        opacity: '0',
+        transform: 'translateY(6px)',
+        transition: 'opacity 0.2s ease-out, transform 0.2s ease-out'
+    });
+
+    // Category label
+    const catEl = document.createElement('div');
+    Object.assign(catEl.style, {
+        fontWeight: '800',
+        color: '#fca5a5',
+        fontSize: '10px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.07em',
+        marginBottom: '4px'
+    });
+    catEl.textContent = category;
+
+    // Matched phrase
+    const phraseEl = document.createElement('div');
+    Object.assign(phraseEl.style, {
+        fontWeight: '600',
+        fontSize: '14px',
+        marginBottom: '8px',
+        color: '#fff'
+    });
+    phraseEl.textContent = `"${displayPhrase}"`;
+
+    // Reason
+    const reasonEl = document.createElement('p');
+    Object.assign(reasonEl.style, {
+        color: '#cbd5e1',
+        fontSize: '12px',
+        margin: '0 0 12px 0',
+        lineHeight: '1.5'
+    });
+    reasonEl.textContent = reason;
+
+    // Divider
+    const divider = document.createElement('div');
+    Object.assign(divider.style, {
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+        margin: '0 0 10px 0'
+    });
+
+    // "Not a threat?" link
+    const feedbackLink = document.createElement('button');
+    Object.assign(feedbackLink.style, {
+        background: 'none',
+        border: 'none',
+        color: '#60a5fa',
+        cursor: 'pointer',
+        fontSize: '12px',
+        fontWeight: '600',
+        padding: '0',
+        textDecoration: 'underline',
+        textUnderlineOffset: '2px',
+        fontFamily: 'inherit'
+    });
+    feedbackLink.textContent = 'Not a threat? Let us know';
+    feedbackLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _hideLocateTooltip();
+        _showLocateFeedback(el, finding, matchedPhrase, category);
+    });
+
+    tooltip.appendChild(catEl);
+    tooltip.appendChild(phraseEl);
+    tooltip.appendChild(reasonEl);
+    tooltip.appendChild(divider);
+    tooltip.appendChild(feedbackLink);
+
+    // Hover-intent: keep tooltip open when mouse moves into it
+    tooltip.addEventListener('mouseenter', () => clearTimeout(_tooltipHideTimer));
+    tooltip.addEventListener('mouseleave', () => {
+        _tooltipHideTimer = setTimeout(() => _hideLocateTooltip(), 250);
+    });
+
+    document.body.appendChild(tooltip);
+
+    // Position
+    const rect = el.getBoundingClientRect();
+    const ttRect = tooltip.getBoundingClientRect();
+    let top = rect.top - ttRect.height - 12;
+    let left = rect.left + (rect.width / 2) - (ttRect.width / 2);
+
+    // Flip below if no room above
+    if (top < 10) top = rect.bottom + 12;
+    // Clamp to viewport
+    if (left < 10) left = 10;
+    if (left + ttRect.width > window.innerWidth - 10) left = window.innerWidth - ttRect.width - 10;
+    if (top + ttRect.height > window.innerHeight - 10) top = rect.top - ttRect.height - 10;
+
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+
+    // Animate in
+    requestAnimationFrame(() => {
+        tooltip.style.opacity = '1';
+        tooltip.style.transform = 'translateY(0)';
+    });
+}
+
+function _hideLocateTooltip() {
+    clearTimeout(_tooltipHideTimer);
+    const existing = document.getElementById(LOCATE_TOOLTIP_ID);
+    if (existing) existing.remove();
+}
+
+// ─── Phase 3: False-Positive Feedback Flow ──────────────────────────────────
+
+/**
+ * Show the feedback form near the highlighted element.
+ * Step 1: Reason selection → Step 2: Transparency preview → Step 3: Submit
+ */
+function _showLocateFeedback(el, finding, matchedPhrase, category) {
+    _hideLocateFeedback(); // Remove any existing
+
+    const displayPhrase = matchedPhrase.replace(/\s*\(fuzzy\s+match\)/i, '').trim();
+    const panel = document.createElement('div');
+    panel.id = LOCATE_FEEDBACK_ID;
+
+    Object.assign(panel.style, {
+        position: 'fixed',
+        zIndex: '2147483647',
+        background: '#0f172a',
+        color: '#f8fafc',
+        padding: '0',
+        borderRadius: '16px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontSize: '13px',
+        lineHeight: '1.5',
+        width: '340px',
+        boxShadow: '0 20px 40px -8px rgba(0,0,0,0.7), 0 0 0 1px rgba(96,165,250,0.3)',
+        border: '1px solid rgba(96, 165, 250, 0.3)',
+        overflow: 'hidden',
+        opacity: '0',
+        transform: 'translateY(6px)',
+        transition: 'opacity 0.2s ease-out, transform 0.2s ease-out'
+    });
+
+    // ── Step 1: Reason form ──────────────────────────────────────────
+    panel.innerHTML = `
+        <div style="padding: 18px 20px 14px; border-bottom: 1px solid #1e293b;">
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 2px;">Tell Us Why This Isn't a Threat</div>
+            <div style="font-size: 11px; color: #64748b;">Your feedback helps us improve</div>
+        </div>
+        <div style="padding: 16px 20px;" id="hg-fb-body">
+            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; border-bottom: 1px solid #1e293b22;">
+                <input type="radio" name="hg-fb-reason" value="legitimate_email" style="margin-top: 2px; accent-color: #60a5fa;">
+                <span>This is a legitimate email</span>
+            </label>
+            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; border-bottom: 1px solid #1e293b22;">
+                <input type="radio" name="hg-fb-reason" value="trusted_sender" style="margin-top: 2px; accent-color: #60a5fa;">
+                <span>I know and trust this sender</span>
+            </label>
+            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer; border-bottom: 1px solid #1e293b22;">
+                <input type="radio" name="hg-fb-reason" value="normal_phrase" style="margin-top: 2px; accent-color: #60a5fa;">
+                <span>This word/phrase is used normally here</span>
+            </label>
+            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; cursor: pointer;">
+                <input type="radio" name="hg-fb-reason" value="other" style="margin-top: 2px; accent-color: #60a5fa;">
+                <span>Other reason</span>
+            </label>
+            <textarea id="hg-fb-note" placeholder="Add a note (optional)" style="
+                width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+                background: #1e293b; color: #f8fafc; border: 1px solid #334155;
+                font-family: inherit; font-size: 13px; resize: vertical; min-height: 48px;
+                box-sizing: border-box;
+            "></textarea>
+        </div>
+        <div style="padding: 12px 20px 16px; display: flex; gap: 10px;">
+            <button id="hg-fb-cancel" style="
+                flex: 1; padding: 10px; border-radius: 10px; font-weight: 600;
+                cursor: pointer; font-size: 13px; font-family: inherit;
+                background: transparent; color: #94a3b8; border: 1px solid #334155;
+            ">Cancel</button>
+            <button id="hg-fb-review" style="
+                flex: 1; padding: 10px; border-radius: 10px; font-weight: 700;
+                cursor: pointer; font-size: 13px; font-family: inherit;
+                background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3);
+            ">Review Before Sending</button>
+        </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    // Position near the highlighted element
+    _positionNearElement(panel, el);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        panel.style.opacity = '1';
+        panel.style.transform = 'translateY(0)';
+    });
+
+    // ── Wire Step 1 buttons ──────────────────────────────────────────
+    panel.querySelector('#hg-fb-cancel').addEventListener('click', () => _hideLocateFeedback());
+
+    panel.querySelector('#hg-fb-review').addEventListener('click', () => {
+        const selected = panel.querySelector('input[name="hg-fb-reason"]:checked');
+        if (!selected) {
+            // Briefly highlight the radio buttons
+            const labels = panel.querySelectorAll('label');
+            labels.forEach(l => { l.style.transition = 'background 0.3s'; l.style.background = 'rgba(239,68,68,0.1)'; });
+            setTimeout(() => labels.forEach(l => { l.style.background = ''; }), 800);
+            return;
+        }
+
+        const userReason = selected.value;
+        const userNote = (panel.querySelector('#hg-fb-note').value || '').trim();
+        const reasonLabels = {
+            legitimate_email: 'This is a legitimate email',
+            trusted_sender: 'I know and trust this sender',
+            normal_phrase: 'This word/phrase is used normally here',
+            other: 'Other reason'
+        };
+
+        // ── Step 2: Transparency preview ─────────────────────────────
+        _showTransparencyPreview(panel, {
+            displayPhrase,
+            category,
+            userReasonLabel: reasonLabels[userReason],
+            userReason,
+            userNote,
+            finding,
+            pageHost: window.location.hostname
+        });
+    });
+}
+
+/**
+ * Step 2: Show the user exactly what data will be sent.
+ */
+function _showTransparencyPreview(panel, data) {
+    const { displayPhrase, category, userReasonLabel, userReason, userNote, finding, pageHost } = data;
+
+    const body = panel.querySelector('#hg-fb-body');
+    if (!body) return;
+
+    // Replace the form with the preview
+    body.innerHTML = `
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 3px;">FLAGGED TEXT</div>
+            <div style="font-size: 14px; font-weight: 600; color: #fca5a5;">"${_escapeHtml(displayPhrase)}"</div>
+        </div>
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 3px;">DETECTION CATEGORY</div>
+            <div style="font-size: 13px;">${_escapeHtml(category)}</div>
+        </div>
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 3px;">YOUR REASON</div>
+            <div style="font-size: 13px;">${_escapeHtml(userReasonLabel)}</div>
+        </div>
+        ${userNote ? `
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 3px;">YOUR NOTE</div>
+            <div style="font-size: 13px; color: #cbd5e1;">"${_escapeHtml(userNote)}"</div>
+        </div>
+        ` : ''}
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 3px;">PAGE</div>
+            <div style="font-size: 13px;">${_escapeHtml(pageHost)} (email context)</div>
+        </div>
+        <div style="background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.15); border-radius: 8px; padding: 10px 12px; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+            This will be sent to Hydra Guard's review team to improve detection accuracy. No personal email content beyond the flagged text above is included.
+        </div>
+    `;
+
+    // Update header
+    const header = panel.querySelector('div:first-child');
+    if (header) {
+        header.querySelector('div:first-child').textContent = "Here's What Will Be Sent";
+        header.querySelector('div:last-child').textContent = 'Review the information below';
+    }
+
+    // Update buttons
+    const btnContainer = panel.querySelector('div:last-child');
+    if (btnContainer && btnContainer.querySelector('#hg-fb-cancel')) {
+        btnContainer.innerHTML = `
+            <button id="hg-fb-back" style="
+                flex: 1; padding: 10px; border-radius: 10px; font-weight: 600;
+                cursor: pointer; font-size: 13px; font-family: inherit;
+                background: transparent; color: #94a3b8; border: 1px solid #334155;
+            ">Cancel</button>
+            <button id="hg-fb-send" style="
+                flex: 1; padding: 10px; border-radius: 10px; font-weight: 700;
+                cursor: pointer; font-size: 13px; font-family: inherit;
+                background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);
+            ">Send Feedback</button>
+        `;
+
+        btnContainer.querySelector('#hg-fb-back').addEventListener('click', () => _hideLocateFeedback());
+
+        btnContainer.querySelector('#hg-fb-send').addEventListener('click', () => {
+            // ── Step 3: Submit ────────────────────────────────────────
+            const payload = {
+                flaggedText: displayPhrase,
+                checkTitle: finding.title || '',
+                category: category,
+                userReason: userReason,
+                userNote: userNote || '',
+                pageUrl: pageHost,
+                timestamp: Date.now()
+            };
+
+            try {
+                chrome.runtime.sendMessage({
+                    type: MessageTypes.REPORT_FALSE_POSITIVE,
+                    data: payload
+                });
+            } catch (e) {
+                console.error('[Hydra Guard] Failed to send feedback:', e);
+            }
+
+            // Show thank you state
+            panel.innerHTML = `
+                <div style="padding: 32px 20px; text-align: center;">
+                    <div style="font-size: 36px; margin-bottom: 12px;">✓</div>
+                    <div style="font-weight: 800; font-size: 16px; margin-bottom: 6px;">Thank You</div>
+                    <div style="font-size: 13px; color: #94a3b8;">Your feedback has been submitted for review.</div>
+                </div>
+            `;
+
+            setTimeout(() => _hideLocateFeedback(), 2500);
+        });
+    }
+}
+
+function _hideLocateFeedback() {
+    const existing = document.getElementById(LOCATE_FEEDBACK_ID);
+    if (existing) existing.remove();
+}
+
+// ─── Shared Helpers ─────────────────────────────────────────────────────────
+
 function _buildSearchPhrases(finding) {
     const phrases = [];
     const seen = new Set();
 
-    // Prefer visualIndicators — they have richer, multi-word phrases
     if (Array.isArray(finding.visualIndicators)) {
         for (const vi of finding.visualIndicators) {
             const p = (vi.phrase || '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
@@ -227,7 +650,6 @@ function _buildSearchPhrases(finding) {
         }
     }
 
-    // Then add raw matches (but only multi-word or longer ones)
     if (Array.isArray(finding.matches)) {
         for (const m of finding.matches) {
             const p = (typeof m === 'string' ? m : '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
@@ -238,15 +660,10 @@ function _buildSearchPhrases(finding) {
         }
     }
 
-    // Sort longest first — longer phrases are more specific and less likely to false-match
     phrases.sort((a, b) => b.length - a.length);
     return phrases;
 }
 
-/**
- * Find the email body container in the DOM using known Gmail/Outlook selectors.
- * Returns the element, or null if not found.
- */
 function _findEmailBody() {
     for (const sel of EMAIL_BODY_SELECTORS) {
         const el = document.querySelector(sel);
@@ -255,12 +672,7 @@ function _findEmailBody() {
     return null;
 }
 
-/**
- * Use a TreeWalker to find a text node containing `searchText` within `root`.
- * Returns the parent element of the matching text node, or null.
- * Skips script/style elements and the dashboard itself.
- */
-function _findTextInElement(root, searchText, dashboardContainer) {
+function _findTextInElement(root, searchText) {
     const walker = document.createTreeWalker(
         root,
         NodeFilter.SHOW_TEXT,
@@ -270,6 +682,8 @@ function _findTextInElement(root, searchText, dashboardContainer) {
                 if (!parent) return NodeFilter.FILTER_REJECT;
                 if (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
                 if (parent.closest('#' + DASHBOARD_ID)) return NodeFilter.FILTER_REJECT;
+                if (parent.closest('#' + LOCATE_TOOLTIP_ID)) return NodeFilter.FILTER_REJECT;
+                if (parent.closest('#' + LOCATE_FEEDBACK_ID)) return NodeFilter.FILTER_REJECT;
                 return node.nodeValue.toLowerCase().includes(searchText)
                     ? NodeFilter.FILTER_ACCEPT
                     : NodeFilter.FILTER_SKIP;
@@ -281,22 +695,15 @@ function _findTextInElement(root, searchText, dashboardContainer) {
     return targetNode?.parentElement || null;
 }
 
-/**
- * Minimize the dashboard: hide backdrop, shrink card to corner.
- * This lets the user see the email content underneath so the flash-highlight is visible.
- * Click the card header to restore the full dashboard.
- */
 function _minimizeDashboard(shadow, card, backdrop) {
     backdrop.style.display = 'none';
     card.classList.add('sa-minimized');
 
-    // Allow restoring with a click on the header
     const header = card.querySelector('.sa-header');
     if (header && !header.dataset.restoreWired) {
         header.dataset.restoreWired = 'true';
         header.style.cursor = 'pointer';
         header.addEventListener('click', (e) => {
-            // Don't restore if they clicked the close button
             if (e.target.classList.contains('sa-close')) return;
             backdrop.style.display = '';
             card.classList.remove('sa-minimized');
@@ -305,20 +712,48 @@ function _minimizeDashboard(shadow, card, backdrop) {
 }
 
 /**
- * Scroll an element into view and apply a brief red flash to draw the eye.
+ * Position a panel near a target element, preferring below-right.
  */
-function _scrollAndFlash(el, dashboardContainer) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+function _positionNearElement(panel, el) {
+    const rect = el.getBoundingClientRect();
+    const pRect = panel.getBoundingClientRect();
 
-    // Apply a temporary flash outline
-    const prev = el.style.cssText;
-    el.style.outline = '3px solid #ef4444';
-    el.style.outlineOffset = '2px';
-    el.style.borderRadius = '4px';
-    el.style.transition = 'outline-color 0.3s';
+    let top = rect.bottom + 12;
+    let left = rect.left;
 
-    // Remove after 3 seconds
-    setTimeout(() => {
-        el.style.cssText = prev;
-    }, 3000);
+    // If no room below, go above
+    if (top + pRect.height > window.innerHeight - 10) {
+        top = rect.top - pRect.height - 12;
+    }
+    // Clamp horizontally
+    if (left + pRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - pRect.width - 10;
+    }
+    if (left < 10) left = 10;
+    // Clamp vertically
+    if (top < 10) top = 10;
+
+    panel.style.top = `${top}px`;
+    panel.style.left = `${left}px`;
+}
+
+/**
+ * Convert a check title like "check_urgency_signals" to "Urgency Signals".
+ */
+function _humanizeTitle(title) {
+    if (!title) return '';
+    return title
+        .replace(/^check_/, '')
+        .replace(/^analyze_/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
+ * Escape HTML special characters (XSS-safe for innerHTML).
+ */
+function _escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
