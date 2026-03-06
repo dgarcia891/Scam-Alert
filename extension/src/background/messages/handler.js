@@ -3,12 +3,12 @@
  */
 import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
-import { submitReport } from '../../lib/supabase.js';
+import { submitReport, submitUserReport } from '../../lib/supabase.js';
 
 export async function handleIncomingMessage(message, sender, context) {
     const { type, data, payload } = message; // Support both for transition
     const msgData = payload || data;
-    const { scanAndHandle, getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, submitReport, submitFalsePositive, tabStateManager } = context;
+    const { scanAndHandle, getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, submitReport, submitUserReport, submitFalsePositive, tabStateManager } = context;
 
     switch (type) {
         case MessageTypes.GET_TAB_STATUS:
@@ -28,7 +28,7 @@ export async function handleIncomingMessage(message, sender, context) {
         case MessageTypes.RESET_STATS:
             return handleResetStats(repairStatistics);
         case MessageTypes.REPORT_SCAM:
-            return handleReportScam(data, submitReport);
+            return handleReportScam(data, submitUserReport || submitReport);
         case MessageTypes.REPORT_FALSE_POSITIVE:
             return handleReportFalsePositive(data, submitFalsePositive);
         case MessageTypes.NAVIGATE_BACK:

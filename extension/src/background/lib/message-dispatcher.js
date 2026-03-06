@@ -3,7 +3,7 @@
  */
 import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, addToBlocklist, removeFromBlocklist, getBlocklist } from '../../lib/storage.js';
-import { submitReport } from '../../lib/supabase.js';
+import { submitUserReport } from '../../lib/supabase.js';
 import { syncManager } from './sync-manager.js';
 
 /**
@@ -112,7 +112,7 @@ async function handleReportScam(data) {
     console.log('[Hydra Guard] Processing report from content script:', data);
     try {
         const { url, type, description, metadata } = data;
-        const reportResult = await submitReport(url, type, description, metadata);
+        const reportResult = await submitUserReport(url, type, description, metadata);
         return { success: reportResult.success, error: reportResult.error };
     } catch (error) {
         console.error('[Hydra Guard] Report submission failed:', error);

@@ -16,7 +16,7 @@ import { MessageTypes, createMessageHandler, sendMessageToTab, createMessage } f
 import { scanUrl } from '../lib/detector.js';
 import { downloadPhishTankDatabase } from '../lib/phishtank.js';
 import { syncPatterns } from '../lib/database.js';
-import { submitReport, submitFalsePositive } from '../lib/supabase.js';
+import { submitReport, submitUserReport, submitFalsePositive } from '../lib/supabase.js';
 import { syncManager } from './lib/sync-manager.js';
 
 // Decentralized Modules (v19.2)
@@ -249,6 +249,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         getWhitelist,
         repairStatistics,
         submitReport,
+        submitUserReport,
         submitFalsePositive,
         tabStateManager
     };

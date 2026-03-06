@@ -126,25 +126,46 @@ export async function submitCorrection(urlHash, feedback, options = {}) {
     }
 }
 
-// ----- Legacy compatibility shims -----
-// These map old function signatures to the new edge function calls.
-// TODO: Migrate all callers to use reportDetection/submitCorrection directly.
-
 /**
- * @deprecated Use reportDetection() instead.
+ * Submit a user scam report with full context.
+ * Sends the actual URL, email data, and scan results to the backend.
+ *
+ * @param {string} url          - The page URL (actual URL, not hashed)
+ * @param {string} type         - Report type: 'scam' | 'phishing' | 'suspicious' | 'false_negative'
+ * @param {string} description  - User description or email subject
+ * @param {Object} metadata     - { sender, subject, body_text, severity, indicators, scan_result, notes }
  */
-export async function submitReport(url, type, description = '', metadata = {}) {
-    console.warn('[Hydra Guard] submitReport() is deprecated. Use reportDetection() instead.');
+export async function submitUserReport(url, type, description = '', metadata = {}) {
     try {
-        // Hash the URL for privacy
-        const urlHash = await hashUrl(url);
-        return await reportDetection(urlHash, { hard: [], soft: [] }, 'MEDIUM', {
-            extensionVersion: metadata.version || chrome.runtime.getManifest().version,
+        const result = await postEdgeFunction('sa-report-user', {
+            url: url,
+            report_type: type || 'scam',
+            description: description,
+            sender_email: metadata.sender || null,
+            subject: metadata.subject || null,
+            body_preview: metadata.body_text ? metadata.body_text.substring(0, 4000) : null,
+            user_notes: metadata.notes || null,
+            severity: metadata.severity || 'UNKNOWN',
+            indicators: metadata.indicators || [],
+            scan_result: metadata.scan_result || {},
+            extension_version: chrome.runtime.getManifest().version,
         });
+        return { success: true, id: result.id };
     } catch (error) {
-        console.error('[Hydra Guard] Failed to submit report:', error);
+        console.error('[Hydra Guard] Failed to submit user report:', error);
         return { success: false, error: error.message };
     }
+}
+
+// ----- Legacy compatibility shims -----
+// These map old function signatures to the new edge function calls.
+
+/**
+ * @deprecated Use submitUserReport() instead.
+ */
+export async function submitReport(url, type, description = '', metadata = {}) {
+    console.warn('[Hydra Guard] submitReport() is deprecated. Use submitUserReport() instead.');
+    return submitUserReport(url, type, description, metadata);
 }
 
 /**

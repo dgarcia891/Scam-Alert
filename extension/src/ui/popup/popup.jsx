@@ -637,7 +637,7 @@ const Popup = () => {
 
     const handleReportScam = () => {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'OPEN_REPORT_MODAL' }, () => {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'open_report_modal' }, () => {
                 if (chrome.runtime.lastError) return;
                 window.close();
             });
@@ -887,22 +887,23 @@ const Popup = () => {
                                         </div>
                                         <ArrowRight size={14} className="text-slate-600" />
                                     </button>
-                                    {(status !== 'secure' || isWhitelisted || isAlreadyReported) && (
-                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                    <div className="grid grid-cols-2 gap-2 pt-1">
+                                        {(status !== 'secure' || isWhitelisted) && (
                                             <button onClick={isWhitelisted ? null : handleWhitelist} disabled={isWhitelisted} className={cn(
                                                 "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
                                                 isWhitelisted ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700"
                                             )}>
                                                 {isWhitelisted ? 'Trusted' : 'Trust Site'}
                                             </button>
-                                            <button onClick={isAlreadyReported ? null : handleReportScam} disabled={isAlreadyReported} className={cn(
-                                                "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-                                                isAlreadyReported ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700"
-                                            )}>
-                                                {isAlreadyReported ? 'Reported' : 'Report Scam'}
-                                            </button>
-                                        </div>
-                                    )}
+                                        )}
+                                        <button onClick={isAlreadyReported ? null : handleReportScam} disabled={isAlreadyReported} className={cn(
+                                            "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                                            isAlreadyReported ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700",
+                                            (status === 'secure' && !isWhitelisted) && "col-span-2"
+                                        )}>
+                                            {isAlreadyReported ? 'Reported' : 'Report Suspicious'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 pt-1">
