@@ -1,39 +1,58 @@
 /**
- * Database Service (Static JSON implementation)
+ * Database Service (Dual-source pattern sync)
  * 
- * Fetches scam patterns from a static JSON file hosted remotely.
- * This replaces the Supabase implementation for a zero-cost architecture.
+ * PRIMARY: AcmeZone2 Supabase edge function (sa-sync-patterns) — live patterns from database
+ * FALLBACK: Static JSON hosted on GitHub — works even if backend is down
+ * 
+ * Phase 25.0: Upgraded from GitHub-only to edge-function-first.
  */
 
-const REMOTE_PATTERNS_URL = 'https://raw.githubusercontent.com/dgarcia891/Hydra-Guard/main/public/patterns.json';
+const EDGE_FUNCTION_URL = 'https://ypeopjbfbxmjfkejbkuq.supabase.co/functions/v1/sa-sync-patterns';
+const GITHUB_FALLBACK_URL = 'https://raw.githubusercontent.com/dgarcia891/Hydra-Guard/main/public/patterns.json';
 
 /**
- * Fetch latest scam patterns from remote JSON
+ * Fetch latest scam patterns — tries edge function first, then GitHub fallback
  * @param {number} lastSync - Optional timestamp of last sync for delta updates
- * @returns {Promise<Array>} - List of scam patterns
+ * @returns {Promise<Object|null>} - Pattern data or null on failure
  */
 export async function fetchScamPatterns(lastSync = 0) {
+    // Try primary source: edge function
     try {
         const url = lastSync > 0
-            ? `${REMOTE_PATTERNS_URL}?since=${lastSync}`
-            : REMOTE_PATTERNS_URL;
+            ? `${EDGE_FUNCTION_URL}?since=${lastSync}`
+            : EDGE_FUNCTION_URL;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch(url, {
-            signal: controller.signal
-        });
-
+        const response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch patterns: ${response.status}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.ok && (data.patterns || data.keywords)) {
+                console.log(`[Hydra Guard] Synced ${data.count || 0} patterns from backend`);
+                return data;
+            }
         }
+    } catch (error) {
+        console.warn('[Hydra Guard] Edge function unavailable, trying GitHub fallback:', error.message);
+    }
+
+    // Fallback: static GitHub JSON
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(GITHUB_FALLBACK_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`GitHub fetch failed: ${response.status}`);
         const data = await response.json();
+        console.log('[Hydra Guard] Synced patterns from GitHub fallback');
         return data;
     } catch (error) {
-        console.warn('Failed to fetch remote patterns, falling back to local defaults:', error);
+        console.warn('[Hydra Guard] Both pattern sources failed:', error.message);
         return null;
     }
 }
