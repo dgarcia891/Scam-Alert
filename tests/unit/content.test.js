@@ -81,6 +81,7 @@ function loadContentScript() {
         REPORT_SCAM: 'report_scam',
         ANALYZE_PAGE: 'analyze_page'
       };
+      const OVERLAY_ID = 'hydra-guard-warning-overlay';
       
       // Mocks for dependencies that were stripped
       const detectContext = () => ({ type: 'web' });
