@@ -484,25 +484,34 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                 reasonBtn.addEventListener('click', (ev) => {
                     ev.stopPropagation();
                     const reason = reasonBtn.dataset.disputeReason;
-                    try {
-                        chrome.runtime.sendMessage({
-                            type: MessageTypes.REPORT_FALSE_POSITIVE,
-                            data: {
-                                flaggedText: finding.details || finding.description || '',
-                                checkTitle: finding.title || '',
-                                category: _humanizeTitle(finding.title),
-                                userReason: reason,
-                                userNote: '',
-                                pageUrl: window.location.hostname,
-                                timestamp: Date.now()
-                            }
-                        });
-                    } catch (err) { /* best effort */ }
 
-                    // Show thank-you
+                    // Show submitting state
                     disputeArea.innerHTML = `
-                        <div style="font-size: 12px; color: #34d399; font-weight: 600; padding-top: 6px;">✓ Feedback submitted. Thanks for helping us improve.</div>
+                        <div style="font-size: 12px; color: #94a3b8; font-weight: 600; padding-top: 6px;">Submitting feedback...</div>
                     `;
+
+                    chrome.runtime.sendMessage({
+                        type: MessageTypes.REPORT_FALSE_POSITIVE,
+                        data: {
+                            flaggedText: finding.details || finding.description || '',
+                            checkTitle: finding.title || '',
+                            category: _humanizeTitle(finding.title),
+                            userReason: reason,
+                            userNote: '',
+                            pageUrl: window.location.hostname,
+                            timestamp: Date.now()
+                        }
+                    }, (resp) => {
+                        if (resp && resp.success) {
+                            disputeArea.innerHTML = `
+                                <div style="font-size: 12px; color: #34d399; font-weight: 600; padding-top: 6px;">\u2713 Feedback submitted. Thanks for helping us improve.</div>
+                            `;
+                        } else {
+                            disputeArea.innerHTML = `
+                                <div style="font-size: 12px; color: #fbbf24; font-weight: 600; padding-top: 6px;">Could not submit feedback. ${resp?.error || 'Please try again later.'}</div>
+                            `;
+                        }
+                    });
                 });
             });
         });
@@ -510,21 +519,10 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
 
     // ── Footer action buttons ──────────────────────────────────────
 
-    // "Yes, This Is a Scam" — user confirms the detection is correct
+    // "Yes, This Is a Scam" — user confirms, open the report workflow.
+    // The report modal handles the actual backend submission with full
+    // payload and verifies the response before showing success/failure.
     shadow.getElementById('sa-confirm-btn').onclick = () => {
-        // Log confirmation for telemetry, then open the report workflow
-        // so user can optionally report the scammer's details
-        try {
-            chrome.runtime.sendMessage({
-                type: MessageTypes.REPORT_SCAM,
-                data: {
-                    url: window.location.href,
-                    severity: result.overallSeverity,
-                    confirmed: true,
-                    timestamp: Date.now()
-                }
-            });
-        } catch (e) { /* best effort */ }
         openReportWorkflow(shadow, extractEmailData(), result);
     };
 
@@ -545,23 +543,40 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         close();
     };
 
-    // "Not a Threat" — user disagrees, open false-positive feedback
+    // "Not a Threat" — user disagrees, whitelist sender
     shadow.getElementById('sa-safe-btn').onclick = () => {
-        // Whitelist and open a lightweight feedback confirmation
         const identity = result.metadata?.sender || window.location.hostname;
-        chrome.runtime.sendMessage({ type: MessageTypes.ADD_TO_WHITELIST, data: { domain: identity } });
-
-        // Show brief thank-you in the footer, then close
         const footer = shadow.querySelector('.sa-footer');
+
+        // Show saving state
         if (footer) {
             footer.innerHTML = `
                 <div style="text-align: center; padding: 8px 0;">
-                    <div style="font-size: 14px; font-weight: 700; color: #34d399; margin-bottom: 4px;">Marked as safe</div>
-                    <div style="font-size: 12px; color: #64748b;">We won't flag this sender again. Thanks for the feedback.</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #94a3b8;">Saving...</div>
                 </div>
             `;
         }
-        setTimeout(() => close(), 2000);
+
+        chrome.runtime.sendMessage({ type: MessageTypes.ADD_TO_WHITELIST, data: { domain: identity } }, (resp) => {
+            if (footer) {
+                if (resp && resp.success) {
+                    footer.innerHTML = `
+                        <div style="text-align: center; padding: 8px 0;">
+                            <div style="font-size: 14px; font-weight: 700; color: #34d399; margin-bottom: 4px;">Marked as safe</div>
+                            <div style="font-size: 12px; color: #64748b;">We won't flag this sender again.</div>
+                        </div>
+                    `;
+                } else {
+                    footer.innerHTML = `
+                        <div style="text-align: center; padding: 8px 0;">
+                            <div style="font-size: 14px; font-weight: 700; color: #fbbf24; margin-bottom: 4px;">Could not save</div>
+                            <div style="font-size: 12px; color: #64748b;">${resp?.error || 'Please try again.'}</div>
+                        </div>
+                    `;
+                }
+            }
+            setTimeout(() => close(), 2000);
+        });
     };
 
     document.body.appendChild(container);
@@ -953,25 +968,37 @@ function _showTransparencyPreview(panel, data) {
                 timestamp: Date.now()
             };
 
-            try {
-                chrome.runtime.sendMessage({
-                    type: MessageTypes.REPORT_FALSE_POSITIVE,
-                    data: payload
-                });
-            } catch (e) {
-                console.error('[Hydra Guard] Failed to send feedback:', e);
-            }
-
-            // Show thank you state
+            // Show submitting state
             panel.innerHTML = `
                 <div style="padding: 32px 20px; text-align: center;">
-                    <div style="font-size: 36px; margin-bottom: 12px;">✓</div>
-                    <div style="font-weight: 800; font-size: 16px; margin-bottom: 6px;">Thank You</div>
-                    <div style="font-size: 13px; color: #94a3b8;">Your feedback has been submitted for review.</div>
+                    <div style="font-size: 24px; margin-bottom: 12px; color: #94a3b8;">Submitting...</div>
                 </div>
             `;
 
-            setTimeout(() => _hideLocateFeedback(), 2500);
+            chrome.runtime.sendMessage({
+                type: MessageTypes.REPORT_FALSE_POSITIVE,
+                data: payload
+            }, (resp) => {
+                if (resp && resp.success) {
+                    panel.innerHTML = `
+                        <div style="padding: 32px 20px; text-align: center;">
+                            <div style="font-size: 36px; margin-bottom: 12px;">\u2713</div>
+                            <div style="font-weight: 800; font-size: 16px; margin-bottom: 6px;">Thank You</div>
+                            <div style="font-size: 13px; color: #94a3b8;">Your feedback has been submitted for review.</div>
+                        </div>
+                    `;
+                    setTimeout(() => _hideLocateFeedback(), 2500);
+                } else {
+                    panel.innerHTML = `
+                        <div style="padding: 32px 20px; text-align: center;">
+                            <div style="font-size: 36px; margin-bottom: 12px;">\u26A0</div>
+                            <div style="font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #fbbf24;">Submission Failed</div>
+                            <div style="font-size: 13px; color: #94a3b8;">${resp?.error || 'Please try again later.'}</div>
+                        </div>
+                    `;
+                    setTimeout(() => _hideLocateFeedback(), 3500);
+                }
+            });
         });
     }
 }

@@ -3,7 +3,7 @@
  */
 import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
-import { submitReport, submitUserReport } from '../../lib/supabase.js';
+import { submitReport, submitUserReport, submitCorrection } from '../../lib/supabase.js';
 import { verifyWithAI } from '../../lib/ai-verifier.js';
 
 export async function handleIncomingMessage(message, sender, context) {
@@ -44,7 +44,7 @@ export async function handleIncomingMessage(message, sender, context) {
             }
             return { success: true };
         case 'SUBMIT_CORRECTION':
-            return handleSubmitCorrection(msgData);
+            return handleSubmitCorrectionUnified(msgData);
         case MessageTypes.FORCE_RESCAN:
             return handleForceRescan(sender, msgData, scanAndHandle);
         case MessageTypes.CLEAR_URL_CACHE:
@@ -223,46 +223,26 @@ async function handleNavigateBack(sender) {
     }
 }
 
-async function handleSubmitCorrection(msgData) {
+async function handleSubmitCorrectionUnified(msgData) {
     try {
         const { url, feedback, comment, detectionResult } = msgData;
 
-        // Hash the URL (ensure simple crypto subtle hash)
+        // Hash the URL using Web Crypto API
         const encoder = new TextEncoder();
-        const data = encoder.encode(url);
+        const data = encoder.encode((url || '').toLowerCase().replace(/\/+$/, ''));
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const urlHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-        // Get detection ID if we have stored results
         const detectionId = detectionResult?.detectionId || null;
 
-        // Get Supabase vars safely using Phase 24.0 logic or fallback
-        const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://kuwglmwaresvmodypnnv.supabase.co';
-        const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1d2dsbXdhcmVzdm1vZHlwbm52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE4NzksImV4cCI6MjA4NTM4Nzg3OX0.uwQxqIWfsDzr8SZIYj_wrlAL5wPHtfWGPhBg-LYC25o';
-
-        // Submit to Supabase edge function
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/sa-submit-correction`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY
-            },
-            body: JSON.stringify({
-                url_hash: urlHash,
-                feedback: feedback,
-                user_comment: comment || null,
-                detection_id: detectionId,
-                detection_result: detectionResult
-            })
+        // Route through unified supabase.js (correct URL + API key)
+        const result = await submitCorrection(urlHash, feedback, {
+            detectionId,
+            userComment: comment || null,
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `HTTP ${response.status}`);
-        }
-
-        return { success: true };
+        return result;
     } catch (error) {
         console.error('[Hydra Guard] Failed to submit correction:', error);
         return { success: false, error: error.message };

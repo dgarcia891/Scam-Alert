@@ -23,24 +23,33 @@ const FUNCTIONS_BASE_URL = getEnvVar(
     'https://ypeopjbfbxmjfkejbkuq.supabase.co/functions/v1'
 );
 
-// SA_API_KEY: loaded from settings or env. Users configure this in Options.
+// SA_API_KEY: loaded from settings, env, or built-in default.
 let _cachedApiKey = null;
+
+// Built-in key — used when no override is configured via env or settings.
+const _BUILTIN_SA_KEY = 'hg_live_2026_ypeopjbfbxmjfkejbkuq_s3cur3';
 
 async function getApiKey() {
     if (_cachedApiKey) return _cachedApiKey;
     try {
+        // 1. Build-time env variable (highest priority override)
         const envKey = getEnvVar('VITE_SA_API_KEY', '');
         if (envKey) {
             _cachedApiKey = envKey;
             return envKey;
         }
-        // Fall back to user-configured key in extension settings
+        // 2. User-configured key in extension settings
         const result = await chrome.storage.local.get(['settings']);
         const key = result?.settings?.saApiKey || '';
-        if (key) _cachedApiKey = key;
-        return key;
+        if (key) {
+            _cachedApiKey = key;
+            return key;
+        }
+        // 3. Built-in default
+        _cachedApiKey = _BUILTIN_SA_KEY;
+        return _BUILTIN_SA_KEY;
     } catch (e) {
-        return '';
+        return _BUILTIN_SA_KEY;
     }
 }
 
