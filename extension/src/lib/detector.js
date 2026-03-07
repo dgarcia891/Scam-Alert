@@ -45,7 +45,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         if (onProgress) onProgress({ percent, message });
     };
 
-    console.log(`[Scam Detector] Scanning: ${url}`);
+    console.log(`[Hydra Guard] Scanning: ${url}`);
     reportProgress(10, 'Initializing scan...');
 
     const timing = {
@@ -331,7 +331,7 @@ export async function getCachedResult(url) {
             const MAX_CACHE_AGE = 24 * 60 * 60 * 1000; // 24 hours
 
             if (age < MAX_CACHE_AGE) {
-                console.log('[Scam Detector] Using cached result for:', normalized);
+                console.log('[Hydra Guard] Using cached result for:', normalized);
 
                 // BUG-076: Normalize legacy cache schemas lacking canonical overallSeverity mapping
                 if (result && typeof result === 'object') {
@@ -347,7 +347,7 @@ export async function getCachedResult(url) {
             }
         }
     } catch (error) {
-        console.error('[Scam Detector] Cache check error:', error);
+        console.error('[Hydra Guard] Cache check error:', error);
     }
     return null;
 }
@@ -366,7 +366,7 @@ export async function cacheResult(url, result) {
             }
         });
     } catch (error) {
-        console.error('[Scam Detector] Cache save error:', error);
+        console.error('[Hydra Guard] Cache save error:', error);
     }
 }
 

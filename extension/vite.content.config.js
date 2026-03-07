@@ -5,7 +5,7 @@ export default defineConfig({
     build: {
         lib: {
             entry: process.env.VITE_ENTRY,
-            name: 'ScamAlertContent',
+            name: 'HydraGuardContent',
             formats: ['iife'],
             fileName: () => `assets/${process.env.VITE_OUT}.js`
         },
