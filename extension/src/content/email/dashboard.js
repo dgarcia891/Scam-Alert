@@ -56,15 +56,15 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
     style.textContent = `
         :host { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647; display: flex; align-items: flex-start; justify-content: flex-end; padding: 24px; box-sizing: border-box; font-family: system-ui, sans-serif; }
         .sa-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px); pointer-events: auto; }
-        .sa-card { position: relative; pointer-events: auto; background: #0f172a; color: #f8fafc; width: 440px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); border: 1px solid ${accentColor}66; border-top: 6px solid ${accentColor}; overflow: hidden; animation: sa-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .sa-card { position: relative; pointer-events: auto; background: #0f172a; color: #f8fafc; width: 440px; max-height: calc(100vh - 48px); border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); border: 1px solid ${accentColor}66; border-top: 6px solid ${accentColor}; overflow: hidden; display: flex; flex-direction: column; animation: sa-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
         .sa-card.sa-minimized { width: 320px; border-radius: 16px; }
         .sa-card.sa-minimized .sa-content, .sa-card.sa-minimized .sa-footer { display: none; }
         @keyframes sa-slide-in { from { transform: translateX(500px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .sa-header { padding: 16px 20px; background: linear-gradient(to bottom, ${accentBg}, transparent); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e293b; }
+        .sa-header { padding: 16px 20px; background: linear-gradient(to bottom, ${accentBg}, transparent); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e293b; flex-shrink: 0; }
         .sa-title { font-weight: 900; color: ${accentColor}; }
         .sa-close { background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 18px; padding: 4px 8px; }
         .sa-close:hover { color: #f8fafc; }
-        .sa-content { padding: 24px; max-height: 80vh; overflow-y: auto; }
+        .sa-content { padding: 24px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
         .sa-badge { display: inline-block; padding: 6px 14px; background: ${accentColor}; color: white; border-radius: 99px; font-size: 11px; font-weight: 800; margin-bottom: 16px; }
         .sa-summary { font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
         .sa-finding { background: rgba(30, 41, 59, 0.4); border: 1px solid #1e293b; border-radius: 16px; padding: 16px; margin-bottom: 12px; }
@@ -72,7 +72,7 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         .sa-jump-btn:hover { background: ${accentColor}44; }
         .sa-jump-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .sa-jump-feedback { font-size: 12px; color: #94a3b8; margin-top: 8px; display: none; }
-        .sa-footer { padding: 20px; background: #020617; border-top: 1px solid #1e293b; display: flex; flex-direction: column; gap: 12px; }
+        .sa-footer { padding: 20px; background: #020617; border-top: 1px solid #1e293b; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
         .sa-btn { width: 100%; padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 1px solid transparent; font-size: 14px; }
         .sa-btn-primary { background: rgba(225, 29, 72, 0.1); color: #fb7185; border-color: rgba(225, 29, 72, 0.2); }
         .sa-btn-primary:hover { background: rgba(225, 29, 72, 0.2); }
@@ -103,7 +103,10 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                 : '#fbbf24';
             return `
                 <div class="sa-finding" style="cursor: pointer;" data-ai-card>
-                    <div style="font-weight: 800; margin-bottom: 6px;">AI SECOND OPINION</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <div style="font-weight: 800;">AI SECOND OPINION</div>
+                        <div style="font-size: 10px; color: #64748b; background: rgba(100,116,139,0.1); padding: 2px 8px; border-radius: 6px; letter-spacing: 0.03em;">Auto-analyzed</div>
+                    </div>
                     <div style="font-size: 13px; color: #94a3b8; margin-bottom: 10px;">${f.details || f.description}</div>
                     <div data-ai-details style="display: none; border-top: 1px solid #1e293b; padding-top: 12px; margin-top: 8px;">
                         <div style="display: flex; gap: 12px; margin-bottom: 10px;">
@@ -216,44 +219,63 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
 
                 const searchRoot = emailBody || document.body;
 
-                // 1. Try Hydra Guard highlight marks inside email body
-                const highlights = searchRoot.querySelectorAll('.hydra-guard-highlight');
-                for (const el of highlights) {
-                    if (el.textContent.toLowerCase().includes(searchText)) {
-                        _applyPersistentHighlight(el, finding, phrase);
+                // Build search variants: full phrase first, then progressively
+                // shorter substrings (for fuzzy matches where exact text differs)
+                const searchVariants = [searchText];
+                const words = searchText.split(/\s+/);
+                if (words.length >= 4) {
+                    // Try dropping last word, then first word
+                    searchVariants.push(words.slice(0, -1).join(' '));
+                    searchVariants.push(words.slice(1).join(' '));
+                    // Try middle chunk (drop first and last word)
+                    if (words.length >= 5) {
+                        searchVariants.push(words.slice(1, -1).join(' '));
+                    }
+                }
+
+                for (const variant of searchVariants) {
+                    if (variant.length < 3) continue;
+
+                    // 1. Try Hydra Guard highlight marks inside email body
+                    const highlights = searchRoot.querySelectorAll('.hydra-guard-highlight');
+                    for (const el of highlights) {
+                        if (el.textContent.toLowerCase().includes(variant)) {
+                            _applyPersistentHighlight(el, finding, phrase);
+                            found = true;
+                            matchedPhrase = phrase;
+                            break;
+                        }
+                    }
+                    if (found) break;
+
+                    // 2. TreeWalker on the email body
+                    const targetEl = _findTextInElement(searchRoot, variant);
+                    if (targetEl) {
+                        _applyPersistentHighlight(targetEl, finding, phrase);
                         found = true;
                         matchedPhrase = phrase;
                         break;
+                    }
+
+                    // 3. Fallback to full document.body
+                    if (emailBody && emailBody !== document.body) {
+                        const fallbackEl = _findTextInElement(document.body, variant);
+                        if (fallbackEl) {
+                            _applyPersistentHighlight(fallbackEl, finding, phrase);
+                            found = true;
+                            matchedPhrase = phrase;
+                            break;
+                        }
                     }
                 }
                 if (found) break;
-
-                // 2. TreeWalker on the email body
-                const targetEl = _findTextInElement(searchRoot, searchText);
-                if (targetEl) {
-                    _applyPersistentHighlight(targetEl, finding, phrase);
-                    found = true;
-                    matchedPhrase = phrase;
-                    break;
-                }
-
-                // 3. Fallback to full document.body
-                if (emailBody && emailBody !== document.body) {
-                    const fallbackEl = _findTextInElement(document.body, searchText);
-                    if (fallbackEl) {
-                        _applyPersistentHighlight(fallbackEl, finding, phrase);
-                        found = true;
-                        matchedPhrase = phrase;
-                        break;
-                    }
-                }
             }
 
             // Show feedback if nothing was found
             const feedback = shadow.querySelector(`[data-feedback-idx="${idx}"]`);
             if (!found && feedback) {
                 feedback.style.display = 'block';
-                feedback.textContent = 'Could not locate this indicator in the visible email. The text may have been obscured or removed.';
+                feedback.textContent = 'Could not locate the exact text. This may be a pattern-based or fuzzy detection rather than an exact phrase match.';
                 setTimeout(() => { feedback.style.display = 'none'; }, 5000);
             }
         });
@@ -707,11 +729,20 @@ function _buildSearchPhrases(finding) {
     const phrases = [];
     const seen = new Set();
 
-    // Known high-level labels that are NOT actual email text — skip these for search
+    // Known high-level labels that are NOT actual email text — skip these for search.
+    // These are indicator category names generated by email-heuristics.js, NOT text
+    // that actually appears in the email body.
     const LABEL_PHRASES = new Set([
-        'gift card payment request', 'official name from personal email address',
-        'suspicious financial request', 'authority pressure + secrecy language',
-        'vague social lure with external link'
+        'gift card payment request',
+        'official name from personal email address',
+        'suspicious financial request',
+        'authority pressure + secrecy language',
+        'vague social lure with external link',
+        // Common description-style strings that aren't real email text
+        'email scam indicators',
+        'urgent wording',
+        'no risky forms or links found',
+        'no email-specific scams detected',
     ]);
 
     // 1. Pull from matches FIRST (these are actual keywords found in the email)
