@@ -129,31 +129,57 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             `;
         }
 
-        // For non-AI cards: show Locate button if locatable, otherwise show matched keywords inline
+        // Determine if this finding has exact (non-fuzzy) matches that can be located
+        const exactMatches = matchedKeywords.filter(k => !/\(fuzzy\s+match\)/i.test(k));
+        const fuzzyMatches = matchedKeywords.filter(k => /\(fuzzy\s+match\)/i.test(k));
+        const hasExactLocatable = hasLocatable && exactMatches.length > 0;
+
         let actionHtml = '';
-        if (hasLocatable) {
+        if (hasExactLocatable) {
+            // Exact matches exist — Locate button can actually find them
             actionHtml = `
-                <button class="sa-jump-btn" data-jump-idx="${idx}">Locate Indicator</button>
+                <button class="sa-jump-btn" data-jump-idx="${idx}">Locate in Email</button>
                 <div class="sa-jump-feedback" data-feedback-idx="${idx}"></div>
             `;
-        } else if (matchedKeywords.length > 0) {
-            // Show matched keywords as inline tags when we can't locate them
-            const tags = matchedKeywords.slice(0, 8).map(k =>
-                `<span style="display: inline-block; padding: 3px 8px; margin: 2px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${k}</span>`
-            ).join('');
-            actionHtml = `
-                <div style="margin-top: 8px;">
-                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Matched keywords</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 2px;">${tags}</div>
-                </div>
-            `;
+        } else {
+            // No exact matches — show evidence directly (indicators, reasons, keyword tags)
+            const indicators = f.indicators || [];
+            const reasons = (f.visualIndicators || [])
+                .map(vi => vi.reason).filter(Boolean)
+                .filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 3);
+            const displayKeywords = exactMatches.length > 0 ? exactMatches : matchedKeywords;
+            const cleanKeywords = displayKeywords.slice(0, 8).map(k => k.replace(/\s*\(fuzzy\s+match\)/i, ''));
+
+            if (indicators.length > 0 || cleanKeywords.length > 0 || reasons.length > 0) {
+                actionHtml = '<div style="border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 10px;">';
+                actionHtml += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">What triggered this</div>';
+
+                if (indicators.length > 0) {
+                    actionHtml += `<div style="font-size: 13px; color: #fbbf24; font-weight: 600; margin-bottom: 6px;">${indicators.join(' + ')}</div>`;
+                }
+                if (reasons.length > 0) {
+                    actionHtml += reasons.map(r => `<div style="font-size: 12px; color: #cbd5e1; margin-bottom: 4px; line-height: 1.4;">${r}</div>`).join('');
+                }
+                if (cleanKeywords.length > 0) {
+                    actionHtml += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 4px;">Matched in email</div>';
+                    actionHtml += '<div style="display: flex; flex-wrap: wrap; gap: 4px;">';
+                    actionHtml += cleanKeywords.map(k =>
+                        `<span style="display: inline-block; padding: 3px 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${k}</span>`
+                    ).join('');
+                    actionHtml += '</div>';
+                }
+                actionHtml += '</div>';
+            }
         }
 
         return `
-            <div class="sa-finding">
+            <div class="sa-finding" data-finding-idx="${idx}">
                 <div style="font-weight: 800; margin-bottom: 6px;">${_humanizeTitle(f.title).toUpperCase()}</div>
                 <div style="font-size: 13px; color: #94a3b8; margin-bottom: 14px;">${f.details || f.description}</div>
                 ${actionHtml}
+                <div style="margin-top: 10px; text-align: right;">
+                    <button class="sa-dispute-btn" data-dispute-idx="${idx}" style="background: none; border: none; color: #475569; font-size: 11px; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; text-underline-offset: 2px;">Not accurate?</button>
+                </div>
             </div>
         `;
     }).join('');
@@ -373,6 +399,58 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             );
         });
     }
+
+    // ── Per-card "Not accurate?" dispute buttons ────────────────────
+    const disputeBtns = shadow.querySelectorAll('.sa-dispute-btn[data-dispute-idx]');
+    disputeBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.disputeIdx, 10);
+            const finding = findings[idx];
+            const findingCard = btn.closest('.sa-finding');
+            if (!findingCard) return;
+
+            // Replace the "Not accurate?" link with inline dispute options
+            const disputeArea = btn.parentElement;
+            disputeArea.innerHTML = `
+                <div style="border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 4px;">
+                    <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">What's wrong with this detection?</div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <button data-dispute-reason="not_in_email" style="text-align: left; background: rgba(30,41,59,0.4); border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px; color: #cbd5e1; font-size: 12px; cursor: pointer; font-family: inherit;">This text isn't in the email</button>
+                        <button data-dispute-reason="not_suspicious" style="text-align: left; background: rgba(30,41,59,0.4); border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px; color: #cbd5e1; font-size: 12px; cursor: pointer; font-family: inherit;">This content isn't suspicious</button>
+                        <button data-dispute-reason="legitimate" style="text-align: left; background: rgba(30,41,59,0.4); border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px; color: #cbd5e1; font-size: 12px; cursor: pointer; font-family: inherit;">This is a legitimate email</button>
+                    </div>
+                </div>
+            `;
+
+            // Wire dispute reason buttons
+            disputeArea.querySelectorAll('[data-dispute-reason]').forEach(reasonBtn => {
+                reasonBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const reason = reasonBtn.dataset.disputeReason;
+                    try {
+                        chrome.runtime.sendMessage({
+                            type: MessageTypes.REPORT_FALSE_POSITIVE,
+                            data: {
+                                flaggedText: finding.details || finding.description || '',
+                                checkTitle: finding.title || '',
+                                category: _humanizeTitle(finding.title),
+                                userReason: reason,
+                                userNote: '',
+                                pageUrl: window.location.hostname,
+                                timestamp: Date.now()
+                            }
+                        });
+                    } catch (err) { /* best effort */ }
+
+                    // Show thank-you
+                    disputeArea.innerHTML = `
+                        <div style="font-size: 12px; color: #34d399; font-weight: 600; padding-top: 6px;">✓ Feedback submitted. Thanks for helping us improve.</div>
+                    `;
+                });
+            });
+        });
+    });
 
     // ── Footer action buttons ──────────────────────────────────────
 

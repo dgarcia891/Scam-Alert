@@ -162,9 +162,17 @@ async function handleReportFalsePositive(data, submitFalsePositive) {
     try {
         const payload = data;
 
-        // 1. Validate explanation length
-        if (!payload.explanation || payload.explanation.trim().length < 15) {
-            return { success: false, error: 'Explanation must be at least 15 characters long.' };
+        // Build explanation from whichever fields the caller provides.
+        // Dashboard sends: { flaggedText, checkTitle, category, userReason, userNote }
+        // Legacy Locate tooltip sends: { explanation, url, phrase }
+        const explanation = payload.explanation
+            || [payload.userReason, payload.userNote, payload.category, payload.flaggedText]
+                .filter(Boolean).join(' — ')
+            || '';
+
+        // 1. Validate: need at least some content
+        if (explanation.trim().length < 3) {
+            return { success: false, error: 'Please provide a reason for your feedback.' };
         }
 
         // 2. Rate limiting (max 10 per day per installation)
@@ -178,8 +186,13 @@ async function handleReportFalsePositive(data, submitFalsePositive) {
             return { success: false, error: 'Daily report limit reached. Thank you for your feedback!' };
         }
 
-        // 3. Submit
-        const result = await submitFalsePositive(payload);
+        // 3. Submit with normalized payload
+        const normalizedPayload = {
+            url: payload.pageUrl || payload.url || '',
+            phrase: payload.flaggedText || payload.phrase || '',
+            explanation: explanation
+        };
+        const result = await submitFalsePositive(normalizedPayload);
 
         if (result.success) {
             fpRateLimits.count++;

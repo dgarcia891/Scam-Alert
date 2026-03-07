@@ -122,7 +122,9 @@ export function analyzePageContent(pageContent, customPhrases = null) {
     if (foundPhrases.length >= 2) severity = 'HIGH'; else if (foundPhrases.length > 0) severity = 'MEDIUM';
 
     // Fuzzy matching against all scam phrases (Hydra Guard)
-    const fuzzyMatch = findBestScamMatch(title + ' ' + bodyText, scamPhrases, 70);
+    // Threshold raised to 85 in v1.0.142 — stop-word filtering means only
+    // meaningful content words count, so 85% is appropriate.
+    const fuzzyMatch = findBestScamMatch(title + ' ' + bodyText, scamPhrases, 85);
     if (fuzzyMatch && !foundPhrases.includes(fuzzyMatch.phrase)) {
         score += 25;
         severity = elevateSeverity(severity, 'MEDIUM');
