@@ -83,7 +83,7 @@ Required format:
 }`;
 
     try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${options.apiKey}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${options.apiKey}`;
 
         const response = await fetch(endpoint, {
             method: 'POST',
