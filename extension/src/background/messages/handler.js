@@ -2,8 +2,9 @@
  * Background Message Handler (v19.2 Refactored)
  */
 import { MessageTypes } from '../../lib/messaging.js';
-import { getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
+import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
 import { submitReport, submitUserReport } from '../../lib/supabase.js';
+import { verifyWithAI } from '../../lib/ai-verifier.js';
 
 export async function handleIncomingMessage(message, sender, context) {
     const { type, data, payload } = message; // Support both for transition
@@ -48,6 +49,8 @@ export async function handleIncomingMessage(message, sender, context) {
             return handleForceRescan(sender, msgData, scanAndHandle);
         case MessageTypes.CLEAR_URL_CACHE:
             return handleClearUrlCache(msgData);
+        case MessageTypes.ASK_AI_OPINION:
+            return handleAskAIOpinion(msgData, getSettings, getCachedScan);
         default:
             console.log('[Hydra Guard] Unknown message type:', type);
             return { error: 'Unknown message type' };
@@ -265,4 +268,48 @@ async function handleClearUrlCache(msgData) {
     const normalized = normalizeUrl(msgData.url);
     await chrome.storage.local.remove(`scan_cache_${normalized}`);
     return { success: true };
+}
+
+async function handleAskAIOpinion(msgData, getSettings, getCachedScan) {
+    try {
+        const settings = await getSettings();
+
+        if (!settings.aiEnabled || !settings.aiApiKey) {
+            return { success: false, error: 'AI is not enabled or no API key configured.' };
+        }
+
+        // Get the current tab URL if not provided
+        let url = msgData?.url;
+        if (!url) {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            url = tab?.url;
+        }
+        if (!url) {
+            return { success: false, error: 'No URL to analyze.' };
+        }
+
+        // Try to get cached scan results for richer context
+        const cached = await getCachedScan(url);
+        const signals = [];
+        const phrases = [];
+
+        if (cached) {
+            if (cached.signals?.hard) signals.push(...cached.signals.hard);
+            if (cached.signals?.soft) signals.push(...cached.signals.soft);
+            const emailIndicators = cached.checks?.emailScams?.visualIndicators || [];
+            phrases.push(...emailIndicators.map(i => i.phrase).filter(Boolean));
+        }
+
+        const result = await verifyWithAI(url, { signals, phrases }, { apiKey: settings.aiApiKey });
+
+        return {
+            success: true,
+            verdict: result.verdict,
+            reason: result.reason,
+            confidence: result.confidence
+        };
+    } catch (err) {
+        console.error('[Hydra Guard] ASK_AI_OPINION failed:', err);
+        return { success: false, error: err.message };
+    }
 }

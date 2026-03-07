@@ -3,7 +3,6 @@
  */
 import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, repairStatistics, addToBlocklist, removeFromBlocklist, getBlocklist } from '../../lib/storage.js';
-import { verifyWithAI } from '../../lib/ai-verifier.js';
 import { submitUserReport } from '../../lib/supabase.js';
 import { syncManager } from './sync-manager.js';
 
@@ -48,9 +47,6 @@ export function handleIncomingMessage(message, sender, context) {
 
         case MessageTypes.SYNC_BLOCKLIST:
             return handleSyncBlocklist(data);
-
-        case MessageTypes.ASK_AI_OPINION:
-            return handleAskAIOpinion(data);
 
         default:
             console.warn('[Hydra Guard] Unknown message type:', type);
@@ -145,49 +141,5 @@ async function handleSyncBlocklist(data) {
     console.log('[Hydra Guard] Manual blocklist sync requested');
     const result = await syncManager.sync(!!data?.force);
     return result;
-}
-
-async function handleAskAIOpinion(data) {
-    try {
-        const settings = await getSettings();
-
-        if (!settings.aiEnabled || !settings.aiApiKey) {
-            return { success: false, error: 'AI is not enabled or no API key configured.' };
-        }
-
-        // Get the current tab URL if not provided
-        let url = data?.url;
-        if (!url) {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            url = tab?.url;
-        }
-        if (!url) {
-            return { success: false, error: 'No URL to analyze.' };
-        }
-
-        // Try to get cached scan results for richer context
-        const cached = await getCachedScan(url);
-        const signals = [];
-        const phrases = [];
-
-        if (cached) {
-            if (cached.signals?.hard) signals.push(...cached.signals.hard);
-            if (cached.signals?.soft) signals.push(...cached.signals.soft);
-            const emailIndicators = cached.checks?.emailScams?.visualIndicators || [];
-            phrases.push(...emailIndicators.map(i => i.phrase).filter(Boolean));
-        }
-
-        const result = await verifyWithAI(url, { signals, phrases }, { apiKey: settings.aiApiKey });
-
-        return {
-            success: true,
-            verdict: result.verdict,
-            reason: result.reason,
-            confidence: result.confidence
-        };
-    } catch (err) {
-        console.error('[Hydra Guard] ASK_AI_OPINION failed:', err);
-        return { success: false, error: err.message };
-    }
 }
 
