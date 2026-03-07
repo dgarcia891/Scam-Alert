@@ -112,8 +112,13 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'those pics', 'those pictures', 'remember them', 'open this', 'photos',
         ...(dyn.vagueLureKeywords || [])
     ])];
-    const hasVagueLure = vagueLureKeywords.some(k => emailBody.includes(k));
-    const hasExternalLinks = pageContent?.links?.length > 0 || pageContent?.rawUrls?.length > 0;
+    const matchedLureKeywords = vagueLureKeywords.filter(k => emailBody.includes(k));
+    const hasVagueLure = matchedLureKeywords.length > 0;
+    const externalLinks = [
+        ...(pageContent?.links || []).map(l => typeof l === 'string' ? l : l.href || l.url || ''),
+        ...(pageContent?.rawUrls || [])
+    ].filter(Boolean).slice(0, 5);
+    const hasExternalLinks = externalLinks.length > 0;
 
     if (hasVagueLure && hasExternalLinks) {
         indicators.push('Vague social lure with external link');
@@ -155,6 +160,16 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         visualIndicators,
         dataChecked: Math.max(emailBody.length, 1) > 1 ? emailBody.substring(0, 5000) : `Sender: ${sender}`,
         matches: keywordMatches,
+        // Evidence for pattern-based detections (used by dashboard to show what triggered it)
+        evidence: {
+            lureKeywords: matchedLureKeywords,
+            externalLinks: externalLinks,
+            giftCardKeywordsFound: giftCardKeywords.filter(k => emailBody.includes(k)),
+            commandWordsFound: commandWords.filter(k => emailBody.includes(k)),
+            financeKeywordsFound: financeKeywords.filter(k => emailBody.includes(k)),
+            authoritySignalsFound: authorityFound || [],
+            senderMismatch: senderFound ? { displayName, sender } : null,
+        },
         score
     };
 }

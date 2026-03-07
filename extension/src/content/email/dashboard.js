@@ -129,47 +129,96 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             `;
         }
 
-        // Determine if this finding has exact (non-fuzzy) matches that can be located
+        // Determine if this finding has locatable phrases in the email body.
+        // _buildSearchPhrases now pulls from f.matches, visualIndicators, AND
+        // f.evidence (lure keywords, gift card signals, authority phrases, etc.)
+        // so hasLocatable is true whenever there's real email text to highlight.
         const exactMatches = matchedKeywords.filter(k => !/\(fuzzy\s+match\)/i.test(k));
-        const fuzzyMatches = matchedKeywords.filter(k => /\(fuzzy\s+match\)/i.test(k));
-        const hasExactLocatable = hasLocatable && exactMatches.length > 0;
+        const isPatternBased = (f.indicators || []).length > 0;
+        const canLocate = hasLocatable;
 
         let actionHtml = '';
-        if (hasExactLocatable) {
-            // Exact matches exist — Locate button can actually find them
-            actionHtml = `
-                <button class="sa-jump-btn" data-jump-idx="${idx}">Locate in Email</button>
-                <div class="sa-jump-feedback" data-feedback-idx="${idx}"></div>
-            `;
-        } else {
-            // No exact matches — show evidence directly (indicators, reasons, keyword tags)
+
+        // ── Evidence section: show for pattern-based findings or when no exact locatables ──
+        if (isPatternBased || !canLocate) {
             const indicators = f.indicators || [];
             const reasons = (f.visualIndicators || [])
                 .map(vi => vi.reason).filter(Boolean)
                 .filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 3);
+            const evidence = f.evidence || {};
             const displayKeywords = exactMatches.length > 0 ? exactMatches : matchedKeywords;
             const cleanKeywords = displayKeywords.slice(0, 8).map(k => k.replace(/\s*\(fuzzy\s+match\)/i, ''));
 
-            if (indicators.length > 0 || cleanKeywords.length > 0 || reasons.length > 0) {
-                actionHtml = '<div style="border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 10px;">';
-                actionHtml += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">What triggered this</div>';
+            const hasEvidence = indicators.length > 0 || cleanKeywords.length > 0 || reasons.length > 0
+                || (evidence.lureKeywords || []).length > 0 || (evidence.externalLinks || []).length > 0;
 
-                if (indicators.length > 0) {
-                    actionHtml += `<div style="font-size: 13px; color: #fbbf24; font-weight: 600; margin-bottom: 6px;">${indicators.join(' + ')}</div>`;
-                }
-                if (reasons.length > 0) {
-                    actionHtml += reasons.map(r => `<div style="font-size: 12px; color: #cbd5e1; margin-bottom: 4px; line-height: 1.4;">${r}</div>`).join('');
-                }
-                if (cleanKeywords.length > 0) {
-                    actionHtml += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 4px;">Matched in email</div>';
-                    actionHtml += '<div style="display: flex; flex-wrap: wrap; gap: 4px;">';
-                    actionHtml += cleanKeywords.map(k =>
-                        `<span style="display: inline-block; padding: 3px 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${k}</span>`
+            if (hasEvidence) {
+                actionHtml += '<div style="border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 10px;">';
+                actionHtml += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">What triggered this</div>';
+
+                // Show lure keywords + links for vague social lure pattern
+                if ((evidence.lureKeywords || []).length > 0) {
+                    actionHtml += '<div style="font-size: 10px; color: #64748b; margin-bottom: 4px;">LURE PHRASE FOUND</div>';
+                    actionHtml += '<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">';
+                    actionHtml += evidence.lureKeywords.map(k =>
+                        `<span style="display: inline-block; padding: 3px 8px; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); border-radius: 6px; font-size: 11px; color: #fbbf24; font-weight: 600;">&ldquo;${k}&rdquo;</span>`
                     ).join('');
                     actionHtml += '</div>';
                 }
+                if ((evidence.externalLinks || []).length > 0) {
+                    actionHtml += '<div style="font-size: 10px; color: #64748b; margin-bottom: 4px;">SUSPICIOUS EXTERNAL LINKS</div>';
+                    actionHtml += '<div style="margin-bottom: 10px;">';
+                    actionHtml += evidence.externalLinks.slice(0, 3).map(link => {
+                        const display = link.length > 50 ? link.substring(0, 50) + '...' : link;
+                        return `<div style="font-size: 11px; color: #fb7185; font-family: monospace; padding: 4px 8px; background: rgba(239,68,68,0.06); border-radius: 4px; margin-bottom: 3px; word-break: break-all;">${_escapeHtml(display)}</div>`;
+                    }).join('');
+                    actionHtml += '</div>';
+                }
+
+                // Show sender mismatch evidence
+                if (evidence.senderMismatch) {
+                    actionHtml += '<div style="font-size: 10px; color: #64748b; margin-bottom: 4px;">SENDER MISMATCH</div>';
+                    actionHtml += `<div style="font-size: 12px; color: #fca5a5; margin-bottom: 10px;">Display name suggests official role, but sent from personal email</div>`;
+                }
+
+                // Show gift card / finance / authority evidence
+                if ((evidence.giftCardKeywordsFound || []).length > 0 || (evidence.commandWordsFound || []).length > 0) {
+                    const gcWords = [...(evidence.giftCardKeywordsFound || []), ...(evidence.commandWordsFound || [])];
+                    actionHtml += '<div style="font-size: 10px; color: #64748b; margin-bottom: 4px;">GIFT CARD SCAM SIGNALS</div>';
+                    actionHtml += '<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">';
+                    actionHtml += gcWords.slice(0, 8).map(k =>
+                        `<span style="display: inline-block; padding: 3px 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${_escapeHtml(k)}</span>`
+                    ).join('');
+                    actionHtml += '</div>';
+                }
+
+                // Fallback: show generic indicators + keyword tags
+                if ((evidence.lureKeywords || []).length === 0 && (evidence.giftCardKeywordsFound || []).length === 0 && !evidence.senderMismatch) {
+                    if (indicators.length > 0) {
+                        actionHtml += `<div style="font-size: 13px; color: #fbbf24; font-weight: 600; margin-bottom: 6px;">${indicators.join(' + ')}</div>`;
+                    }
+                    if (reasons.length > 0) {
+                        actionHtml += reasons.map(r => `<div style="font-size: 12px; color: #cbd5e1; margin-bottom: 4px; line-height: 1.4;">${r}</div>`).join('');
+                    }
+                    if (cleanKeywords.length > 0) {
+                        actionHtml += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 4px;">Matched in email</div>';
+                        actionHtml += '<div style="display: flex; flex-wrap: wrap; gap: 4px;">';
+                        actionHtml += cleanKeywords.map(k =>
+                            `<span style="display: inline-block; padding: 3px 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${_escapeHtml(k)}</span>`
+                        ).join('');
+                        actionHtml += '</div>';
+                    }
+                }
                 actionHtml += '</div>';
             }
+        }
+
+        // ── Locate button: show whenever there are exact keyword matches ──
+        if (canLocate) {
+            actionHtml += `
+                <button class="sa-jump-btn" data-jump-idx="${idx}" style="margin-top: 10px;">Locate in Email</button>
+                <div class="sa-jump-feedback" data-feedback-idx="${idx}"></div>
+            `;
         }
 
         return `
@@ -250,10 +299,12 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
 
             // Find the email body container
             const emailBody = _findEmailBody();
+            const searchRoot = emailBody || document.body;
 
-            // Try each phrase (longest first)
-            let found = false;
-            let matchedPhrase = '';
+            // Try EVERY phrase and highlight all that are found (multi-highlight)
+            let totalFound = 0;
+            let firstHighlightEl = null;
+
             for (const phrase of phrases) {
                 const searchText = phrase
                     .replace(/\s*\(fuzzy\s+match\)/i, '')
@@ -262,22 +313,19 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
 
                 if (!searchText || searchText.length < 3) continue;
 
-                const searchRoot = emailBody || document.body;
-
                 // Build search variants: full phrase first, then progressively
                 // shorter substrings (for fuzzy matches where exact text differs)
                 const searchVariants = [searchText];
                 const words = searchText.split(/\s+/);
                 if (words.length >= 4) {
-                    // Try dropping last word, then first word
                     searchVariants.push(words.slice(0, -1).join(' '));
                     searchVariants.push(words.slice(1).join(' '));
-                    // Try middle chunk (drop first and last word)
                     if (words.length >= 5) {
                         searchVariants.push(words.slice(1, -1).join(' '));
                     }
                 }
 
+                let phraseFound = false;
                 for (const variant of searchVariants) {
                     if (variant.length < 3) continue;
 
@@ -286,19 +334,21 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                     for (const el of highlights) {
                         if (el.textContent.toLowerCase().includes(variant)) {
                             _applyPersistentHighlight(el, finding, phrase);
-                            found = true;
-                            matchedPhrase = phrase;
+                            if (!firstHighlightEl) firstHighlightEl = el;
+                            phraseFound = true;
+                            totalFound++;
                             break;
                         }
                     }
-                    if (found) break;
+                    if (phraseFound) break;
 
                     // 2. TreeWalker on the email body
                     const targetEl = _findTextInElement(searchRoot, variant);
                     if (targetEl) {
                         _applyPersistentHighlight(targetEl, finding, phrase);
-                        found = true;
-                        matchedPhrase = phrase;
+                        if (!firstHighlightEl) firstHighlightEl = targetEl;
+                        phraseFound = true;
+                        totalFound++;
                         break;
                     }
 
@@ -307,17 +357,23 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                         const fallbackEl = _findTextInElement(document.body, variant);
                         if (fallbackEl) {
                             _applyPersistentHighlight(fallbackEl, finding, phrase);
-                            found = true;
-                            matchedPhrase = phrase;
+                            if (!firstHighlightEl) firstHighlightEl = fallbackEl;
+                            phraseFound = true;
+                            totalFound++;
                             break;
                         }
                     }
                 }
-                if (found) break;
+                // Continue to next phrase — don't break, highlight them ALL
             }
 
-            // If nothing found, show inline evidence instead of a disappearing message
-            if (!found) {
+            // Scroll to the first highlighted element
+            if (firstHighlightEl) {
+                firstHighlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // If nothing found at all, show inline evidence as fallback
+            if (totalFound === 0) {
                 const findingCard = btn.closest('.sa-finding');
                 if (findingCard) {
                     _showInlineEvidence(findingCard, finding, btn);
@@ -527,8 +583,8 @@ function _applyPersistentHighlight(el, finding, matchedPhrase) {
     el.style.borderRadius = '4px';
     el.setAttribute(HIGHLIGHT_ATTR, 'true');
 
-    // Scroll into view
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Note: scrollIntoView is handled by the caller (multi-highlight scrolls
+    // to the first found element only, not every highlight).
 
     // ── Phase 2: Wire hover tooltip ──────────────────────────────────
     const onEnter = () => {
@@ -996,46 +1052,57 @@ function _buildSearchPhrases(finding) {
     const seen = new Set();
 
     // Known high-level labels that are NOT actual email text — skip these for search.
-    // These are indicator category names generated by email-heuristics.js, NOT text
-    // that actually appears in the email body.
     const LABEL_PHRASES = new Set([
         'gift card payment request',
         'official name from personal email address',
         'suspicious financial request',
         'authority pressure + secrecy language',
         'vague social lure with external link',
-        // Common description-style strings that aren't real email text
         'email scam indicators',
         'urgent wording',
         'no risky forms or links found',
         'no email-specific scams detected',
     ]);
 
-    // 1. Pull from matches FIRST (these are actual keywords found in the email)
+    const _add = (str) => {
+        const p = (typeof str === 'string' ? str : '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
+        if (p && p.length >= 3 && !seen.has(p.toLowerCase()) && !LABEL_PHRASES.has(p.toLowerCase())) {
+            seen.add(p.toLowerCase());
+            phrases.push(p);
+        }
+    };
+
+    // 1. Pull from matches (actual keywords found in the email)
     if (Array.isArray(finding.matches)) {
-        for (const m of finding.matches) {
-            const p = (typeof m === 'string' ? m : '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
-            if (p && p.length >= 4 && !seen.has(p.toLowerCase()) && !LABEL_PHRASES.has(p.toLowerCase())) {
-                seen.add(p.toLowerCase());
-                phrases.push(p);
-            }
-        }
+        for (const m of finding.matches) _add(m);
     }
 
-    // 2. Then pull from visualIndicators, but skip label-style phrases
+    // 2. Pull from visualIndicators, skip label-style phrases
     if (Array.isArray(finding.visualIndicators)) {
-        for (const vi of finding.visualIndicators) {
-            const p = (vi.phrase || '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
-            if (p && p.length >= 4 && !seen.has(p.toLowerCase()) && !LABEL_PHRASES.has(p.toLowerCase())) {
-                seen.add(p.toLowerCase());
-                phrases.push(p);
-            }
-        }
+        for (const vi of finding.visualIndicators) _add(vi.phrase);
     }
 
-    // Sort: prefer longer phrases (more specific), but cap search to top 6
+    // 3. Pull from evidence object — these are ALL real phrases from the email body
+    const ev = finding.evidence || {};
+    if (Array.isArray(ev.lureKeywords)) {
+        for (const k of ev.lureKeywords) _add(k);
+    }
+    if (Array.isArray(ev.giftCardKeywordsFound)) {
+        for (const k of ev.giftCardKeywordsFound) _add(k);
+    }
+    if (Array.isArray(ev.commandWordsFound)) {
+        for (const k of ev.commandWordsFound) _add(k);
+    }
+    if (Array.isArray(ev.financeKeywordsFound)) {
+        for (const k of ev.financeKeywordsFound) _add(k);
+    }
+    if (Array.isArray(ev.authoritySignalsFound)) {
+        for (const k of ev.authoritySignalsFound) _add(k);
+    }
+
+    // Sort: prefer longer phrases (more specific), cap to top 12
     phrases.sort((a, b) => b.length - a.length);
-    return phrases.slice(0, 6);
+    return phrases.slice(0, 12);
 }
 
 function _findEmailBody() {
