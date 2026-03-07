@@ -88,16 +88,69 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
     const findings = Object.values(result.checks || {}).filter(c => c.flagged);
     const findingSearchPhrases = findings.map(f => _buildSearchPhrases(f));
 
-    const findingsHtml = findings.map((f, idx) => `
-        <div class="sa-finding">
-            <div style="font-weight: 800; margin-bottom: 6px;">${f.title.toUpperCase()}</div>
-            <div style="font-size: 13px; color: #94a3b8; margin-bottom: 14px;">${f.details || f.description}</div>
-            ${findingSearchPhrases[idx].length ? `
+    const findingsHtml = findings.map((f, idx) => {
+        const isAI = f.title === 'ai_second_opinion';
+        const hasLocatable = findingSearchPhrases[idx].length > 0;
+        const matchedKeywords = (f.matches || []).filter(m => typeof m === 'string');
+
+        // For AI card: show expandable details
+        if (isAI) {
+            const verdictLabel = f.verdict === 'DOWNGRADED' ? 'Likely Safe'
+                : f.verdict === 'ESCALATED' ? 'Dangerous'
+                : 'Suspicious';
+            const verdictColor = f.verdict === 'DOWNGRADED' ? '#34d399'
+                : f.verdict === 'ESCALATED' ? '#fb7185'
+                : '#fbbf24';
+            return `
+                <div class="sa-finding" style="cursor: pointer;" data-ai-card>
+                    <div style="font-weight: 800; margin-bottom: 6px;">AI SECOND OPINION</div>
+                    <div style="font-size: 13px; color: #94a3b8; margin-bottom: 10px;">${f.details || f.description}</div>
+                    <div data-ai-details style="display: none; border-top: 1px solid #1e293b; padding-top: 12px; margin-top: 8px;">
+                        <div style="display: flex; gap: 12px; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Verdict</div>
+                                <div style="font-size: 14px; font-weight: 700; color: ${verdictColor};">${verdictLabel}</div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Confidence</div>
+                                <div style="font-size: 14px; font-weight: 700;">${f.confidence ?? '—'}%</div>
+                            </div>
+                        </div>
+                        ${f.dataChecked ? `<div style="font-size: 11px; color: #64748b;">Analyzed: ${f.dataChecked}</div>` : ''}
+                    </div>
+                    <div data-ai-toggle style="font-size: 11px; color: #60a5fa; font-weight: 600; margin-top: 8px;">Show details ▾</div>
+                </div>
+            `;
+        }
+
+        // For non-AI cards: show Locate button if locatable, otherwise show matched keywords inline
+        let actionHtml = '';
+        if (hasLocatable) {
+            actionHtml = `
                 <button class="sa-jump-btn" data-jump-idx="${idx}">Locate Indicator</button>
                 <div class="sa-jump-feedback" data-feedback-idx="${idx}"></div>
-            ` : ''}
-        </div>
-    `).join('');
+            `;
+        } else if (matchedKeywords.length > 0) {
+            // Show matched keywords as inline tags when we can't locate them
+            const tags = matchedKeywords.slice(0, 8).map(k =>
+                `<span style="display: inline-block; padding: 3px 8px; margin: 2px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${k}</span>`
+            ).join('');
+            actionHtml = `
+                <div style="margin-top: 8px;">
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Matched keywords</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 2px;">${tags}</div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="sa-finding">
+                <div style="font-weight: 800; margin-bottom: 6px;">${_humanizeTitle(f.title).toUpperCase()}</div>
+                <div style="font-size: 13px; color: #94a3b8; margin-bottom: 14px;">${f.details || f.description}</div>
+                ${actionHtml}
+            </div>
+        `;
+    }).join('');
 
     const card = document.createElement('div');
     card.className = 'sa-card';
@@ -204,6 +257,20 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                 setTimeout(() => { feedback.style.display = 'none'; }, 5000);
             }
         });
+    });
+
+    // ── AI Second Opinion card: toggle details ─────────────────────
+    const aiCards = shadow.querySelectorAll('[data-ai-card]');
+    aiCards.forEach(card => {
+        const details = card.querySelector('[data-ai-details]');
+        const toggle = card.querySelector('[data-ai-toggle]');
+        if (details && toggle) {
+            card.addEventListener('click', () => {
+                const isHidden = details.style.display === 'none';
+                details.style.display = isHidden ? 'block' : 'none';
+                toggle.textContent = isHidden ? 'Hide details ▴' : 'Show details ▾';
+            });
+        }
     });
 
     // ── Report / Trust buttons ───────────────────────────────────────
@@ -471,7 +538,7 @@ function _showLocateFeedback(el, finding, matchedPhrase, category) {
                 box-sizing: border-box;
             "></textarea>
         </div>
-        <div style="padding: 12px 20px 16px; display: flex; gap: 10px;">
+        <div id="hg-fb-buttons" style="padding: 12px 20px 16px; display: flex; gap: 10px;">
             <button id="hg-fb-cancel" style="
                 flex: 1; padding: 10px; border-radius: 10px; font-weight: 600;
                 cursor: pointer; font-size: 13px; font-family: inherit;
@@ -577,8 +644,8 @@ function _showTransparencyPreview(panel, data) {
     }
 
     // Update buttons
-    const btnContainer = panel.querySelector('div:last-child');
-    if (btnContainer && btnContainer.querySelector('#hg-fb-cancel')) {
+    const btnContainer = panel.querySelector('#hg-fb-buttons');
+    if (btnContainer) {
         btnContainer.innerHTML = `
             <button id="hg-fb-back" style="
                 flex: 1; padding: 10px; border-radius: 10px; font-weight: 600;
@@ -640,28 +707,38 @@ function _buildSearchPhrases(finding) {
     const phrases = [];
     const seen = new Set();
 
-    if (Array.isArray(finding.visualIndicators)) {
-        for (const vi of finding.visualIndicators) {
-            const p = (vi.phrase || '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
-            if (p && p.length >= 4 && !seen.has(p.toLowerCase())) {
-                seen.add(p.toLowerCase());
-                phrases.push(p);
-            }
-        }
-    }
+    // Known high-level labels that are NOT actual email text — skip these for search
+    const LABEL_PHRASES = new Set([
+        'gift card payment request', 'official name from personal email address',
+        'suspicious financial request', 'authority pressure + secrecy language',
+        'vague social lure with external link'
+    ]);
 
+    // 1. Pull from matches FIRST (these are actual keywords found in the email)
     if (Array.isArray(finding.matches)) {
         for (const m of finding.matches) {
             const p = (typeof m === 'string' ? m : '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
-            if (p && p.length >= 4 && !seen.has(p.toLowerCase())) {
+            if (p && p.length >= 4 && !seen.has(p.toLowerCase()) && !LABEL_PHRASES.has(p.toLowerCase())) {
                 seen.add(p.toLowerCase());
                 phrases.push(p);
             }
         }
     }
 
+    // 2. Then pull from visualIndicators, but skip label-style phrases
+    if (Array.isArray(finding.visualIndicators)) {
+        for (const vi of finding.visualIndicators) {
+            const p = (vi.phrase || '').replace(/\s*\(fuzzy\s+match\)/i, '').trim();
+            if (p && p.length >= 4 && !seen.has(p.toLowerCase()) && !LABEL_PHRASES.has(p.toLowerCase())) {
+                seen.add(p.toLowerCase());
+                phrases.push(p);
+            }
+        }
+    }
+
+    // Sort: prefer longer phrases (more specific), but cap search to top 6
     phrases.sort((a, b) => b.length - a.length);
-    return phrases;
+    return phrases.slice(0, 6);
 }
 
 function _findEmailBody() {
