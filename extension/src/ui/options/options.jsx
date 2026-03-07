@@ -547,27 +547,157 @@ const Options = () => {
     );
 };
 
+// ── Reusable API key input with Test button ───────────────────
+const ApiKeyField = ({ label, value, onChange, placeholder, testMessageType, accentColor, helpText, getKeyUrl, getKeyLabel }) => {
+    const [testState, setTestState] = useState(null); // null | 'testing' | 'success' | { error: string }
+
+    const handleTest = () => {
+        if (!value) {
+            setTestState({ error: 'Enter a key first.' });
+            setTimeout(() => setTestState(null), 3000);
+            return;
+        }
+        setTestState('testing');
+        chrome.runtime.sendMessage({ type: testMessageType, data: { apiKey: value } }, (resp) => {
+            if (resp?.success) {
+                setTestState('success');
+                setTimeout(() => setTestState(null), 4000);
+            } else {
+                setTestState({ error: resp?.error || 'Connection failed.' });
+                setTimeout(() => setTestState(null), 5000);
+            }
+        });
+    };
+
+    const borderFocus = accentColor === 'emerald' ? 'focus:border-emerald-500' : accentColor === 'sky' ? 'focus:border-sky-500' : 'focus:border-indigo-500';
+
+    return (
+        <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">{label}</label>
+            <div className="flex gap-2">
+                <div className="relative group flex-1">
+                    <input
+                        type="password"
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        placeholder={placeholder}
+                        className={`w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none ${borderFocus} transition-colors pr-20`}
+                    />
+                    <button
+                        onClick={() => window.open(getKeyUrl, '_blank')}
+                        className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
+                        {getKeyLabel || 'GET KEY'} ↗
+                    </button>
+                </div>
+                <button
+                    onClick={handleTest}
+                    disabled={testState === 'testing'}
+                    className={clsx(
+                        "px-3 h-[38px] rounded-lg text-xs font-bold transition-all border whitespace-nowrap",
+                        testState === 'testing'
+                            ? "bg-slate-800 border-slate-600 text-slate-400 cursor-wait"
+                            : testState === 'success'
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                                : testState?.error
+                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                    : "bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
+                    )}
+                >
+                    {testState === 'testing' ? 'Testing...' : testState === 'success' ? '✓ Valid' : testState?.error ? '✗ Failed' : 'Test'}
+                </button>
+            </div>
+            {testState?.error && (
+                <span className="text-[10px] text-amber-400 mt-1 block">{testState.error}</span>
+            )}
+            {testState === 'success' && (
+                <span className="text-[10px] text-emerald-400 mt-1 block">Key is working correctly.</span>
+            )}
+            {!testState && helpText && (
+                <span className="text-[10px] text-slate-500 mt-1 block italic text-center">{helpText}</span>
+            )}
+        </div>
+    );
+};
+
 const WhitelistSettings = () => {
     const [whitelist, setWhitelist] = useState([]);
     const [settings, setSettings] = useState({
         emailScanningEnabled: true,
         highlightingEnabled: true
     });
+    // Deferred text fields — edited locally, saved explicitly
+    const [draft, setDraft] = useState({
+        aiApiKey: '',
+        aiDailyCeiling: 50,
+        gsbApiKey: '',
+        phishTankApiKey: ''
+    });
+    const [savedSnapshot, setSavedSnapshot] = useState(null); // snapshot of draft at last save/load
+    const [saveState, setSaveState] = useState(null); // null | 'saving' | 'saved' | { error: string }
 
     useEffect(() => {
         const fetchSettings = () => {
             chrome.storage?.local.get(['whitelist', 'settings'], (result) => {
                 setWhitelist(result.whitelist || []);
-                if (result.settings) setSettings(result.settings);
+                if (result.settings) {
+                    setSettings(result.settings);
+                    const snap = {
+                        aiApiKey: result.settings.aiApiKey || '',
+                        aiDailyCeiling: result.settings.aiDailyCeiling ?? 50,
+                        gsbApiKey: result.settings.gsbApiKey || '',
+                        phishTankApiKey: result.settings.phishTankApiKey || ''
+                    };
+                    setDraft(snap);
+                    setSavedSnapshot(snap);
+                }
             });
         };
         fetchSettings();
     }, []);
 
-    const handleToggleEmail = () => {
-        const updated = { ...settings, emailScanningEnabled: !settings.emailScanningEnabled };
+    const isDirty = savedSnapshot && (
+        draft.aiApiKey !== savedSnapshot.aiApiKey ||
+        String(draft.aiDailyCeiling) !== String(savedSnapshot.aiDailyCeiling) ||
+        draft.gsbApiKey !== savedSnapshot.gsbApiKey ||
+        draft.phishTankApiKey !== savedSnapshot.phishTankApiKey
+    );
+
+    const handleToggle = (key) => {
+        const updated = { ...settings, [key]: !settings[key] };
         setSettings(updated);
         chrome.storage.local.set({ settings: updated });
+    };
+
+    const handleSave = () => {
+        setSaveState('saving');
+        const merged = {
+            ...settings,
+            aiApiKey: draft.aiApiKey,
+            aiDailyCeiling: parseInt(draft.aiDailyCeiling) || 50,
+            gsbApiKey: draft.gsbApiKey,
+            phishTankApiKey: draft.phishTankApiKey
+        };
+        chrome.storage.local.set({ settings: merged }, () => {
+            // Read back to verify
+            chrome.storage.local.get(['settings'], (result) => {
+                if (result.settings) {
+                    const snap = {
+                        aiApiKey: result.settings.aiApiKey || '',
+                        aiDailyCeiling: result.settings.aiDailyCeiling ?? 50,
+                        gsbApiKey: result.settings.gsbApiKey || '',
+                        phishTankApiKey: result.settings.phishTankApiKey || ''
+                    };
+                    setSettings(result.settings);
+                    setDraft(snap);
+                    setSavedSnapshot(snap);
+                    setSaveState('saved');
+                    setTimeout(() => setSaveState(null), 3000);
+                } else {
+                    setSaveState({ error: 'Could not verify save.' });
+                    setTimeout(() => setSaveState(null), 4000);
+                }
+            });
+        });
     };
 
     const handleRemove = (domain) => {
@@ -593,7 +723,7 @@ const WhitelistSettings = () => {
                             <span className="text-slate-500 text-xs">Analyze messages in Gmail and Outlook for phishing threats.</span>
                         </div>
                         <button
-                            onClick={handleToggleEmail}
+                            onClick={() => handleToggle('emailScanningEnabled')}
                             className={clsx(
                                 "w-12 h-6 rounded-full transition-colors relative",
                                 settings.emailScanningEnabled ? "bg-indigo-600" : "bg-slate-700"
@@ -611,11 +741,7 @@ const WhitelistSettings = () => {
                             <span className="text-slate-500 text-xs">Highlight suspicious phrases directly on the page with explanatory tooltips.</span>
                         </div>
                         <button
-                            onClick={() => {
-                                const updated = { ...settings, highlightingEnabled: !settings.highlightingEnabled };
-                                setSettings(updated);
-                                chrome.storage.local.set({ settings: updated });
-                            }}
+                            onClick={() => handleToggle('highlightingEnabled')}
                             className={clsx(
                                 "w-12 h-6 rounded-full transition-colors relative",
                                 settings.highlightingEnabled || settings.highlightingEnabled === undefined ? "bg-indigo-600" : "bg-slate-700"
@@ -639,11 +765,7 @@ const WhitelistSettings = () => {
                                 </span>
                             </div>
                             <button
-                                onClick={() => {
-                                    const updated = { ...settings, aiEnabled: !settings.aiEnabled };
-                                    setSettings(updated);
-                                    chrome.storage.local.set({ settings: updated });
-                                }}
+                                onClick={() => handleToggle('aiEnabled')}
                                 className={clsx(
                                     "w-12 h-6 rounded-full transition-colors relative",
                                     settings.aiEnabled ? "bg-indigo-600" : "bg-slate-700"
@@ -657,28 +779,17 @@ const WhitelistSettings = () => {
 
                         {settings.aiEnabled && (
                             <div className="space-y-3 pt-2 border-t border-slate-700/30">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">Gemini API Key</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="password"
-                                            value={settings.aiApiKey || ''}
-                                            onChange={(e) => {
-                                                const updated = { ...settings, aiApiKey: e.target.value };
-                                                setSettings(updated);
-                                                chrome.storage.local.set({ settings: updated });
-                                            }}
-                                            placeholder="Enter your API key..."
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-indigo-500 transition-colors pr-20"
-                                        />
-                                        <button
-                                            onClick={() => window.open('https://aistudio.google.com/app/apikey', '_blank')}
-                                            className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
-                                            GET KEY ↗
-                                        </button>
-                                    </div>
-                                    <span className="text-[10px] text-slate-500 mt-1 block italic text-center">Your key is stored locally and never shared.</span>
-                                </div>
+                                <ApiKeyField
+                                    label="Gemini API Key"
+                                    value={draft.aiApiKey}
+                                    onChange={(v) => setDraft(d => ({ ...d, aiApiKey: v }))}
+                                    placeholder="Enter your API key..."
+                                    testMessageType={MessageTypes.TEST_AI_KEY}
+                                    accentColor="indigo"
+                                    helpText="Your key is stored locally and never shared."
+                                    getKeyUrl="https://aistudio.google.com/app/apikey"
+                                    getKeyLabel="GET KEY"
+                                />
 
                                 <div className="flex items-center justify-between gap-4">
                                     <div className="flex flex-col">
@@ -687,13 +798,8 @@ const WhitelistSettings = () => {
                                     </div>
                                     <input
                                         type="number"
-                                        value={settings.aiDailyCeiling || 50}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 0;
-                                            const updated = { ...settings, aiDailyCeiling: val };
-                                            setSettings(updated);
-                                            chrome.storage.local.set({ settings: updated });
-                                        }}
+                                        value={draft.aiDailyCeiling}
+                                        onChange={(e) => setDraft(d => ({ ...d, aiDailyCeiling: e.target.value }))}
                                         className="w-16 bg-slate-900/50 border border-slate-700 rounded-lg py-1 px-2 text-sm text-slate-300 text-center"
                                     />
                                 </div>
@@ -714,11 +820,7 @@ const WhitelistSettings = () => {
                                 </span>
                             </div>
                             <button
-                                onClick={() => {
-                                    const updated = { ...settings, useGoogleSafeBrowsing: !settings.useGoogleSafeBrowsing };
-                                    setSettings(updated);
-                                    chrome.storage.local.set({ settings: updated });
-                                }}
+                                onClick={() => handleToggle('useGoogleSafeBrowsing')}
                                 className={clsx(
                                     "w-12 h-6 rounded-full transition-colors relative",
                                     settings.useGoogleSafeBrowsing !== false ? "bg-emerald-600" : "bg-slate-700"
@@ -732,28 +834,17 @@ const WhitelistSettings = () => {
 
                         {settings.useGoogleSafeBrowsing !== false && (
                             <div className="space-y-3 pt-2 border-t border-slate-700/30">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">API Key</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="password"
-                                            value={settings.gsbApiKey || ''}
-                                            onChange={(e) => {
-                                                const updated = { ...settings, gsbApiKey: e.target.value };
-                                                setSettings(updated);
-                                                chrome.storage.local.set({ settings: updated });
-                                            }}
-                                            placeholder="Enter your Google Safe Browsing API key..."
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-emerald-500 transition-colors pr-20"
-                                        />
-                                        <button
-                                            onClick={() => window.open('https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com', '_blank')}
-                                            className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
-                                            GET KEY ↗
-                                        </button>
-                                    </div>
-                                    <span className="text-[10px] text-slate-500 mt-1 block italic text-center">Enable the Safe Browsing API in Google Cloud Console, then create an API key.</span>
-                                </div>
+                                <ApiKeyField
+                                    label="API Key"
+                                    value={draft.gsbApiKey}
+                                    onChange={(v) => setDraft(d => ({ ...d, gsbApiKey: v }))}
+                                    placeholder="Enter your Google Safe Browsing API key..."
+                                    testMessageType={MessageTypes.TEST_GSB_KEY}
+                                    accentColor="emerald"
+                                    helpText="Enable the Safe Browsing API in Google Cloud Console, then create an API key."
+                                    getKeyUrl="https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com"
+                                    getKeyLabel="GET KEY"
+                                />
                             </div>
                         )}
                     </div>
@@ -771,11 +862,7 @@ const WhitelistSettings = () => {
                                 </span>
                             </div>
                             <button
-                                onClick={() => {
-                                    const updated = { ...settings, usePhishTank: !settings.usePhishTank };
-                                    setSettings(updated);
-                                    chrome.storage.local.set({ settings: updated });
-                                }}
+                                onClick={() => handleToggle('usePhishTank')}
                                 className={clsx(
                                     "w-12 h-6 rounded-full transition-colors relative",
                                     settings.usePhishTank ? "bg-sky-600" : "bg-slate-700"
@@ -789,28 +876,17 @@ const WhitelistSettings = () => {
 
                         {settings.usePhishTank && (
                             <div className="space-y-3 pt-2 border-t border-slate-700/30">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">API Key (Optional)</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="password"
-                                            value={settings.phishTankApiKey || ''}
-                                            onChange={(e) => {
-                                                const updated = { ...settings, phishTankApiKey: e.target.value };
-                                                setSettings(updated);
-                                                chrome.storage.local.set({ settings: updated });
-                                            }}
-                                            placeholder="Enter your PhishTank API key..."
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-sky-500 transition-colors pr-20"
-                                        />
-                                        <button
-                                            onClick={() => window.open('https://www.phishtank.com/api_register.php', '_blank')}
-                                            className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
-                                            GET KEY ↗
-                                        </button>
-                                    </div>
-                                    <span className="text-[10px] text-slate-500 mt-1 block italic text-center">Register at PhishTank for a free API key. Without one, lookups are rate-limited.</span>
-                                </div>
+                                <ApiKeyField
+                                    label="API Key (Optional)"
+                                    value={draft.phishTankApiKey}
+                                    onChange={(v) => setDraft(d => ({ ...d, phishTankApiKey: v }))}
+                                    placeholder="Enter your PhishTank API key..."
+                                    testMessageType={MessageTypes.TEST_PHISHTANK_KEY}
+                                    accentColor="sky"
+                                    helpText="Register at PhishTank for a free API key. Without one, lookups are rate-limited."
+                                    getKeyUrl="https://www.phishtank.com/api_register.php"
+                                    getKeyLabel="GET KEY"
+                                />
                             </div>
                         )}
                     </div>
@@ -838,6 +914,44 @@ const WhitelistSettings = () => {
                     </div>
                 </div>
             </Card>
+
+            {/* Sticky Save Bar */}
+            {isDirty && (
+                <div className="sticky bottom-4 z-50">
+                    <div className="bg-slate-900/95 backdrop-blur-md border border-indigo-500/30 rounded-xl p-4 flex items-center justify-between shadow-2xl shadow-indigo-500/10">
+                        <span className="text-sm text-slate-300 font-medium">You have unsaved changes</span>
+                        <button
+                            onClick={handleSave}
+                            disabled={saveState === 'saving'}
+                            className={clsx(
+                                "px-5 py-2 rounded-lg text-sm font-bold transition-all",
+                                saveState === 'saving'
+                                    ? "bg-indigo-600/50 text-indigo-300 cursor-wait"
+                                    : "bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer"
+                            )}
+                        >
+                            {saveState === 'saving' ? 'Saving...' : 'Save Settings'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Save confirmation (shown briefly after save) */}
+            {saveState === 'saved' && !isDirty && (
+                <div className="sticky bottom-4 z-50">
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-center shadow-2xl">
+                        <span className="text-sm text-emerald-400 font-semibold">Settings saved successfully.</span>
+                    </div>
+                </div>
+            )}
+
+            {saveState?.error && (
+                <div className="sticky bottom-4 z-50">
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-center shadow-2xl">
+                        <span className="text-sm text-amber-400 font-semibold">{saveState.error}</span>
+                    </div>
+                </div>
+            )}
 
             <Card>
                 <CardHeader>

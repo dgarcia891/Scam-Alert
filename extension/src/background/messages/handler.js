@@ -5,6 +5,8 @@ import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
 import { submitReport, submitUserReport, submitCorrection } from '../../lib/supabase.js';
 import { verifyWithAI } from '../../lib/ai-verifier.js';
+import { checkUrlsWithSafeBrowsing } from '../../lib/google-safe-browsing.js';
+import { checkUrlWithPhishTank } from '../../lib/phishtank.js';
 
 export async function handleIncomingMessage(message, sender, context) {
     const { type, data, payload } = message; // Support both for transition
@@ -51,6 +53,12 @@ export async function handleIncomingMessage(message, sender, context) {
             return handleClearUrlCache(msgData);
         case MessageTypes.ASK_AI_OPINION:
             return handleAskAIOpinion(msgData, getSettings, getCachedScan);
+        case MessageTypes.TEST_GSB_KEY:
+            return handleTestGsbKey(msgData);
+        case MessageTypes.TEST_AI_KEY:
+            return handleTestAiKey(msgData);
+        case MessageTypes.TEST_PHISHTANK_KEY:
+            return handleTestPhishTankKey(msgData);
         default:
             console.log('[Hydra Guard] Unknown message type:', type);
             return { error: 'Unknown message type' };
@@ -262,6 +270,63 @@ async function handleClearUrlCache(msgData) {
     await chrome.storage.local.remove(`scan_cache_${normalized}`);
     return { success: true };
 }
+
+// ── API Key Test Handlers ──────────────────────────────────────
+
+async function handleTestGsbKey(msgData) {
+    const apiKey = msgData?.apiKey;
+    if (!apiKey) return { success: false, error: 'No API key provided.' };
+    try {
+        const result = await checkUrlsWithSafeBrowsing(['https://www.google.com'], apiKey);
+        // If result has an error property, the request failed
+        if (result.error) {
+            return { success: false, error: result.error };
+        }
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+async function handleTestAiKey(msgData) {
+    const apiKey = msgData?.apiKey;
+    if (!apiKey) return { success: false, error: 'No API key provided.' };
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Say OK' }] }],
+                generationConfig: { maxOutputTokens: 5 }
+            })
+        });
+        if (!resp.ok) {
+            const errBody = await resp.json().catch(() => ({}));
+            return { success: false, error: errBody.error?.message || `HTTP ${resp.status}` };
+        }
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+async function handleTestPhishTankKey(msgData) {
+    const apiKey = msgData?.apiKey;
+    if (!apiKey) return { success: false, error: 'No API key provided.' };
+    try {
+        // PhishTank test: check a known safe URL. A valid key returns a response; an invalid one errors.
+        const result = await checkUrlWithPhishTank('https://www.google.com', { apiKey });
+        if (result.error) {
+            return { success: false, error: result.error };
+        }
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+// ── AI Opinion Handler ─────────────────────────────────────────
 
 async function handleAskAIOpinion(msgData, getSettings, getCachedScan) {
     try {

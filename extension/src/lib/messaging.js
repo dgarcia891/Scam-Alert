@@ -103,7 +103,12 @@ export const MessageTypes = {
     REPORT_FALSE_POSITIVE: 'report_false_positive',
     SYNC_BLOCKLIST: 'sync_blocklist',
     NAVIGATE_BACK: 'navigate_back',
-    OPEN_REPORT_MODAL: 'open_report_modal'
+    OPEN_REPORT_MODAL: 'open_report_modal',
+
+    // Settings — API key testing
+    TEST_GSB_KEY: 'test_gsb_key',
+    TEST_AI_KEY: 'test_ai_key',
+    TEST_PHISHTANK_KEY: 'test_phishtank_key'
 };
 
 /**
