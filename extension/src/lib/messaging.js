@@ -91,6 +91,7 @@ export const MessageTypes = {
     GET_SCAN_RESULTS: 'get_scan_results', // NEW
     FORCE_RESCAN: 'force_rescan',
     CLEAR_URL_CACHE: 'clear_url_cache',
+    ASK_AI_OPINION: 'ask_ai_opinion',
 
     // Responses
     STATUS_RESPONSE: 'status_response',

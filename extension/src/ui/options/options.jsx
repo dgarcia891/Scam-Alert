@@ -701,6 +701,120 @@ const WhitelistSettings = () => {
                         )}
                     </div>
 
+                    {/* Google Safe Browsing */}
+                    <div className="space-y-4 p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-200 font-semibold text-sm">Google Safe Browsing</span>
+                                    <Badge variant="info" className="text-[9px] py-0 px-1">PRO</Badge>
+                                </div>
+                                <span className="text-slate-500 text-[11px] leading-tight mt-1 max-w-[300px]">
+                                    Check URLs against Google's database of known phishing and malware sites. Free for up to 10,000 lookups/day.
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const updated = { ...settings, useGoogleSafeBrowsing: !settings.useGoogleSafeBrowsing };
+                                    setSettings(updated);
+                                    chrome.storage.local.set({ settings: updated });
+                                }}
+                                className={clsx(
+                                    "w-12 h-6 rounded-full transition-colors relative",
+                                    settings.useGoogleSafeBrowsing !== false ? "bg-emerald-600" : "bg-slate-700"
+                                )}>
+                                <div className={clsx(
+                                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                    settings.useGoogleSafeBrowsing !== false ? "left-7" : "left-1"
+                                )} />
+                            </button>
+                        </div>
+
+                        {settings.useGoogleSafeBrowsing !== false && (
+                            <div className="space-y-3 pt-2 border-t border-slate-700/30">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">API Key</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="password"
+                                            value={settings.gsbApiKey || ''}
+                                            onChange={(e) => {
+                                                const updated = { ...settings, gsbApiKey: e.target.value };
+                                                setSettings(updated);
+                                                chrome.storage.local.set({ settings: updated });
+                                            }}
+                                            placeholder="Enter your Google Safe Browsing API key..."
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-emerald-500 transition-colors pr-20"
+                                        />
+                                        <button
+                                            onClick={() => window.open('https://console.cloud.google.com/apis/library/safebrowsing.googleapis.com', '_blank')}
+                                            className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
+                                            GET KEY ↗
+                                        </button>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 mt-1 block italic text-center">Enable the Safe Browsing API in Google Cloud Console, then create an API key.</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* PhishTank */}
+                    <div className="space-y-4 p-4 bg-sky-500/5 rounded-xl border border-sky-500/10">
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-200 font-semibold text-sm">PhishTank</span>
+                                    <Badge variant="info" className="text-[9px] py-0 px-1">PRO</Badge>
+                                </div>
+                                <span className="text-slate-500 text-[11px] leading-tight mt-1 max-w-[300px]">
+                                    Community-driven phishing URL database. Works without a key (rate-limited) — add a key for full-speed lookups.
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const updated = { ...settings, usePhishTank: !settings.usePhishTank };
+                                    setSettings(updated);
+                                    chrome.storage.local.set({ settings: updated });
+                                }}
+                                className={clsx(
+                                    "w-12 h-6 rounded-full transition-colors relative",
+                                    settings.usePhishTank ? "bg-sky-600" : "bg-slate-700"
+                                )}>
+                                <div className={clsx(
+                                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                    settings.usePhishTank ? "left-7" : "left-1"
+                                )} />
+                            </button>
+                        </div>
+
+                        {settings.usePhishTank && (
+                            <div className="space-y-3 pt-2 border-t border-slate-700/30">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">API Key (Optional)</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="password"
+                                            value={settings.phishTankApiKey || ''}
+                                            onChange={(e) => {
+                                                const updated = { ...settings, phishTankApiKey: e.target.value };
+                                                setSettings(updated);
+                                                chrome.storage.local.set({ settings: updated });
+                                            }}
+                                            placeholder="Enter your PhishTank API key..."
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-sky-500 transition-colors pr-20"
+                                        />
+                                        <button
+                                            onClick={() => window.open('https://www.phishtank.com/api_register.php', '_blank')}
+                                            className="absolute right-1 top-1 text-[9px] font-bold bg-slate-800 text-slate-400 h-6 px-2 rounded-md hover:bg-slate-700 hover:text-white transition-colors">
+                                            GET KEY ↗
+                                        </button>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 mt-1 block italic text-center">Register at PhishTank for a free API key. Without one, lookups are rate-limited.</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
                         <div className="flex flex-col">
                             <span className="text-slate-200 font-semibold text-sm">Repair Local Storage</span>

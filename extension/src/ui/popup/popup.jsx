@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTriangle, ChevronRight, ArrowRight, Bug, Copy, Check, ChevronDown, RefreshCw, Trash2, Terminal, Globe, Mail, Lock, Unlock, Clock, Zap, Database, Key, Cpu, Eye, EyeOff } from 'lucide-react';
+import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTriangle, ChevronRight, ArrowRight, Bug, Copy, Check, ChevronDown, RefreshCw, Trash2, Terminal, Globe, Mail, Lock, Unlock, Clock, Zap, Database, Key, Cpu, Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
@@ -390,7 +390,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                                     <span className="text-slate-500">Verdict</span>
                                     <span className={cn("font-bold",
                                         aiVerification.verdict === 'ESCALATED' ? "text-rose-400" :
-                                        aiVerification.verdict === 'DOWNGRADED' ? "text-emerald-400" : "text-slate-300"
+                                            aiVerification.verdict === 'DOWNGRADED' ? "text-emerald-400" : "text-slate-300"
                                     )}>{aiVerification.verdict}</span>
                                     <span className="text-slate-500">Confidence</span>
                                     <span className="text-slate-300">{aiVerification.confidence != null ? `${aiVerification.confidence}%` : 'N/A'}</span>
@@ -553,6 +553,8 @@ const Popup = () => {
     const [settings, setSettings] = useState({});
     const [isRescanning, setIsRescanning] = useState(false);
     const [currentTabId, setCurrentTabId] = useState(null);
+    const [aiAsking, setAiAsking] = useState(false);
+    const [aiResult, setAiResult] = useState(null);
 
     // Load dev mode + settings on mount
     useEffect(() => {
@@ -690,6 +692,23 @@ const Popup = () => {
         });
     }, [currentUrl]);
 
+    const handleAskAI = useCallback(() => {
+        if (!currentUrl || aiAsking) return;
+        setAiAsking(true);
+        setAiResult(null);
+        chrome.runtime.sendMessage(
+            { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl } },
+            (response) => {
+                setAiAsking(false);
+                if (response?.success) {
+                    setAiResult(response);
+                } else {
+                    setAiResult({ verdict: 'ERROR', reason: response?.error || 'Could not reach AI.' });
+                }
+            }
+        );
+    }, [currentUrl, aiAsking]);
+
     const config = getStatusConfig(status);
 
     return (
@@ -772,6 +791,64 @@ const Popup = () => {
             {/* ═══ NORMAL MODE: Standard UI ═══ */}
             {!devMode && (
                 <>
+                    {/* Ask AI button */}
+                    {settings?.aiEnabled && settings?.aiApiKey && (
+                        <div className="mt-3 px-1">
+                            {!aiResult ? (
+                                <button
+                                    onClick={handleAskAI}
+                                    disabled={aiAsking}
+                                    className={cn(
+                                        "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all border",
+                                        aiAsking
+                                            ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 cursor-wait"
+                                            : "bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/30"
+                                    )}
+                                >
+                                    {aiAsking ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            Analyzing with AI...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={14} />
+                                            Ask AI for a second opinion
+                                        </>
+                                    )}
+                                </button>
+                            ) : (
+                                <div className={cn(
+                                    "w-full rounded-xl border p-3 text-xs font-medium",
+                                    aiResult.verdict === 'DOWNGRADED'
+                                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                        : aiResult.verdict === 'ESCALATED'
+                                            ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                                            : aiResult.verdict === 'ERROR'
+                                                ? "bg-slate-800/50 border-slate-700 text-slate-400"
+                                                : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                                )}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Sparkles size={12} />
+                                        <span className="font-bold">
+                                            {aiResult.verdict === 'DOWNGRADED' ? 'AI says: Looks safe'
+                                                : aiResult.verdict === 'ESCALATED' ? 'AI says: This looks dangerous'
+                                                    : aiResult.verdict === 'ERROR' ? 'AI unavailable'
+                                                        : 'AI says: Something looks off'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] opacity-80 leading-snug">{aiResult.reason}</p>
+                                    <button
+                                        onClick={() => { setAiResult(null); }}
+                                        className="mt-2 text-[9px] font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-opacity"
+                                    >
+                                        Ask again
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Action buttons for caution/danger */}
                     {status !== 'secure' && (
                         <div className="mt-4 px-1 animate-in fade-in slide-in-from-top-2 duration-300">
