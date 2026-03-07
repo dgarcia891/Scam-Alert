@@ -5,7 +5,9 @@
  * and a global daily ceiling.
  */
 
-const DOMAIN_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+// TODO: Re-enable for production launch
+// const DOMAIN_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const DOMAIN_COOLDOWN_MS = 0; // Disabled for testing
 
 /**
  * Check if the global daily ceiling has been reached.

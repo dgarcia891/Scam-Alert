@@ -60,6 +60,7 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         .sa-card.sa-minimized { width: 320px; border-radius: 16px; }
         .sa-card.sa-minimized .sa-content, .sa-card.sa-minimized .sa-footer { display: none; }
         @keyframes sa-slide-in { from { transform: translateX(500px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes sa-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .sa-header { padding: 16px 20px; background: linear-gradient(to bottom, ${accentBg}, transparent); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1e293b; flex-shrink: 0; }
         .sa-title { font-weight: 900; color: ${accentColor}; }
         .sa-close { background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 18px; padding: 4px 8px; }
@@ -74,10 +75,12 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         .sa-jump-feedback { font-size: 12px; color: #94a3b8; margin-top: 8px; display: none; }
         .sa-footer { padding: 20px; background: #020617; border-top: 1px solid #1e293b; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
         .sa-btn { width: 100%; padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 1px solid transparent; font-size: 14px; }
-        .sa-btn-primary { background: rgba(225, 29, 72, 0.1); color: #fb7185; border-color: rgba(225, 29, 72, 0.2); }
-        .sa-btn-primary:hover { background: rgba(225, 29, 72, 0.2); }
-        .sa-btn-secondary { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
-        .sa-btn-secondary:hover { background: rgba(16, 185, 129, 0.2); }
+        .sa-btn-confirm { background: rgba(225, 29, 72, 0.1); color: #fb7185; border-color: rgba(225, 29, 72, 0.2); }
+        .sa-btn-confirm:hover { background: rgba(225, 29, 72, 0.2); }
+        .sa-btn-dismiss { background: rgba(100, 116, 139, 0.1); color: #94a3b8; border-color: rgba(100, 116, 139, 0.2); }
+        .sa-btn-dismiss:hover { background: rgba(100, 116, 139, 0.2); }
+        .sa-btn-safe { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
+        .sa-btn-safe:hover { background: rgba(16, 185, 129, 0.2); }
     `;
     shadow.appendChild(style);
 
@@ -155,6 +158,20 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         `;
     }).join('');
 
+    // Check if AI ran — if not, add a "Get AI Opinion" prompt card
+    const hasAIFinding = findings.some(f => f.title === 'ai_second_opinion');
+    const aiPromptHtml = !hasAIFinding ? `
+        <div class="sa-finding" style="cursor: pointer; border: 1px dashed #334155;" data-ai-prompt>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="font-size: 20px;">🤖</div>
+                <div>
+                    <div style="font-weight: 700; font-size: 13px;">Get AI Second Opinion</div>
+                    <div style="font-size: 12px; color: #64748b;">Ask Gemini AI to cross-check these findings</div>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
     const card = document.createElement('div');
     card.className = 'sa-card';
     card.innerHTML = `
@@ -166,10 +183,12 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             <div class="sa-badge">${isCritical ? 'High Risk' : 'Suspicious'}</div>
             <div class="sa-summary">${result.summary || 'Indicators suggest this email may be unsafe.'}</div>
             ${findingsHtml}
+            ${aiPromptHtml}
         </div>
         <div class="sa-footer">
-            <button class="sa-btn sa-btn-primary" id="sa-report-btn">Report Detected Scam</button>
-            <button class="sa-btn sa-btn-secondary" id="sa-trust-btn">${result.metadata?.sender ? 'Always Trust Sender' : 'Always Trust Site'}</button>
+            <button class="sa-btn sa-btn-confirm" id="sa-confirm-btn">Yes, This Is a Scam</button>
+            <button class="sa-btn sa-btn-dismiss" id="sa-dismiss-btn">Dismiss for Now</button>
+            <button class="sa-btn sa-btn-safe" id="sa-safe-btn">Not a Threat</button>
         </div>
     `;
 
@@ -271,12 +290,15 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                 if (found) break;
             }
 
-            // Show feedback if nothing was found
-            const feedback = shadow.querySelector(`[data-feedback-idx="${idx}"]`);
-            if (!found && feedback) {
-                feedback.style.display = 'block';
-                feedback.textContent = 'Could not locate the exact text. This may be a pattern-based or fuzzy detection rather than an exact phrase match.';
-                setTimeout(() => { feedback.style.display = 'none'; }, 5000);
+            // If nothing found, show inline evidence instead of a disappearing message
+            if (!found) {
+                const findingCard = btn.closest('.sa-finding');
+                if (findingCard) {
+                    _showInlineEvidence(findingCard, finding, btn);
+                }
+                // Restore dashboard from minimized state since we're showing evidence inline
+                backdrop.style.display = '';
+                card.classList.remove('sa-minimized');
             }
         });
     });
@@ -295,15 +317,117 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         }
     });
 
-    // ── Report / Trust buttons ───────────────────────────────────────
-    shadow.getElementById('sa-report-btn').onclick = () => openReportWorkflow(shadow, extractEmailData(), result);
+    // ── "Get AI Opinion" prompt card ─────────────────────────────────
+    const aiPrompt = shadow.querySelector('[data-ai-prompt]');
+    if (aiPrompt) {
+        aiPrompt.addEventListener('click', () => {
+            // Show loading state
+            aiPrompt.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="font-size: 20px; animation: sa-spin 1s linear infinite;">⏳</div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 13px;">Analyzing with AI...</div>
+                        <div style="font-size: 12px; color: #64748b;">This may take a few seconds</div>
+                    </div>
+                </div>
+            `;
+            aiPrompt.style.cursor = 'default';
 
-    shadow.getElementById('sa-trust-btn').onclick = () => {
-        const identity = result.metadata?.sender || window.location.hostname;
-        chrome.runtime.sendMessage({ type: MessageTypes.ADD_TO_WHITELIST, data: { domain: identity } }, () => {
-            alert('Whitelisted successfully.');
-            close();
+            chrome.runtime.sendMessage(
+                { type: MessageTypes.ASK_AI_OPINION, data: { url: window.location.href } },
+                (response) => {
+                    if (response?.success) {
+                        const verdictLabel = response.verdict === 'DOWNGRADED' ? 'Likely Safe'
+                            : response.verdict === 'ESCALATED' ? 'Dangerous'
+                            : 'Suspicious';
+                        const verdictColor = response.verdict === 'DOWNGRADED' ? '#34d399'
+                            : response.verdict === 'ESCALATED' ? '#fb7185'
+                            : '#fbbf24';
+                        aiPrompt.style.borderStyle = 'solid';
+                        aiPrompt.innerHTML = `
+                            <div style="font-weight: 800; margin-bottom: 6px;">AI SECOND OPINION</div>
+                            <div style="font-size: 13px; color: #94a3b8; margin-bottom: 10px;">${response.reason || 'AI analysis complete.'}</div>
+                            <div style="display: flex; gap: 12px;">
+                                <div style="flex: 1;">
+                                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Verdict</div>
+                                    <div style="font-size: 14px; font-weight: 700; color: ${verdictColor};">${verdictLabel}</div>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Confidence</div>
+                                    <div style="font-size: 14px; font-weight: 700;">${response.confidence ?? '—'}%</div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        aiPrompt.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="font-size: 20px;">⚠️</div>
+                                <div>
+                                    <div style="font-weight: 700; font-size: 13px; color: #fbbf24;">AI Unavailable</div>
+                                    <div style="font-size: 12px; color: #64748b;">${response?.error || 'Enable AI and add your API key in settings.'}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            );
         });
+    }
+
+    // ── Footer action buttons ──────────────────────────────────────
+
+    // "Yes, This Is a Scam" — user confirms the detection is correct
+    shadow.getElementById('sa-confirm-btn').onclick = () => {
+        // Log confirmation for telemetry, then open the report workflow
+        // so user can optionally report the scammer's details
+        try {
+            chrome.runtime.sendMessage({
+                type: MessageTypes.REPORT_SCAM,
+                data: {
+                    url: window.location.href,
+                    severity: result.overallSeverity,
+                    confirmed: true,
+                    timestamp: Date.now()
+                }
+            });
+        } catch (e) { /* best effort */ }
+        openReportWorkflow(shadow, extractEmailData(), result);
+    };
+
+    // "Dismiss for Now" — close dashboard but remember to remind later
+    shadow.getElementById('sa-dismiss-btn').onclick = () => {
+        // Store a snooze entry so we can show a reminder next time
+        const snoozeKey = `hg_snoozed_${btoa(window.location.href).slice(0, 32)}`;
+        try {
+            chrome.storage.local.set({
+                [snoozeKey]: {
+                    url: window.location.href,
+                    severity: result.overallSeverity,
+                    summary: result.summary || 'This email was previously flagged as suspicious.',
+                    snoozedAt: Date.now()
+                }
+            });
+        } catch (e) { /* best effort */ }
+        close();
+    };
+
+    // "Not a Threat" — user disagrees, open false-positive feedback
+    shadow.getElementById('sa-safe-btn').onclick = () => {
+        // Whitelist and open a lightweight feedback confirmation
+        const identity = result.metadata?.sender || window.location.hostname;
+        chrome.runtime.sendMessage({ type: MessageTypes.ADD_TO_WHITELIST, data: { domain: identity } });
+
+        // Show brief thank-you in the footer, then close
+        const footer = shadow.querySelector('.sa-footer');
+        if (footer) {
+            footer.innerHTML = `
+                <div style="text-align: center; padding: 8px 0;">
+                    <div style="font-size: 14px; font-weight: 700; color: #34d399; margin-bottom: 4px;">Marked as safe</div>
+                    <div style="font-size: 12px; color: #64748b;">We won't flag this sender again. Thanks for the feedback.</div>
+                </div>
+            `;
+        }
+        setTimeout(() => close(), 2000);
     };
 
     document.body.appendChild(container);
@@ -724,6 +848,70 @@ function _hideLocateFeedback() {
 }
 
 // ─── Shared Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Show inline evidence when Locate can't find text in the email body.
+ * Replaces the Locate button with a breakdown of what triggered the detection.
+ */
+function _showInlineEvidence(findingCard, finding, locateBtn) {
+    // Don't show twice
+    if (findingCard.querySelector('[data-evidence]')) return;
+
+    // Hide the Locate button and any feedback text
+    locateBtn.style.display = 'none';
+    const feedback = locateBtn.nextElementSibling;
+    if (feedback) feedback.style.display = 'none';
+
+    const evidence = document.createElement('div');
+    evidence.setAttribute('data-evidence', 'true');
+    evidence.style.cssText = 'border-top: 1px solid #1e293b; padding-top: 12px; margin-top: 10px;';
+
+    // Collect matched keywords
+    const keywords = (finding.matches || []).filter(m => typeof m === 'string').slice(0, 10);
+    // Collect indicator labels (the high-level reason)
+    const indicators = finding.indicators || [];
+    // Collect visual indicator reasons
+    const reasons = (finding.visualIndicators || [])
+        .map(vi => vi.reason)
+        .filter(Boolean)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .slice(0, 3);
+
+    let html = '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">What triggered this</div>';
+
+    // Show indicator labels as the main reason
+    if (indicators.length > 0) {
+        html += `<div style="font-size: 13px; color: #fbbf24; font-weight: 600; margin-bottom: 8px;">${indicators.map(i => _escapeHtml(i)).join(' + ')}</div>`;
+    }
+
+    // Show explanation
+    if (reasons.length > 0) {
+        html += reasons.map(r => `<div style="font-size: 12px; color: #cbd5e1; margin-bottom: 6px; line-height: 1.4;">${_escapeHtml(r)}</div>`).join('');
+    }
+
+    // Show matched keywords as tags
+    if (keywords.length > 0) {
+        html += '<div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 8px 0 6px;">Matched in email</div>';
+        html += '<div style="display: flex; flex-wrap: wrap; gap: 4px;">';
+        html += keywords.map(k =>
+            `<span style="display: inline-block; padding: 3px 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; font-size: 11px; color: #fca5a5;">${_escapeHtml(k.replace(/\s*\(fuzzy\s+match\)/i, ''))}</span>`
+        ).join('');
+        html += '</div>';
+    }
+
+    // "Got it" collapse button
+    html += '<button data-evidence-close style="background: none; border: none; color: #60a5fa; font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; margin-top: 10px; font-family: inherit;">Got it</button>';
+
+    evidence.innerHTML = html;
+    findingCard.appendChild(evidence);
+
+    // Wire close button
+    evidence.querySelector('[data-evidence-close]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        evidence.remove();
+        locateBtn.style.display = '';
+    });
+}
 
 function _buildSearchPhrases(finding) {
     const phrases = [];
