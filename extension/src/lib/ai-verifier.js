@@ -54,10 +54,10 @@ export function validateAIResponse(rawResponse) {
 /**
  * Call Gemini API to verify a suspicious URL.
  * @param {string} url - The URL to verify
- * @param {Object} details - { signals, phrases }
+ * @param {Object} details - { signals, phrases, intentKeywords }
  * @param {Object} options - { apiKey }
  */
-export async function verifyWithAI(url, { signals = [], phrases = [] }, options = {}) {
+export async function verifyWithAI(url, { signals = [], phrases = [], intentKeywords = [] }, options = {}) {
     if (!options.apiKey) throw new Error('Gemini API Key missing');
 
     const hostname = new URL(url).hostname;
@@ -68,8 +68,13 @@ export async function verifyWithAI(url, { signals = [], phrases = [] }, options 
 Your ONLY job is to validate whether the following URL is likely a scam.
 
 URL Hostname: ${hostname}
+Detected Phrases/Keywords: ${JSON.stringify(cleanPhrases)}
+Detected Intent Category: ${JSON.stringify(intentKeywords)}
 Local engine signals: ${JSON.stringify(signalCodes)}
-Detected phrases: ${JSON.stringify(cleanPhrases)}
+
+Contextual logic:
+1. If the phrases relate to high-trust brands (Google, Amazon, Banks) but the hostname is unrelated, it's likely a scam.
+2. If there are "payment failed" or "account expired" lures pointing to non-official domains, it's a critical threat.
 
 Respond ONLY with a single valid JSON object. No explanation, no markdown.
 If you are unsure, you MUST default verdict to "CONFIRMED" and confidence to 50.

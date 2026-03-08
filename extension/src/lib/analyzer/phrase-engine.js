@@ -6,7 +6,7 @@ import { findBestScamMatch } from './local-matching.js';
 import { getExplanation } from './explanations.js';
 
 export function checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent = null, customKeywords = null) {
-    const keywords = customKeywords || ['login', 'signin', 'verify', 'update', 'secure', 'account', 'banking', 'suspend', 'locked', 'urgent', 'confirm', 'billing', 'payment', 'wallet', 'alert', 'warning'];
+    const keywords = customKeywords || ['login', 'signin', 'verify', 'update', 'secure', 'account', 'banking', 'suspend', 'locked', 'urgent', 'confirm', 'billing', 'payment', 'wallet', 'alert', 'warning', 'failed', 'expired', 'renew', 'storage'];
     const keywordExplanations = {
         login: 'Common on real sites, but often used on fake sign-in pages to steal passwords.',
         signin: 'Common on real sites, but often used on fake sign-in pages to steal passwords.',
@@ -23,7 +23,11 @@ export function checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent = null
         payment: 'Payment-related context; scammers may request card or payment details.',
         wallet: 'Payment-related context; scammers may request access to wallets/accounts.',
         alert: 'Often used to create urgency or fear (e.g., “security alert”).',
-        warning: 'Often used to create urgency or fear and push quick action.'
+        warning: 'Often used to create urgency or fear and push quick action.',
+        failed: 'Common in "payment failed" scams used to steal credit card info.',
+        expired: 'Common in "account expired" or "subscription expired" scams.',
+        renew: 'Scammers use "renew now" to rush you into entering payment details.',
+        storage: 'Google/iCloud storage full/expired is a common phishing lure.'
     };
 
     const lowerUrl = url.toLowerCase();
@@ -108,7 +112,8 @@ export function analyzePageContent(pageContent, customPhrases = null) {
         'urgent action required', 'confirm your information', 'click here immediately', 'your computer is infected',
         'call this number now', 'refund pending', 'tax refund', 'purchase a gift card', 'pick up gift cards', 'send me the a picture of the code',
         'do not share this code', 'verify your wallet', 'compromised account', 'legal action', 'final notice', 'money order', 'crypto transfer',
-        'scratch the back', 'reveal the code', 'gift card for me', 'amount of each card'
+        'scratch the back', 'reveal the code', 'gift card for me', 'amount of each card',
+        'payment method has expired', 'payment failed', 'to avoid service interruption', 'renew your subscription', 'storage is full'
     ];
     const scamPhrases = customPhrases || basePhrases;
     const text = (title + ' ' + bodyText).toLowerCase();

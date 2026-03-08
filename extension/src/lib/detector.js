@@ -224,6 +224,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         if (rateCheck.allowed) {
             const startTime = Date.now();
             const phrases = (finalChecks.emailScams?.visualIndicators || []).map(i => i.phrase);
+            const intentKeywords = finalChecks.emailScams?.evidence?.detectedBrands || [];
 
             // withTimeout helper (inline)
             const withTimeout = (promise, ms, fallback) => {
@@ -235,7 +236,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
             };
 
             const aiResult = await withTimeout(
-                verifyWithAI(url, { signals: [...hardSignals, ...softSignals], phrases }, { apiKey: options.aiApiKey }),
+                verifyWithAI(url, { signals: [...hardSignals, ...softSignals], phrases, intentKeywords }, { apiKey: options.aiApiKey }),
                 4000,
                 { verdict: 'CONFIRMED', reason: 'AI validation timed out.', confidence: 50 }
             );

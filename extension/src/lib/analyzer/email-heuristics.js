@@ -42,7 +42,19 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
 
     if (hasGiftCard && hasCommand) { indicators.push('Gift card payment request'); score += 50; }
 
-    // 2. Sender Inconsistency: Official title from free email address
+    // 2. Account Security & Payment Lures (NEW)
+    const securityKeywords = [...new Set([
+        'failed', 'expired', 'renew', 'subscription', 'storage', 'update payment',
+        'card declined', 'transaction failed', 'action required', 'unauthorized',
+        ...(dyn.securityKeywords || [])
+    ])];
+    const hasSecurityLure = securityKeywords.filter(k => emailBody.includes(k));
+    if (hasSecurityLure.length >= 2) {
+        indicators.push('Account security or payment lure');
+        score += 30;
+    }
+
+    // 3. Sender Inconsistency: Official title from free email address
     const freeEmailProviders = ['gmail.com', 'outlook.com', 'yahoo.com', 'hotmail.com', 'icloud.com', 'aol.com', 'protonmail.com'];
     const officialKeywords = [
         'official', 'support', 'admin', 'service', 'desk', 'ceo', 'security', 'alert',
@@ -79,7 +91,49 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         score += 40;
     }
 
-    // 3. Invoice/Wire Fraud (hardcoded + dynamic)
+    // 4. Intent-Link Mismatch Detection (FEAT-094)
+    const emailSubject = (pageContent.subject || '').toLowerCase();
+    const fullText = (emailSubject + ' ' + emailBody);
+    const intentKeywords = {
+        'google': ['google', 'gmail', 'cloud', 'drive', 'photos', 'storage'],
+        'microsoft': ['microsoft', 'outlook', 'office', '365', 'onedrive', 'azure'],
+        'apple': ['apple', 'icloud', 'itunes', 'app store', 'mac', 'iphone'],
+        'amazon': ['amazon', 'prime', 'aws', 'kindle'],
+        'netflix': ['netflix', 'subscription', 'streaming'],
+        'banking': ['bank', 'chase', 'wellsfargo', 'bofa', 'capital one', 'visa', 'mastercard', 'payment']
+    };
+
+    const externalLinks = [
+        ...(pageContent?.links || []).map(l => typeof l === 'string' ? l : l.href || l.url || ''),
+        ...(pageContent?.rawUrls || [])
+    ].filter(Boolean).slice(0, 5);
+
+    let mismatchFound = false;
+    const detectedBrands = [];
+    for (const [brand, keywords] of Object.entries(intentKeywords)) {
+        const hasBrandIntent = keywords.some(k => fullText.includes(k));
+        if (hasBrandIntent) {
+            detectedBrands.push(brand);
+            for (const link of externalLinks) {
+                try {
+                    const hostname = new URL(link).hostname.toLowerCase();
+                    // If intent is brand but link is NOT brand
+                    const isLegit = isBrandLink(hostname, brand);
+                    if (!isLegit && !isWhitelistedBrand(hostname)) {
+                        mismatchFound = true;
+                        break;
+                    }
+                } catch (e) { }
+            }
+        }
+    }
+
+    if (mismatchFound) {
+        indicators.push('Intent-link mismatch: suspicious destination');
+        score += 50;
+    }
+
+    // 5. Invoice/Wire Fraud (hardcoded + dynamic)
     const financeKeywords = [...new Set([
         'invoice', 'wire transfer', 'payment pending', 'unpaid', 'overdue', 'bank details', 'routing number',
         ...(dyn.financeKeywords || [])
@@ -87,7 +141,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
     const hasFinance = financeKeywords.filter(k => emailBody.includes(k));
     if (hasFinance.length >= 2) { indicators.push('Suspicious financial request'); score += 30; }
 
-    // 4. Authority Impersonation Body Language (hardcoded + dynamic)
+    // 6. Authority Impersonation Body Language (hardcoded + dynamic)
     const authorityPressureSignals = [...new Set([
         'requires discretion', 'cannot take calls', 'cannot receive calls', 'not able to take calls',
         'this should be confidential', 'keep this confidential', 'this is confidential',
@@ -101,9 +155,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         score += 30;
     }
 
-    // 5. Vague Lure Detection: Nostalgia/Photos/Documents + External Link
-    // Attackers often use a disarming, friendly lure with an embedded malicious URL.
-    // e.g. "I've been meaning to send you these photos" + suspicious link
+    // 7. Vague Lure Detection: Nostalgia/Photos/Documents + External Link
     const vagueLureKeywords = [...new Set([
         'nostalgic', 'old photos', 'pictures i wanted to share', 'thought you might enjoy',
         'remember when', 'i found this', 'been meaning to send', 'had to share this',
@@ -114,10 +166,6 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
     ])];
     const matchedLureKeywords = vagueLureKeywords.filter(k => emailBody.includes(k));
     const hasVagueLure = matchedLureKeywords.length > 0;
-    const externalLinks = [
-        ...(pageContent?.links || []).map(l => typeof l === 'string' ? l : l.href || l.url || ''),
-        ...(pageContent?.rawUrls || [])
-    ].filter(Boolean).slice(0, 5);
     const hasExternalLinks = externalLinks.length > 0;
 
     if (hasVagueLure && hasExternalLinks) {
@@ -129,19 +177,16 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         ...(giftCardKeywords.filter(k => emailBody.includes(k))),
         ...(commandWords.filter(k => emailBody.includes(k))),
         ...(financeKeywords.filter(k => emailBody.includes(k))),
-        ...(vagueLureKeywords.filter(k => emailBody.includes(k)))
+        ...(vagueLureKeywords.filter(k => emailBody.includes(k))),
+        ...(securityKeywords.filter(k => emailBody.includes(k)))
     ];
 
     // Build visualIndicators ONLY when the check is actually flagged.
-    // Defense-in-depth: even if a consumer forgets to check `flagged`,
-    // unflagged checks won't leak incidental keyword matches as highlights.
     const visualIndicators = indicators.length > 0 ? [
-        // High-level labels (most informative)
         ...indicators.map(label => ({
             phrase: label,
             ...(INDICATOR_EXPLANATIONS[label] || getExplanation(label))
         })),
-        // Individual keyword matches that aren't already covered by a label
         ...keywordMatches
             .filter(k => !indicators.some(label =>
                 (INDICATOR_EXPLANATIONS[label]?.category || '') ===
@@ -160,17 +205,43 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         visualIndicators,
         dataChecked: Math.max(emailBody.length, 1) > 1 ? emailBody.substring(0, 5000) : `Sender: ${sender}`,
         matches: keywordMatches,
-        // Evidence for pattern-based detections (used by dashboard to show what triggered it)
         evidence: {
             lureKeywords: matchedLureKeywords,
             externalLinks: externalLinks,
             giftCardKeywordsFound: giftCardKeywords.filter(k => emailBody.includes(k)),
             commandWordsFound: commandWords.filter(k => emailBody.includes(k)),
             financeKeywordsFound: financeKeywords.filter(k => emailBody.includes(k)),
+            securityKeywordsFound: hasSecurityLure,
             authoritySignalsFound: authorityFound || [],
             senderMismatch: senderFound ? { displayName, sender } : null,
+            intentMismatch: mismatchFound,
+            detectedBrands: detectedBrands
         },
         score
     };
+}
+
+/**
+ * Helper: Check if hostname belongs to the branded intent (simplified)
+ */
+function isBrandLink(hostname, brand) {
+    const brandDomains = {
+        'google': ['google.com', 'gmail.com', 'gstatic.com', 'googleusercontent.com'],
+        'microsoft': ['microsoft.com', 'live.com', 'outlook.com', 'office.com', 'office365.com'],
+        'apple': ['apple.com', 'icloud.com', 'me.com'],
+        'amazon': ['amazon.com', 'aws.amazon.com', 'media-amazon.com'],
+        'netflix': ['netflix.com'],
+        'banking': [] // Generic banking is hard to verify without a whitelist
+    };
+    const domains = brandDomains[brand] || [];
+    return domains.some(d => hostname === d || hostname.endsWith('.' + d));
+}
+
+/**
+ * Helper: Sites that are common redirectors or high-trust but not brand specific
+ */
+function isWhitelistedBrand(hostname) {
+    const whitelist = ['google.com', 'microsoft.com', 'apple.com', 'amazon.com', 'dropbox.com', 'box.com'];
+    return whitelist.some(d => hostname === d || hostname.endsWith('.' + d));
 }
 
