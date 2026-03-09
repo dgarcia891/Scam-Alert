@@ -251,7 +251,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         submitReport,
         submitUserReport,
         submitFalsePositive,
-        tabStateManager
+        tabStateManager,
+        cacheScan
     };
     handleIncomingMessage(message, sender, context).then(sendResponse);
     return true; // Keep channel open for async

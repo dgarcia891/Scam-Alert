@@ -634,6 +634,13 @@ const Popup = () => {
     const [aiAsking, setAiAsking] = useState(false);
     const [aiResult, setAiResult] = useState(null);
 
+    // Persist AI Second Opinion across popup remounts
+    useEffect(() => {
+        if (scanResults?.aiVerification && !aiResult) {
+            setAiResult(scanResults.aiVerification);
+        }
+    }, [scanResults]);
+
     // Load dev mode + settings on mount
     useEffect(() => {
         chrome.storage.local.get(['hydraGuardDevMode', 'settings'], (result) => {

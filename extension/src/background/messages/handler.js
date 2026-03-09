@@ -52,7 +52,7 @@ export async function handleIncomingMessage(message, sender, context) {
         case MessageTypes.CLEAR_URL_CACHE:
             return handleClearUrlCache(msgData);
         case MessageTypes.ASK_AI_OPINION:
-            return handleAskAIOpinion(msgData, getSettings, getCachedScan);
+            return handleAskAIOpinion(msgData, getSettings, getCachedScan, context.cacheScan);
         case MessageTypes.TEST_GSB_KEY:
             return handleTestGsbKey(msgData);
         case MessageTypes.TEST_AI_KEY:
@@ -328,7 +328,7 @@ async function handleTestPhishTankKey(msgData) {
 
 // ── AI Opinion Handler ─────────────────────────────────────────
 
-async function handleAskAIOpinion(msgData, getSettings, getCachedScan) {
+async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan) {
     try {
         const settings = await getSettings();
 
@@ -360,11 +360,21 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan) {
 
         const result = await verifyWithAI(url, { signals, phrases }, { apiKey: settings.aiApiKey });
 
-        return {
-            success: true,
+        const aiVerification = {
             verdict: result.verdict,
             reason: result.reason,
             confidence: result.confidence
+        };
+
+        // FEAT-088 Fix: Persist AI verdict in persistent scan cache so it survives popup re-opens
+        if (cached && cacheScan) {
+            cached.aiVerification = aiVerification;
+            await cacheScan(url, cached);
+        }
+
+        return {
+            success: true,
+            ...aiVerification
         };
     } catch (err) {
         console.error('[Hydra Guard] ASK_AI_OPINION failed:', err);
