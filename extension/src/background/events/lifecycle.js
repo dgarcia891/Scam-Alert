@@ -3,8 +3,9 @@
  */
 import { repairStatistics, getSettings, updateSettings, clearCache } from '../../lib/storage.js';
 import { syncPatterns } from '../../lib/database.js';
+import { syncManager } from '../lib/sync-manager.js';
 
-export async function onInstalled(details, scanActiveTabs) {
+export async function onInstalled(details, scanActiveTabsCb) {
     console.log('[Hydra Guard] Extension installed/updated:', details.reason);
     try {
         await repairStatistics();
@@ -12,6 +13,26 @@ export async function onInstalled(details, scanActiveTabs) {
 
         if (settings.usePhishTank) {
             await updateSettings({ usePhishTank: false, preferOffline: false });
+        }
+
+        if (details.reason === 'install' || details.reason === 'update') {
+            // Clear all persistent scan caches on update to prevent legacy schema issues (e.g. 0 CHECKS)
+            try {
+                await clearCache();
+                console.log('[Hydra Guard] Persistent scan caches cleared on update.');
+            } catch (e) {
+                console.warn('[Hydra Guard] Failed to clear cache on update:', e);
+            }
+
+            if (!settings.usePatternDetection && !settings.usePhishTank && !settings.useGoogleSafeBrowsing) {
+                await updateSettings({
+                    usePatternDetection: true,
+                    useGoogleSafeBrowsing: true,
+                    scanningEnabled: true
+                });
+            }
+            await syncManager.sync(true); // Force sync
+            if (scanActiveTabsCb) scanActiveTabsCb();
         }
 
         if (details.reason === 'install') {

@@ -109,10 +109,30 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     });
 
     // Global Message Listener for Scan Results
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!chrome.runtime?.id) return;
 
         const type = message.type || message.action;
+
+        // NEW: Popup AI Context Fetcher
+        if (type === 'GET_EMAIL_CONTEXT') {
+            const data = extractEmailText();
+            const senderInfo = parseSenderInfo();
+            const subject = extractSubject();
+            const linkData = extractEmailLinks();
+
+            sendResponse({
+                success: true,
+                context: {
+                    sender: senderInfo.name ? `${senderInfo.name} <${senderInfo.email}>` : senderInfo.email,
+                    subject: subject,
+                    snippet: data ? data.substring(0, 500) : '',
+                    embeddedLinks: linkData.links.map(l => l.href)
+                }
+            });
+            return true; // Keep channel open for async response
+        }
+
         if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
             const result = message.data.result;
             if (result.overallThreat || result.overallSeverity !== 'SAFE') {

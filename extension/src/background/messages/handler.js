@@ -359,11 +359,39 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                 bodyLinks: [], // Background verifyWithAI will extract links from phrases if needed
                 isReply: false
             };
-        } else if (cached) {
-            // Fallback for automated background scans or if payload is empty
-            const meta = cached.metadata || {};
-            const emailCheck = cached.checks?.emailScams || null;
-            emailContext = extractEmailContext(url, meta, emailCheck);
+        } else {
+            // NEW: Fetch from active tab for popup AI
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab && (tab.url.includes('mail.google.com') || tab.url.includes('outlook'))) {
+                    const timeoutResponse = new Promise(resolve => setTimeout(() => resolve(null), 1500));
+                    const fetchResponse = chrome.tabs.sendMessage(tab.id, { type: 'GET_EMAIL_CONTEXT' }).catch(() => null);
+                    const response = await Promise.race([fetchResponse, timeoutResponse]);
+
+                    if (response?.success && response.context) {
+                        const ec = response.context;
+                        // Map the new context format to what AI verifier expects
+                        emailContext = {
+                            senderName: ec.sender || '',
+                            senderEmail: '', // packed into sender
+                            subject: ec.subject || '',
+                            bodySnippet: ec.snippet || '',
+                            bodyLinks: ec.embeddedLinks || [],
+                            isReply: false
+                        };
+                        console.log('[Hydra Guard] Fetched live email context for popup AI:', emailContext);
+                    }
+                }
+            } catch (e) {
+                console.warn('[Hydra Guard] Failed to fetch live email context for AI:', e);
+            }
+
+            // Fallback for automated background scans or if fetch failed
+            if (!emailContext && cached) {
+                const meta = cached.metadata || {};
+                const emailCheck = cached.checks?.emailScams || null;
+                emailContext = extractEmailContext(url, meta, emailCheck);
+            }
         }
 
         const result = await verifyWithAI(url, { signals, phrases, emailContext }, { apiKey: settings.aiApiKey });
