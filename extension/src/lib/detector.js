@@ -17,7 +17,7 @@ import { createScanResult, SEVERITY, ACTION } from './scan-schema.js';
 import { determineSeverity } from './analysis/scoring.js';
 import { normalizeUrl, isBlocked } from './storage.js';
 import { extractHostname } from './analyzer/url-engine.js';
-import { verifyWithAI } from './ai-verifier.js';
+import { verifyWithAI, extractEmailContext } from './ai-verifier.js';
 import { checkAICanRun, incrementRateCounters } from './ai-rate-limiter.js';
 import { recordAICall } from './ai-telemetry.js';
 
@@ -33,7 +33,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
 
     const {
         useGoogleSafeBrowsing = true,
-        usePhishTank = true,
+        usePhishTank = false, // DISABLED: PhishTank not accepting new users (BUG-PHISH-01)
         usePatternDetection = true,
         pageContent = null,
         preferOffline = false,
@@ -171,7 +171,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
             sources.push({ id: 'phishtank', status: 'failed', reason: error.message });
         }
     } else {
-        sources.push({ id: 'phishtank', status: 'skipped', reason: 'disabled' });
+        sources.push({ id: 'phishtank', status: 'skipped', reason: 'service_unavailable' });
     }
     timing.phishtank = Date.now() - phishtankStart;
 
@@ -236,7 +236,12 @@ export async function scanUrl(url, options = {}, onProgress = null) {
             };
 
             const aiResult = await withTimeout(
-                verifyWithAI(url, { signals: [...hardSignals, ...softSignals], phrases, intentKeywords }, { apiKey: options.aiApiKey }),
+                verifyWithAI(url, {
+                    signals: [...hardSignals, ...softSignals],
+                    phrases,
+                    intentKeywords,
+                    emailContext: extractEmailContext(url, options.metadata || {}, finalChecks.emailScams || null)
+                }, { apiKey: options.aiApiKey }),
                 4000,
                 { verdict: 'CONFIRMED', reason: 'AI validation timed out.', confidence: 50 }
             );

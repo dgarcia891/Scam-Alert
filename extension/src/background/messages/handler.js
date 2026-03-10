@@ -4,9 +4,8 @@
 import { MessageTypes } from '../../lib/messaging.js';
 import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
 import { submitReport, submitUserReport, submitCorrection } from '../../lib/supabase.js';
-import { verifyWithAI } from '../../lib/ai-verifier.js';
+import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
 import { checkUrlsWithSafeBrowsing } from '../../lib/google-safe-browsing.js';
-import { checkUrlWithPhishTank } from '../../lib/phishtank.js';
 
 export async function handleIncomingMessage(message, sender, context) {
     const { type, data, payload } = message; // Support both for transition
@@ -312,18 +311,7 @@ async function handleTestAiKey(msgData) {
 }
 
 async function handleTestPhishTankKey(msgData) {
-    const apiKey = msgData?.apiKey;
-    if (!apiKey) return { success: false, error: 'No API key provided.' };
-    try {
-        // PhishTank test: check a known safe URL. A valid key returns a response; an invalid one errors.
-        const result = await checkUrlWithPhishTank('https://www.google.com', { apiKey });
-        if (result.error) {
-            return { success: false, error: result.error };
-        }
-        return { success: true };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
+    return { success: false, error: 'PhishTank service is currently unavailable.' };
 }
 
 // ── AI Opinion Handler ─────────────────────────────────────────
@@ -361,53 +349,8 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             // Build email context from cached metadata and checks
             const meta = cached.metadata || {};
             const emailCheck = cached.checks?.emailScams || null;
-            const isEmailPage = url.includes('mail.google.com') || url.includes('outlook.');
 
-            if (isEmailPage || meta.subject || meta.sender || emailCheck) {
-                // Extract sender info — could be "Name <email>" or separate fields
-                let senderName = '';
-                let senderEmail = '';
-                if (meta.sender) {
-                    const senderMatch = meta.sender.match(/^(.+?)\s*<(.+?)>$/);
-                    if (senderMatch) {
-                        senderName = senderMatch[1].trim();
-                        senderEmail = senderMatch[2].trim();
-                    } else if (meta.sender.includes('@')) {
-                        senderEmail = meta.sender;
-                    } else {
-                        senderName = meta.sender;
-                    }
-                }
-
-                // Extract URLs from email body via indicators
-                const bodyLinks = [];
-                if (emailCheck?.visualIndicators) {
-                    for (const ind of emailCheck.visualIndicators) {
-                        if (ind.phrase && (ind.phrase.startsWith('http://') || ind.phrase.startsWith('https://'))) {
-                            bodyLinks.push(ind.phrase);
-                        }
-                    }
-                }
-                // Also check evidence for links
-                if (emailCheck?.evidence?.links) {
-                    bodyLinks.push(...emailCheck.evidence.links.slice(0, 5));
-                }
-
-                // Extract body snippet from evidence or metadata
-                const bodySnippet = emailCheck?.evidence?.bodySnippet
-                    || emailCheck?.evidence?.bodyText
-                    || meta.bodySnippet
-                    || '';
-
-                emailContext = {
-                    senderName,
-                    senderEmail,
-                    subject: meta.subject || '',
-                    bodySnippet: typeof bodySnippet === 'string' ? bodySnippet.slice(0, 500) : '',
-                    bodyLinks: [...new Set(bodyLinks)].slice(0, 5),
-                    isReply: meta.isReply ?? false
-                };
-            }
+            emailContext = extractEmailContext(url, meta, emailCheck);
         }
 
         const result = await verifyWithAI(url, { signals, phrases, emailContext }, { apiKey: settings.aiApiKey });

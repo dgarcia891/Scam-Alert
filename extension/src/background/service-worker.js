@@ -14,7 +14,6 @@
 import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cacheScan, isWhitelisted, addToWhitelist, getWhitelist, clearCache, isPro, repairStatistics, normalizeUrl } from '../lib/storage.js';
 import { MessageTypes, createMessageHandler, sendMessageToTab, createMessage } from '../lib/messaging.js';
 import { scanUrl } from '../lib/detector.js';
-import { downloadPhishTankDatabase } from '../lib/phishtank.js';
 import { syncPatterns } from '../lib/database.js';
 import { submitReport, submitUserReport, submitFalsePositive } from '../lib/supabase.js';
 import { syncManager } from './lib/sync-manager.js';

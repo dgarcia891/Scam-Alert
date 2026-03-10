@@ -629,8 +629,7 @@ const WhitelistSettings = () => {
     const [draft, setDraft] = useState({
         aiApiKey: '',
         aiDailyCeiling: 50,
-        gsbApiKey: '',
-        phishTankApiKey: ''
+        gsbApiKey: ''
     });
     const [savedSnapshot, setSavedSnapshot] = useState(null); // snapshot of draft at last save/load
     const [saveState, setSaveState] = useState(null); // null | 'saving' | 'saved' | { error: string }
@@ -644,8 +643,7 @@ const WhitelistSettings = () => {
                     const snap = {
                         aiApiKey: result.settings.aiApiKey || '',
                         aiDailyCeiling: result.settings.aiDailyCeiling ?? 50,
-                        gsbApiKey: result.settings.gsbApiKey || '',
-                        phishTankApiKey: result.settings.phishTankApiKey || ''
+                        gsbApiKey: result.settings.gsbApiKey || ''
                     };
                     setDraft(snap);
                     setSavedSnapshot(snap);
@@ -658,8 +656,7 @@ const WhitelistSettings = () => {
     const isDirty = savedSnapshot && (
         draft.aiApiKey !== savedSnapshot.aiApiKey ||
         String(draft.aiDailyCeiling) !== String(savedSnapshot.aiDailyCeiling) ||
-        draft.gsbApiKey !== savedSnapshot.gsbApiKey ||
-        draft.phishTankApiKey !== savedSnapshot.phishTankApiKey
+        draft.gsbApiKey !== savedSnapshot.gsbApiKey
     );
 
     const handleToggle = (key) => {
@@ -674,8 +671,7 @@ const WhitelistSettings = () => {
             ...settings,
             aiApiKey: draft.aiApiKey,
             aiDailyCeiling: parseInt(draft.aiDailyCeiling) || 50,
-            gsbApiKey: draft.gsbApiKey,
-            phishTankApiKey: draft.phishTankApiKey
+            gsbApiKey: draft.gsbApiKey
         };
         chrome.storage.local.set({ settings: merged }, () => {
             // Read back to verify
@@ -684,8 +680,7 @@ const WhitelistSettings = () => {
                     const snap = {
                         aiApiKey: result.settings.aiApiKey || '',
                         aiDailyCeiling: result.settings.aiDailyCeiling ?? 50,
-                        gsbApiKey: result.settings.gsbApiKey || '',
-                        phishTankApiKey: result.settings.phishTankApiKey || ''
+                        gsbApiKey: result.settings.gsbApiKey || ''
                     };
                     setSettings(result.settings);
                     setDraft(snap);
@@ -849,48 +844,6 @@ const WhitelistSettings = () => {
                         )}
                     </div>
 
-                    {/* PhishTank */}
-                    <div className="space-y-4 p-4 bg-sky-500/5 rounded-xl border border-sky-500/10">
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-200 font-semibold text-sm">PhishTank</span>
-                                    <Badge variant="info" className="text-[9px] py-0 px-1">PRO</Badge>
-                                </div>
-                                <span className="text-slate-500 text-[11px] leading-tight mt-1 max-w-[300px]">
-                                    Community-driven phishing URL database. Works without a key (rate-limited) — add a key for full-speed lookups.
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => handleToggle('usePhishTank')}
-                                className={clsx(
-                                    "w-12 h-6 rounded-full transition-colors relative",
-                                    settings.usePhishTank ? "bg-sky-600" : "bg-slate-700"
-                                )}>
-                                <div className={clsx(
-                                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                                    settings.usePhishTank ? "left-7" : "left-1"
-                                )} />
-                            </button>
-                        </div>
-
-                        {settings.usePhishTank && (
-                            <div className="space-y-3 pt-2 border-t border-slate-700/30">
-                                <ApiKeyField
-                                    label="API Key (Optional)"
-                                    value={draft.phishTankApiKey}
-                                    onChange={(v) => setDraft(d => ({ ...d, phishTankApiKey: v }))}
-                                    placeholder="Enter your PhishTank API key..."
-                                    testMessageType={MessageTypes.TEST_PHISHTANK_KEY}
-                                    accentColor="sky"
-                                    helpText="Register at PhishTank for a free API key. Without one, lookups are rate-limited."
-                                    getKeyUrl="https://www.phishtank.com/api_register.php"
-                                    getKeyLabel="GET KEY"
-                                />
-                            </div>
-                        )}
-                    </div>
-
                     <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
                         <div className="flex flex-col">
                             <span className="text-slate-200 font-semibold text-sm">Repair Local Storage</span>
@@ -1005,7 +958,7 @@ const WhitelistSettings = () => {
                     </div>
                 </div>
             </Card>
-        </div>
+        </div >
     );
 };
 

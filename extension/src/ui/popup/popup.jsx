@@ -177,8 +177,8 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     const totalFlagged = flaggedChecks.length + (aiVerification?.flagged ? 1 : 0);
     const totalPassed = passedChecks.length + (aiVerification && !aiVerification.flagged ? 1 : 0);
     const totalSkipped = skippedChecks.length;
-    const stageCount = 5; // Blocklist, Patterns, PhishTank, GSB, AI
-    const activeStages = sources.filter(s => s.status === 'success').length + 1; // +1 for blocklist always
+    const stageCount = 4; // Blocklist, Patterns, GSB, AI
+    const activeStages = sources.filter(s => s.status === 'success' && s.id !== 'phishtank').length + 1; // +1 for blocklist always
 
     return (
         <div className="space-y-2 mt-3 custom-scrollbar" style={{ maxHeight: '480px', overflowY: 'auto', paddingRight: '2px' }}>
@@ -232,7 +232,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                     )}
                     <span className="text-slate-700">|</span>
                     <span className="text-[10px] text-slate-400">
-                        <span className="font-bold text-slate-300">{activeStages}</span>/{stageCount} stages active
+                        <span className="font-bold text-slate-300">{activeStages}</span>/{stageCount} stages
                     </span>
                 </div>
             </div>
@@ -329,35 +329,13 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 </div>
             </StageHeader>
 
-            {/* Stage 3: PhishTank */}
-            {(() => {
-                const pt = getSource('phishtank');
-                const ptCheck = checks.phishTank;
-                const ptStatus = !pt ? 'skip' : pt.status === 'success' ? (ptCheck?.flagged ? 'flag' : 'pass') : pt.status === 'failed' ? 'error' : 'skip';
-                return (
-                    <StageHeader icon={Database} title="3. PhishTank" status={ptStatus} timing={timing.phishtank} defaultOpen={pt?.status === 'success' || ptCheck?.flagged}>
-                        {!pt ? (
-                            <div className="text-[10px] text-slate-600 italic">Not in scan data</div>
-                        ) : pt.status === 'skipped' ? (
-                            <div className="text-[10px] text-slate-500">Skipped — {pt.reason || 'disabled'}</div>
-                        ) : pt.status === 'failed' ? (
-                            <div className="text-[10px] text-orange-400">Error — {pt.reason || 'unknown'}</div>
-                        ) : ptCheck?.flagged ? (
-                            <div className="text-[10px] text-rose-400 font-semibold">MATCH — {ptCheck.details || 'Listed in PhishTank'}</div>
-                        ) : (
-                            <div className="text-[10px] text-emerald-400/70">Clean — not in PhishTank database</div>
-                        )}
-                    </StageHeader>
-                );
-            })()}
-
-            {/* Stage 4: Google Safe Browsing */}
+            {/* Stage 3: Google Safe Browsing */}
             {(() => {
                 const gsb = getSource('gsb');
                 const gsbCheck = checks.googleSafeBrowsing;
                 const gsbStatus = !gsb ? 'skip' : gsb.status === 'success' ? (gsbCheck?.flagged ? 'flag' : 'pass') : gsb.status === 'failed' ? 'error' : 'skip';
                 return (
-                    <StageHeader icon={Globe} title="4. Google Safe Browsing" status={gsbStatus} timing={timing.gsb} defaultOpen={gsb?.status === 'success' || gsbCheck?.flagged}>
+                    <StageHeader icon={Globe} title="3. Google Safe Browsing" status={gsbStatus} timing={timing.gsb} defaultOpen={gsb?.status === 'success' || gsbCheck?.flagged}>
                         {!gsb ? (
                             <div className="text-[10px] text-slate-600 italic">Not in scan data</div>
                         ) : gsb.status === 'skipped' ? (
@@ -511,8 +489,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 <div className="space-y-0.5">
                     {[
                         { label: 'Google Safe Browsing', ok: !!settings?.gsbApiKey, detail: settings?.gsbApiKey ? `Key: ...${settings.gsbApiKey.slice(-4)}` : 'No API key' },
-                        { label: 'PhishTank', ok: !!settings?.phishTankApiKey, detail: settings?.phishTankApiKey ? `Key: ...${settings.phishTankApiKey.slice(-4)}` : 'No API key (rate-limited mode)' },
-                        { label: 'AI Second Opinion', ok: settings?.aiEnabled && !!settings?.aiApiKey, detail: settings?.aiEnabled ? (settings?.aiApiKey ? `Enabled (key: ...${settings.aiApiKey.slice(-4)})` : 'Enabled but no key') : 'Disabled' },
+                        { label: 'AI Engine', ok: settings?.aiEnabled && !!settings?.aiApiKey, detail: settings?.aiEnabled ? (settings?.aiApiKey ? `Enabled (key: ...${settings.aiApiKey.slice(-4)})` : 'Enabled but no key') : 'Disabled' },
                         { label: 'Email Scanning', ok: settings?.emailScanEnabled !== false, detail: settings?.emailScanEnabled !== false ? 'Enabled' : 'Disabled' },
                         { label: 'Pattern Detection', ok: settings?.usePatternDetection !== false, detail: 'Enabled' },
                         { label: 'Scanning', ok: settings?.scanningEnabled !== false, detail: settings?.scanningEnabled !== false ? 'Active' : 'PAUSED' },

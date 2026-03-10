@@ -102,6 +102,59 @@ function buildEmailSection(emailContext) {
 }
 
 /**
+ * Helper to extract email context from scan metadata and checks.
+ * Used by both background auto-scans and manual 'Ask AI' requests.
+ * @param {string} url 
+ * @param {Object} meta 
+ * @param {Object} emailCheck 
+ * @returns {Object|null}
+ */
+export function extractEmailContext(url, meta = {}, emailCheck = null) {
+    const isEmailPage = url.includes('mail.google.com') || url.includes('outlook.');
+    if (!isEmailPage && !meta.subject && !meta.sender && !emailCheck) return null;
+
+    let senderName = '';
+    let senderEmail = '';
+    if (meta.sender) {
+        const senderMatch = meta.sender.match(/^(.+?)\s*<(.+?)>$/);
+        if (senderMatch) {
+            senderName = senderMatch[1].trim();
+            senderEmail = senderMatch[2].trim();
+        } else if (meta.sender.includes('@')) {
+            senderEmail = meta.sender;
+        } else {
+            senderName = meta.sender;
+        }
+    }
+
+    const bodyLinks = [];
+    if (emailCheck?.visualIndicators) {
+        for (const ind of emailCheck.visualIndicators) {
+            if (ind.phrase && (ind.phrase.startsWith('http://') || ind.phrase.startsWith('https://'))) {
+                bodyLinks.push(ind.phrase);
+            }
+        }
+    }
+    if (emailCheck?.evidence?.links) {
+        bodyLinks.push(...emailCheck.evidence.links.slice(0, 5));
+    }
+
+    const bodySnippet = emailCheck?.evidence?.bodySnippet
+        || emailCheck?.evidence?.bodyText
+        || meta.bodySnippet
+        || '';
+
+    return {
+        senderName,
+        senderEmail,
+        subject: meta.subject || '',
+        bodySnippet: typeof bodySnippet === 'string' ? bodySnippet.slice(0, 500) : '',
+        bodyLinks: [...new Set(bodyLinks)].slice(0, 5),
+        isReply: meta.isReply ?? false
+    };
+}
+
+/**
  * Call Gemini API to verify a suspicious URL.
  * @param {string} url - The URL to verify
  * @param {Object} details - { signals, phrases, intentKeywords, emailContext }
