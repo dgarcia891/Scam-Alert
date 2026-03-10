@@ -350,20 +350,73 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         const cached = await getCachedScan(url);
         const signals = [];
         const phrases = [];
+        let emailContext = null;
 
         if (cached) {
             if (cached.signals?.hard) signals.push(...cached.signals.hard);
             if (cached.signals?.soft) signals.push(...cached.signals.soft);
             const emailIndicators = cached.checks?.emailScams?.visualIndicators || [];
             phrases.push(...emailIndicators.map(i => i.phrase).filter(Boolean));
+
+            // Build email context from cached metadata and checks
+            const meta = cached.metadata || {};
+            const emailCheck = cached.checks?.emailScams || null;
+            const isEmailPage = url.includes('mail.google.com') || url.includes('outlook.');
+
+            if (isEmailPage || meta.subject || meta.sender || emailCheck) {
+                // Extract sender info — could be "Name <email>" or separate fields
+                let senderName = '';
+                let senderEmail = '';
+                if (meta.sender) {
+                    const senderMatch = meta.sender.match(/^(.+?)\s*<(.+?)>$/);
+                    if (senderMatch) {
+                        senderName = senderMatch[1].trim();
+                        senderEmail = senderMatch[2].trim();
+                    } else if (meta.sender.includes('@')) {
+                        senderEmail = meta.sender;
+                    } else {
+                        senderName = meta.sender;
+                    }
+                }
+
+                // Extract URLs from email body via indicators
+                const bodyLinks = [];
+                if (emailCheck?.visualIndicators) {
+                    for (const ind of emailCheck.visualIndicators) {
+                        if (ind.phrase && (ind.phrase.startsWith('http://') || ind.phrase.startsWith('https://'))) {
+                            bodyLinks.push(ind.phrase);
+                        }
+                    }
+                }
+                // Also check evidence for links
+                if (emailCheck?.evidence?.links) {
+                    bodyLinks.push(...emailCheck.evidence.links.slice(0, 5));
+                }
+
+                // Extract body snippet from evidence or metadata
+                const bodySnippet = emailCheck?.evidence?.bodySnippet
+                    || emailCheck?.evidence?.bodyText
+                    || meta.bodySnippet
+                    || '';
+
+                emailContext = {
+                    senderName,
+                    senderEmail,
+                    subject: meta.subject || '',
+                    bodySnippet: typeof bodySnippet === 'string' ? bodySnippet.slice(0, 500) : '',
+                    bodyLinks: [...new Set(bodyLinks)].slice(0, 5),
+                    isReply: meta.isReply ?? false
+                };
+            }
         }
 
-        const result = await verifyWithAI(url, { signals, phrases }, { apiKey: settings.aiApiKey });
+        const result = await verifyWithAI(url, { signals, phrases, emailContext }, { apiKey: settings.aiApiKey });
 
         const aiVerification = {
             verdict: result.verdict,
             reason: result.reason,
-            confidence: result.confidence
+            confidence: result.confidence,
+            _debug: result._debug || null
         };
 
         // FEAT-088 Fix: Persist AI verdict in persistent scan cache so it survives popup re-opens

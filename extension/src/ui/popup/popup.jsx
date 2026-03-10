@@ -537,10 +537,13 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
 };
 
 const AskAIButton = ({ settings, currentUrl, aiAsking, setAiAsking, aiResult, setAiResult }) => {
+    const [debugOpen, setDebugOpen] = useState(false);
+
     const handleAskAI = useCallback(() => {
         if (!currentUrl || aiAsking) return;
         setAiAsking(true);
         setAiResult(null);
+        setDebugOpen(false);
         chrome.runtime.sendMessage(
             { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl } },
             (response) => {
@@ -583,7 +586,7 @@ const AskAIButton = ({ settings, currentUrl, aiAsking, setAiAsking, aiResult, se
                 </button>
             ) : (
                 <div className={cn(
-                    "w-full rounded-xl border p-3 text-xs font-medium",
+                    "w-full rounded-xl border text-xs font-medium overflow-hidden",
                     aiResult.verdict === 'DOWNGRADED'
                         ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                         : aiResult.verdict === 'ESCALATED'
@@ -592,22 +595,62 @@ const AskAIButton = ({ settings, currentUrl, aiAsking, setAiAsking, aiResult, se
                                 ? "bg-slate-800/50 border-slate-700 text-slate-400"
                                 : "bg-amber-500/10 border-amber-500/20 text-amber-400"
                 )}>
-                    <div className="flex items-center gap-2 mb-1">
-                        <Sparkles size={12} />
-                        <span className="font-bold">
-                            {aiResult.verdict === 'DOWNGRADED' ? 'AI says: Looks safe'
-                                : aiResult.verdict === 'ESCALATED' ? 'AI says: This looks dangerous'
-                                    : aiResult.verdict === 'ERROR' ? 'AI unavailable'
-                                        : 'AI says: Something looks off'}
-                        </span>
-                    </div>
-                    <p className="text-[10px] opacity-80 leading-snug">{aiResult.reason}</p>
+                    {/* Clickable verdict header */}
                     <button
-                        onClick={() => { setAiResult(null); }}
-                        className="mt-2 text-[9px] font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-opacity"
+                        onClick={() => setDebugOpen(!debugOpen)}
+                        className="w-full p-3 text-left hover:opacity-90 transition-opacity"
                     >
-                        Ask again
+                        <div className="flex items-center gap-2 mb-1">
+                            <Sparkles size={12} />
+                            <span className="font-bold flex-1">
+                                {aiResult.verdict === 'DOWNGRADED' ? 'AI says: Looks safe'
+                                    : aiResult.verdict === 'ESCALATED' ? 'AI says: This looks dangerous'
+                                        : aiResult.verdict === 'ERROR' ? 'AI unavailable'
+                                            : 'AI says: Something looks off'}
+                            </span>
+                            <ChevronDown size={12} className={cn("transition-transform shrink-0 opacity-50", !debugOpen && "-rotate-90")} />
+                        </div>
+                        <p className="text-[10px] opacity-80 leading-snug">{aiResult.reason}</p>
+                        {aiResult.confidence != null && aiResult.verdict !== 'ERROR' && (
+                            <p className="text-[9px] opacity-50 mt-1">Confidence: {aiResult.confidence}%</p>
+                        )}
                     </button>
+
+                    {/* Debug transparency panel */}
+                    {debugOpen && aiResult._debug && (
+                        <div className="border-t border-current/10 p-3 space-y-2 bg-slate-900/40">
+                            <div>
+                                <div className="text-[9px] font-bold uppercase tracking-wider opacity-50 mb-1">Prompt Sent to AI</div>
+                                <pre className="text-[8px] text-slate-400 font-mono whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto custom-scrollbar bg-slate-900/60 rounded p-2 border border-slate-700/30">
+                                    {aiResult._debug.promptSent || '(not available)'}
+                                </pre>
+                            </div>
+                            <div>
+                                <div className="text-[9px] font-bold uppercase tracking-wider opacity-50 mb-1">Raw AI Response</div>
+                                <pre className="text-[8px] text-slate-400 font-mono whitespace-pre-wrap break-all max-h-[120px] overflow-y-auto custom-scrollbar bg-slate-900/60 rounded p-2 border border-slate-700/30">
+                                    {aiResult._debug.rawResponse || '(not available)'}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="px-3 pb-3 flex items-center gap-3">
+                        <button
+                            onClick={() => { setAiResult(null); setDebugOpen(false); }}
+                            className="text-[9px] font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-opacity"
+                        >
+                            Ask again
+                        </button>
+                        {aiResult._debug && (
+                            <button
+                                onClick={() => setDebugOpen(!debugOpen)}
+                                className="text-[9px] font-bold uppercase tracking-wider opacity-40 hover:opacity-80 transition-opacity"
+                            >
+                                {debugOpen ? 'Hide details' : 'Show details'}
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
