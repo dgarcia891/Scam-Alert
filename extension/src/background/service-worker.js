@@ -98,8 +98,14 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
 
             const metadata = {};
             if (pageContent?.subject) metadata.subject = pageContent.subject;
-            if (pageContent?.senderName) metadata.sender = pageContent.senderName;
-            if (pageContent?.senderEmail && !metadata.sender) metadata.sender = pageContent.senderEmail;
+
+            if (pageContent?.senderName && pageContent?.senderEmail) {
+                metadata.sender = `${pageContent.senderName} <${pageContent.senderEmail}>`;
+            } else if (pageContent?.senderName) {
+                metadata.sender = pageContent.senderName;
+            } else if (pageContent?.senderEmail) {
+                metadata.sender = pageContent.senderEmail;
+            }
 
             result = await scanUrl(url, { ...settings, ...scanOptions, pageContent, isPro: isProUser, metadata }, onProgress);
             await cacheScan(url, result);

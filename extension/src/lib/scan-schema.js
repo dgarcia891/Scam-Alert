@@ -36,6 +36,7 @@ export function createScanResult({
     reasons = [],
     signals = { hard: [], soft: [] },
     checks = {}, // NEW: Preserve detailed check objects for the UI
+    metadata = {}, // NEW: Preserve email headers and page meta
     meta = {}
 } = {}) {
     // BUG-066 Fix: The codebase universally reads `overallSeverity` and `overallThreat`.
@@ -53,6 +54,7 @@ export function createScanResult({
         reasons,
         signals,
         checks,                      // Canonical checks object for the Activity Log UI
+        metadata,                    // Data payload for background jobs (like AI)
         aiVerification: meta.aiVerification || null, // FEAT-088: Secondary AI signal
         meta: {
             timestamp: Date.now(),

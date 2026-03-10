@@ -292,6 +292,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
         reasons,
         signals: { hard: hardSignals, soft: softSignals },
         checks: finalChecks,
+        metadata: options.metadata || {},
         meta: { sources, aiVerification, timing }
     });
 }
