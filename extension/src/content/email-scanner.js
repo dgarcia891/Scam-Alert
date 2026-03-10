@@ -10,7 +10,7 @@ import { showActivationPrompt } from './email/activation-prompt.js';
 import { showThreatDashboard } from './email/dashboard.js';
 import { setupEmailObserver } from './email/mutation-observer.js';
 import { highlightDetections } from './highlighter.js';
-import { extractEmailText, parseSenderInfo, extractEmailLinks } from '../lib/scanner/parser.js';
+import { extractEmailText, parseSenderInfo, extractEmailLinks, extractSubject } from '../lib/scanner/parser.js';
 import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
 
@@ -66,8 +66,13 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
         const senderInfo = parseSenderInfo();
         const linkData = extractEmailLinks();
+        const subject = extractSubject();
 
         console.log('[Hydra Guard] Intentional scan triggered...');
+        console.log('[Hydra Guard] Sender:', senderInfo.name, senderInfo.email);
+        console.log('[Hydra Guard] Subject:', subject);
+        console.log('[Hydra Guard] Links found:', linkData.rawUrls.length);
+        console.log('[Hydra Guard] Body length:', data.length);
 
         chrome.runtime.sendMessage({
             type: MessageTypes.SCAN_CURRENT_TAB,
@@ -78,6 +83,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                     isEmailView: true,
                     senderName: senderInfo.name,
                     senderEmail: senderInfo.email,
+                    subject: subject,
                     links: linkData.links,
                     rawUrls: linkData.rawUrls
                 }
