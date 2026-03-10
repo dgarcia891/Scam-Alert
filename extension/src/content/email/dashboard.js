@@ -10,6 +10,7 @@
 import { openReportWorkflow } from './report-modal.js';
 import { MessageTypes } from '../../lib/messaging.js';
 import { extractEmailData } from './extraction-logic.js';
+import { extractEmailText, parseSenderInfo, extractSubject } from '../../lib/scanner/parser.js';
 
 const DASHBOARD_ID = 'hydra-guard-threat-dashboard';
 const LOCATE_TOOLTIP_ID = 'hydra-guard-locate-tooltip';
@@ -415,7 +416,22 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             `;
             aiPrompt.style.cursor = 'default';
 
-            const emailData = extractEmailData();
+            // Use parser.js functions (proven in BUG-096) instead of extraction-logic.js
+            const senderInfo = parseSenderInfo();
+            const bodyText = extractEmailText();
+            const subject = extractSubject();
+            const emailData = {
+                senderName: senderInfo.name || '',
+                senderEmail: senderInfo.email || '',
+                subject: subject || '',
+                bodyText: bodyText || '',
+                isEmailView: true
+            };
+            console.log('[Hydra Guard] AI Opinion — extracted context:', {
+                sender: `${emailData.senderName} <${emailData.senderEmail}>`,
+                subject: emailData.subject,
+                bodyLength: emailData.bodyText.length
+            });
             chrome.runtime.sendMessage(
                 { type: MessageTypes.ASK_AI_OPINION, data: { url: window.location.href, emailContext: emailData } },
                 (response) => {
