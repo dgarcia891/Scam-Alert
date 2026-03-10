@@ -345,11 +345,24 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             if (cached.signals?.soft) signals.push(...cached.signals.soft);
             const emailIndicators = cached.checks?.emailScams?.visualIndicators || [];
             phrases.push(...emailIndicators.map(i => i.phrase).filter(Boolean));
+        }
 
-            // Build email context from cached metadata and checks
+        // Build email context: Prefer real-time context from message payload (manual 'Ask AI' click)
+        // extractEmailData from dashboard returns: { bodyText, senderName, senderEmail, subject, isEmailView }
+        if (msgData?.emailContext) {
+            const ec = msgData.emailContext;
+            emailContext = {
+                senderName: ec.senderName || '',
+                senderEmail: ec.senderEmail || '',
+                subject: ec.subject || '',
+                bodySnippet: typeof ec.bodyText === 'string' ? ec.bodyText.slice(0, 500) : '',
+                bodyLinks: [], // Background verifyWithAI will extract links from phrases if needed
+                isReply: false
+            };
+        } else if (cached) {
+            // Fallback for automated background scans or if payload is empty
             const meta = cached.metadata || {};
             const emailCheck = cached.checks?.emailScams || null;
-
             emailContext = extractEmailContext(url, meta, emailCheck);
         }
 

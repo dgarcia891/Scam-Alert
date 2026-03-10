@@ -100,10 +100,10 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         if (isAI) {
             const verdictLabel = f.verdict === 'DOWNGRADED' ? 'Likely Safe'
                 : f.verdict === 'ESCALATED' ? 'Dangerous'
-                : 'Suspicious';
+                    : 'Suspicious';
             const verdictColor = f.verdict === 'DOWNGRADED' ? '#34d399'
                 : f.verdict === 'ESCALATED' ? '#fb7185'
-                : '#fbbf24';
+                    : '#fbbf24';
             return `
                 <div class="sa-finding" style="cursor: pointer;" data-ai-card>
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
@@ -415,16 +415,17 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             `;
             aiPrompt.style.cursor = 'default';
 
+            const emailData = extractEmailData();
             chrome.runtime.sendMessage(
-                { type: MessageTypes.ASK_AI_OPINION, data: { url: window.location.href } },
+                { type: MessageTypes.ASK_AI_OPINION, data: { url: window.location.href, emailContext: emailData } },
                 (response) => {
                     if (response?.success) {
                         const verdictLabel = response.verdict === 'DOWNGRADED' ? 'Likely Safe'
                             : response.verdict === 'ESCALATED' ? 'Dangerous'
-                            : 'Suspicious';
+                                : 'Suspicious';
                         const verdictColor = response.verdict === 'DOWNGRADED' ? '#34d399'
                             : response.verdict === 'ESCALATED' ? '#fb7185'
-                            : '#fbbf24';
+                                : '#fbbf24';
                         aiPrompt.style.borderStyle = 'solid';
                         aiPrompt.innerHTML = `
                             <div style="font-weight: 800; margin-bottom: 6px;">AI SECOND OPINION</div>
