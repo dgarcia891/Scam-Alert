@@ -40,3 +40,15 @@ To scale without immense overhead:
 
 - **Async Defense**: Don't run AI on every visit. Only analyze sites that pass a specific "Suspicion Threshold" locally.
 - **Hybrid Storage**: Use the same Postgres instance for both standard relational data (Phase 2) and Vector data (Phase 3).
+
+## Phase 4: Deep Email Forensics (Raw Headers)
+
+**Goal**: Extract raw email headers (SPF, DKIM, SCL, routing) to give the AI Judge definitive proof of compromised accounts and bypassed spam filters.
+
+- **Mechanism 1 (Invisible Fetch)**:
+  - Extract the internal Gmail Message ID (`data-message-id` or URL `th=` parameter) from the DOM.
+  - Background script performs an authenticated `fetch()` directly to the Gmail "Show Original" endpoint (`view=om&th=...`).
+  - Parse the resulting HTML to extract the raw plaintext headers without opening any visible tabs.
+- **Mechanism 2 (DOM Simulation)**:
+  - If fetch fails due to cookie restrictions, surgically inject a hidden `iframe` pointed at the "Show Original" URL, extract the `<pre>` text, and destroy the iframe.
+- **Benefit**: Allows the AI to detect compromised `.edu` / trusted domains and see Microsoft/Google's initial spam confidence scores.

@@ -72,7 +72,12 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         }
 
         const { forceRefresh = false } = scanOptions;
-        let result = forceRefresh ? null : await getCachedScan(url);
+        
+        // BUG-107 Fix: Salvage AI verification from existing cache to survive forced rescans
+        let existingCache = null;
+        try { existingCache = await getCachedScan(url); } catch { /* ignore */ }
+
+        let result = forceRefresh ? null : existingCache;
 
         if (!result) {
             const onProgress = (progress) => {
@@ -108,6 +113,12 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             }
 
             result = await scanUrl(url, { ...settings, ...scanOptions, pageContent, isPro: isProUser, metadata }, onProgress);
+            
+            // BUG-107 Fix: Re-inject the salvaged AI verification back into the fresh scan result
+            if (existingCache?.aiVerification) {
+                result.aiVerification = existingCache.aiVerification;
+            }
+            
             await cacheScan(url, result);
         }
 
