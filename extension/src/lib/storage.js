@@ -65,7 +65,8 @@ export async function getSettings() {
         emailPromptDisabled: false,
         aiEnabled: true,
         aiApiKey: '',
-        aiDailyCeiling: 50
+        aiDailyCeiling: 50,
+        aiConsentGiven: false // FEAT-108: Explicit privacy opt-in
     };
 
     const merged = { ...defaults, ...(result[STORAGE_KEYS.SETTINGS] || {}) };

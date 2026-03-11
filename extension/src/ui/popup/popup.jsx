@@ -515,12 +515,16 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
 
 const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking, aiResult, setAiResult }) => {
     const [debugOpen, setDebugOpen] = useState(false);
+    const [showConsent, setShowConsent] = useState(false);
+    const [consentChecked, setConsentChecked] = useState(false);
 
-    const handleAskAI = useCallback(() => {
+    const executeAskAI = useCallback(() => {
         if (!currentUrl || aiAsking) return;
         setAiAsking(true);
         setAiResult(null);
         setDebugOpen(false);
+        setShowConsent(false);
+        
         chrome.runtime.sendMessage(
             { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl, tabId: currentTabId } },
             (response) => {
@@ -534,7 +538,64 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
         );
     }, [currentUrl, aiAsking, currentTabId]);
 
+    const handleAskAI = useCallback(() => {
+        if (settings?.aiConsentGiven) {
+            executeAskAI();
+        } else {
+            setShowConsent(true);
+        }
+    }, [settings?.aiConsentGiven, executeAskAI]);
+
+    const handleConsentProceed = useCallback(async () => {
+        if (consentChecked) {
+            // Save consent so they aren't asked again
+            const current = await chrome.storage.local.get('settings');
+            const newSettings = { ...(current.settings || {}), aiConsentGiven: true };
+            await chrome.storage.local.set({ settings: newSettings });
+        }
+        executeAskAI();
+    }, [consentChecked, executeAskAI]);
+
     if (!settings?.aiEnabled || !settings?.aiApiKey) return null;
+
+    if (showConsent) {
+        return (
+            <div className="mt-3 bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 text-xs font-medium">
+                <div className="flex items-center gap-2 mb-2 text-amber-400">
+                    <ShieldAlert size={14} />
+                    <span className="font-bold">Privacy Notice</span>
+                </div>
+                <p className="text-[10.5px] text-slate-300 leading-snug mb-3">
+                    Analyzing this email transmits the sender details, subject, and a 500-character body snippet directly to your configured AI provider. 
+                    <br/><br/>
+                    <strong className="text-white">No data is ever saved on Hydra Guard servers.</strong> Please do not use this on highly sensitive emails.
+                </p>
+                <label className="flex items-center gap-2 mb-3 cursor-pointer group">
+                    <input 
+                        type="checkbox" 
+                        checked={consentChecked}
+                        onChange={(e) => setConsentChecked(e.target.checked)}
+                        className="rounded border-slate-600 bg-slate-900/50 text-indigo-500 focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span className="text-[10px] text-slate-400 group-hover:text-slate-300 transition-colors">Don't ask me again</span>
+                </label>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setShowConsent(false)}
+                        className="flex-1 py-1.5 rounded-lg text-slate-400 border border-slate-700 hover:bg-slate-700/50 transition-colors cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={handleConsentProceed}
+                        className="flex-[2] py-1.5 rounded-lg text-white bg-indigo-600 hover:bg-indigo-500 transition-colors font-bold cursor-pointer"
+                    >
+                        Proceed & Analyze
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="mt-3 px-1">
