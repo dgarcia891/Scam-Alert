@@ -116,21 +116,28 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
         // NEW: Popup AI Context Fetcher
         if (type === 'GET_EMAIL_CONTEXT') {
-            const data = extractEmailText();
-            const senderInfo = parseSenderInfo();
-            const subject = extractSubject();
-            const linkData = extractEmailLinks();
+            try {
+                const data = extractEmailText() || '';
+                const senderInfo = parseSenderInfo() || { name: '', email: '' };
+                const subject = extractSubject() || '';
+                const linkData = extractEmailLinks() || { links: [] };
 
-            sendResponse({
-                success: true,
-                context: {
-                    sender: senderInfo.name ? `${senderInfo.name} <${senderInfo.email}>` : senderInfo.email,
-                    subject: subject,
-                    snippet: data ? data.substring(0, 500) : '',
-                    embeddedLinks: linkData.links.map(l => l.href)
-                }
-            });
-            return true; // Keep channel open for async response
+                const senderStr = senderInfo.name ? `${senderInfo.name} <${senderInfo.email}>` : senderInfo.email;
+
+                sendResponse({
+                    success: true,
+                    context: {
+                        sender: senderStr,
+                        subject: subject,
+                        snippet: data.substring(0, 500),
+                        embeddedLinks: linkData.links.map(l => l.href)
+                    }
+                });
+            } catch (error) {
+                console.error('[Hydra Guard] Error extracting email context:', error);
+                sendResponse({ success: false, error: error.message });
+            }
+            return false;
         }
 
         if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {

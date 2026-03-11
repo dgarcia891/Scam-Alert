@@ -376,11 +376,12 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             };
         } else {
             // NEW: Fetch from active tab for popup AI
+            let fetchError = null;
             try {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab && (tab.url.includes('mail.google.com') || tab.url.includes('outlook'))) {
-                    const timeoutResponse = new Promise(resolve => setTimeout(() => resolve(null), 1500));
-                    const fetchResponse = chrome.tabs.sendMessage(tab.id, { type: 'GET_EMAIL_CONTEXT' }).catch(() => null);
+                    const timeoutResponse = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'Content script timed out (1500ms).' }), 1500));
+                    const fetchResponse = chrome.tabs.sendMessage(tab.id, { type: 'GET_EMAIL_CONTEXT' }).catch((e) => ({ success: false, error: e.message || 'Content script unreachable.' }));
                     const response = await Promise.race([fetchResponse, timeoutResponse]);
 
                     if (response?.success && response.context) {
@@ -395,9 +396,13 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                             isReply: false
                         };
                         console.log('[Hydra Guard] Fetched live email context for popup AI:', emailContext);
+                    } else if (response?.error) {
+                        fetchError = response.error;
+                        console.warn('[Hydra Guard] Live email context fetch failed:', fetchError);
                     }
                 }
             } catch (e) {
+                fetchError = e.message;
                 console.warn('[Hydra Guard] Failed to fetch live email context for AI:', e);
             }
 
@@ -412,10 +417,15 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         // EMPTY CONTEXT GUARD: Prevent false positives on safe pages with no email context
         if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !emailContext) {
             console.log('[Hydra Guard] AI Context Guard triggered: Insufficient data for AI analysis.');
+            const errorReport = fetchError ? `\n\n[FETCH ERROR]: The extension tried to pull live data but failed: ${fetchError}` : '';
             const aiVerification = {
                 verdict: 'INCONCLUSIVE',
                 reason: 'Insufficient suspicious context or email data found to analyze.',
-                confidence: 50
+                confidence: 50,
+                _debug: {
+                    promptSent: `--- Context Guard Triggered ---\nI prevented sending an empty prompt to the AI to avoid a 'Looks safe' false positive.\n\nHere is the exact evidence the extension successfully extracted from this tab (Tab ID: ${msgData?.tabId}):\n\n1. Threat Signals: ${JSON.stringify(signals)}\n2. Found Phrases: ${JSON.stringify(phrases)}\n3. Intent Keywords: ${JSON.stringify(intentKeywords)}\n4. Email Context Data: ${JSON.stringify(emailContext)}${errorReport}\n\nIf everything above is empty, the webpage content was not successfully extracted or didn't contain anything readable. Refresh the page to trigger a new extraction.`,
+                    rawResponse: `No API call was made to Google Gemini. The extension blocked the request to save API costs and prevent false positives because there was zero data to analyze.`
+                }
             };
             if (cached && cacheScan) {
                 cached.aiVerification = aiVerification;
