@@ -522,7 +522,7 @@ const AskAIButton = ({ settings, currentUrl, aiAsking, setAiAsking, aiResult, se
         setAiResult(null);
         setDebugOpen(false);
         chrome.runtime.sendMessage(
-            { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl } },
+            { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl, tabId: currentTabId } },
             (response) => {
                 setAiAsking(false);
                 if (response?.success) {

@@ -51,7 +51,7 @@ export async function handleIncomingMessage(message, sender, context) {
         case MessageTypes.CLEAR_URL_CACHE:
             return handleClearUrlCache(msgData);
         case MessageTypes.ASK_AI_OPINION:
-            return handleAskAIOpinion(msgData, getSettings, getCachedScan, context.cacheScan);
+            return handleAskAIOpinion(msgData, getSettings, getCachedScan, context.cacheScan, tabStateManager);
         case MessageTypes.TEST_GSB_KEY:
             return handleTestGsbKey(msgData);
         case MessageTypes.TEST_AI_KEY:
@@ -316,7 +316,7 @@ async function handleTestPhishTankKey(msgData) {
 
 // ── AI Opinion Handler ─────────────────────────────────────────
 
-async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan) {
+async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan, tabStateManager) {
     try {
         const settings = await getSettings();
 
@@ -335,19 +335,31 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         }
 
         // Try to get cached scan results for richer context
-        const cached = await getCachedScan(url);
+        let cached = await getCachedScan(url);
         const signals = [];
         const phrases = [];
         const intentKeywords = [];
         let emailContext = null;
+
+        // NEW: Prioritize tabStateManager for live email scan results instead of URL cache
+        if (msgData?.tabId && tabStateManager) {
+            const tabState = tabStateManager.getTabState(msgData.tabId);
+            if (tabState && tabState.results) {
+                cached = tabState.results;
+                console.log('[Hydra Guard] AI Using live tab scan results instead of URL cache');
+            }
+        }
 
         if (cached) {
             if (cached.signals?.hard) signals.push(...cached.signals.hard);
             if (cached.signals?.soft) signals.push(...cached.signals.soft);
             const emailIndicators = cached.checks?.emailScams?.visualIndicators || [];
             phrases.push(...emailIndicators.map(i => i.phrase).filter(Boolean));
+            
             const detectedBrands = cached.checks?.emailScams?.evidence?.detectedBrands || [];
             intentKeywords.push(...detectedBrands);
+            const rawIntents = cached.checks?.emailScams?.evidence?.intentKeywords || [];
+            intentKeywords.push(...rawIntents);
         }
 
         // Build email context: Prefer real-time context from message payload (manual 'Ask AI' click)
@@ -395,6 +407,21 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                 const emailCheck = cached.checks?.emailScams || null;
                 emailContext = extractEmailContext(url, meta, emailCheck);
             }
+        }
+
+        // EMPTY CONTEXT GUARD: Prevent false positives on safe pages with no email context
+        if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !emailContext) {
+            console.log('[Hydra Guard] AI Context Guard triggered: Insufficient data for AI analysis.');
+            const aiVerification = {
+                verdict: 'INCONCLUSIVE',
+                reason: 'Insufficient suspicious context or email data found to analyze.',
+                confidence: 50
+            };
+            if (cached && cacheScan) {
+                cached.aiVerification = aiVerification;
+                await cacheScan(url, cached);
+            }
+            return { success: true, ...aiVerification };
         }
 
         const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext }, { apiKey: settings.aiApiKey });
