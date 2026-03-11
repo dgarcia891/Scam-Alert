@@ -338,6 +338,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         const cached = await getCachedScan(url);
         const signals = [];
         const phrases = [];
+        const intentKeywords = [];
         let emailContext = null;
 
         if (cached) {
@@ -345,6 +346,8 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             if (cached.signals?.soft) signals.push(...cached.signals.soft);
             const emailIndicators = cached.checks?.emailScams?.visualIndicators || [];
             phrases.push(...emailIndicators.map(i => i.phrase).filter(Boolean));
+            const detectedBrands = cached.checks?.emailScams?.evidence?.detectedBrands || [];
+            intentKeywords.push(...detectedBrands);
         }
 
         // Build email context: Prefer real-time context from message payload (manual 'Ask AI' click)
@@ -394,7 +397,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             }
         }
 
-        const result = await verifyWithAI(url, { signals, phrases, emailContext }, { apiKey: settings.aiApiKey });
+        const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext }, { apiKey: settings.aiApiKey });
 
         const aiVerification = {
             verdict: result.verdict,
