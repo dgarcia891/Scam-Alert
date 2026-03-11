@@ -513,7 +513,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     );
 };
 
-const AskAIButton = ({ settings, currentUrl, aiAsking, setAiAsking, aiResult, setAiResult }) => {
+const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking, aiResult, setAiResult }) => {
     const [debugOpen, setDebugOpen] = useState(false);
 
     const handleAskAI = useCallback(() => {
@@ -894,6 +894,7 @@ const Popup = () => {
                     <AskAIButton
                         settings={settings}
                         currentUrl={currentUrl}
+                        currentTabId={currentTabId}
                         aiAsking={aiAsking}
                         setAiAsking={setAiAsking}
                         aiResult={aiResult}
