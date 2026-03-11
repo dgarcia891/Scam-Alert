@@ -368,8 +368,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             handleExecuteScan(payload || data).then(sendResponse);
             return true;
         default:
-            sendResponse({ success: false, error: 'Unknown message type' });
-            break;
+            // Do NOT respond to unknown types — other content scripts
+            // (e.g. emailScanner.js) may handle them.
+            return false; // Signal no async response from this listener
     }
     return true;
 });
