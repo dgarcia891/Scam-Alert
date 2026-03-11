@@ -32,7 +32,6 @@ export async function onInstalled(details, scanActiveTabsCb) {
                 });
             }
             await syncManager.sync(true); // Force sync
-            if (scanActiveTabsCb) scanActiveTabsCb();
         }
 
         if (details.reason === 'install') {
@@ -48,7 +47,7 @@ export async function onInstalled(details, scanActiveTabsCb) {
         await clearCache();
         chrome.storage.local.remove('emailPromptSessionDismissed');
         await syncPatterns();
-        await scanActiveTabs();
+        if (scanActiveTabsCb) await scanActiveTabsCb();
     } catch (err) {
         console.error('[Hydra Guard] onInstalled error:', err);
     }
