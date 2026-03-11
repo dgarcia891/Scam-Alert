@@ -200,8 +200,14 @@ Required format:
     try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${options.apiKey}`;
 
+        let signal;
+        if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+            signal = AbortSignal.timeout(10000); // 10s timeout
+        }
+
         const response = await fetch(endpoint, {
             method: 'POST',
+            signal: signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],

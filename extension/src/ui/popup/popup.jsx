@@ -532,7 +532,7 @@ const AskAIButton = ({ settings, currentUrl, aiAsking, setAiAsking, aiResult, se
                 }
             }
         );
-    }, [currentUrl, aiAsking]);
+    }, [currentUrl, aiAsking, currentTabId]);
 
     if (!settings?.aiEnabled || !settings?.aiApiKey) return null;
 
