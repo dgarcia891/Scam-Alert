@@ -388,8 +388,8 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                         const ec = response.context;
                         // Map the new context format to what AI verifier expects
                         emailContext = {
-                            senderName: ec.sender || '',
-                            senderEmail: '', // packed into sender
+                            senderName: ec.senderName || '',
+                            senderEmail: ec.senderEmail || '',
                             subject: ec.subject || '',
                             bodySnippet: ec.snippet || '',
                             bodyLinks: ec.embeddedLinks || [],

@@ -122,12 +122,11 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                 const subject = extractSubject() || '';
                 const linkData = extractEmailLinks() || { links: [] };
 
-                const senderStr = senderInfo.name ? `${senderInfo.name} <${senderInfo.email}>` : senderInfo.email;
-
                 sendResponse({
                     success: true,
                     context: {
-                        sender: senderStr,
+                        senderName: senderInfo.name || '',
+                        senderEmail: senderInfo.email || '',
                         subject: subject,
                         snippet: data.substring(0, 500),
                         embeddedLinks: linkData.links.map(l => l.href)
