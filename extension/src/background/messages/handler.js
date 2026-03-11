@@ -344,8 +344,8 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         // NEW: Prioritize tabStateManager for live email scan results instead of URL cache
         if (msgData?.tabId && tabStateManager) {
             const tabState = tabStateManager.getTabState(msgData.tabId);
-            if (tabState && tabState.results) {
-                cached = tabState.results;
+            if (tabState && tabState.scanResults) {
+                cached = tabState.scanResults;
                 console.log('[Hydra Guard] AI Using live tab scan results instead of URL cache');
             }
         }
@@ -415,7 +415,8 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         }
 
         // EMPTY CONTEXT GUARD: Prevent false positives on safe pages with no email context
-        if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !emailContext) {
+        const hasUsefulEmail = emailContext && (emailContext.bodySnippet || emailContext.subject || emailContext.senderName || emailContext.senderEmail);
+        if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !hasUsefulEmail) {
             console.log('[Hydra Guard] AI Context Guard triggered: Insufficient data for AI analysis.');
             const errorReport = fetchError ? `\n\n[FETCH ERROR]: The extension tried to pull live data but failed: ${fetchError}` : '';
             const aiVerification = {

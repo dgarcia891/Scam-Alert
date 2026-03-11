@@ -137,7 +137,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                 console.error('[Hydra Guard] Error extracting email context:', error);
                 sendResponse({ success: false, error: error.message });
             }
-            return false;
+            return true; // Keep channel open for async response
         }
 
         if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
