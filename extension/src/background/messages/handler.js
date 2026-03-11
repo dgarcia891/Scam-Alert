@@ -362,6 +362,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             intentKeywords.push(...rawIntents);
         }
 
+        let fetchError = null;
         // Build email context: Prefer real-time context from message payload (manual 'Ask AI' click)
         // extractEmailData from dashboard returns: { bodyText, senderName, senderEmail, subject, isEmailView }
         if (msgData?.emailContext) {
@@ -376,7 +377,6 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             };
         } else {
             // NEW: Fetch from active tab for popup AI
-            let fetchError = null;
             try {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab && (tab.url.includes('mail.google.com') || tab.url.includes('outlook'))) {
