@@ -1,20 +1,23 @@
 ---
-name: plan
 description: Architectural blueprint with Impact Report. READ ONLY.
 ---
+// turbo
+
 1. Load Context
    node scripts/consult.cjs
-   // turbo
+
+// turbo
 
 2. Drift Check
    node scripts/drift_check.cjs
-   // turbo
+
+// turbo
 
 3. Blueprint Generation
    echo "📝 Drafting Implementation Plan..."
    echo "⚠️ CONSTRAINT: Output Markdown ONLY. Do not write files."
-   // turbo
+
+// turbo
 
 4. Stop
    echo "🛑 PLAN COMPLETE. Run /build to execute."
-   // turbo

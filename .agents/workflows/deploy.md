@@ -1,5 +1,4 @@
 ---
-name: deploy
 description: Release with Auto-Versioning (Global Rules §4.1)
 ---
 ## Steps

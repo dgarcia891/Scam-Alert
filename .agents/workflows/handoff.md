@@ -1,5 +1,4 @@
 ---
-name: handoff
 description: Session archive (Global Rules §6.2)
 ---
 ## Steps
