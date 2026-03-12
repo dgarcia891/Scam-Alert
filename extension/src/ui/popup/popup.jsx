@@ -754,8 +754,8 @@ function deriveStatusFromResults(res, scanInProgress) {
     if (scanInProgress) return 'loading';
     if (!res) return 'empty';
 
-    // FEAT-119: Override status if AI escalates
-    if (res.aiVerification && res.aiVerification.verdict === 'ESCALATED') {
+    // FEAT-119: Override status if AI escalated/confirmed a threat
+    if (res.aiVerification && ['ESCALATED', 'CONFIRMED'].includes(res.aiVerification.verdict)) {
         return 'danger';
     }
 
@@ -794,10 +794,13 @@ const Popup = () => {
 
     // FEAT-119: Sync localized AI verdict instantly back to main UI state so dynamic overrides apply
     useEffect(() => {
-        if (aiResult && scanResults && (!scanResults.aiVerification || scanResults.aiVerification.verdict !== aiResult.verdict)) {
-            const updatedResults = { ...scanResults, aiVerification: aiResult };
-            setScanResults(updatedResults);
-            setStatus(deriveStatusFromResults(updatedResults, false));
+        if (aiResult) {
+            const currentAiVerdict = scanResults?.aiVerification?.verdict;
+            if (currentAiVerdict !== aiResult.verdict) {
+                const updatedResults = scanResults ? { ...scanResults, aiVerification: aiResult } : { aiVerification: aiResult };
+                setScanResults(updatedResults);
+                setStatus(deriveStatusFromResults(updatedResults, false));
+            }
         }
     }, [aiResult, scanResults]);
 

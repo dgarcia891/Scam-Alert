@@ -499,8 +499,8 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
         };
 
         // FEAT-119: Telemetry & UI Badge propagation
-        if (aiVerification.verdict === 'ESCALATED') {
-            console.log('[Hydra Guard] AI Escalated threat. Enforcing UI sync & potentially sending telemetry.');
+        if (['ESCALATED', 'CONFIRMED'].includes(aiVerification.verdict)) {
+            console.log('[Hydra Guard] AI identified threat. Enforcing UI sync & potentially sending telemetry.');
             
             // 1. Force icon badge to RED instantly
             if (msgData?.tabId) {
