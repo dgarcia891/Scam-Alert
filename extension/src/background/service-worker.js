@@ -11,11 +11,11 @@
  * - Handles message routing
  */
 
-import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cacheScan, isWhitelisted, addToWhitelist, getWhitelist, clearCache, isPro, repairStatistics, normalizeUrl } from '../lib/storage.js';
+import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cacheScan, isWhitelisted, addToWhitelist, getWhitelist, clearCache, isPro, repairStatistics, normalizeUrl, cacheGlobalSafeList } from '../lib/storage.js';
 import { MessageTypes, createMessageHandler, sendMessageToTab, createMessage } from '../lib/messaging.js';
 import { scanUrl } from '../lib/detector.js';
 import { syncPatterns } from '../lib/database.js';
-import { submitReport, submitUserReport, submitFalsePositive } from '../lib/supabase.js';
+import { submitReport, submitUserReport, submitFalsePositive, fetchGlobalSafeList } from '../lib/supabase.js';
 import { syncManager } from './lib/sync-manager.js';
 
 // Decentralized Modules (v19.2)
@@ -43,9 +43,21 @@ if (typeof chrome.alarms !== 'undefined') {
     chrome.alarms.onAlarm.addListener(async (alarm) => {
         if (alarm.name === 'syncScamPatterns') await syncPatterns();
         if (alarm.name === 'syncBlocklist') await syncManager.sync();
+        if (alarm.name === 'syncGlobalSafeList') {
+            try {
+                const list = await fetchGlobalSafeList();
+                if (list.length > 0) {
+                    await cacheGlobalSafeList(list);
+                    console.log(`[Hydra Guard] Synced ${list.length} domains to Global Safe List`);
+                }
+            } catch (err) {
+                console.error('[Hydra Guard] Failed to sync Global Safe List:', err);
+            }
+        }
     });
     chrome.alarms.create('syncScamPatterns', { periodInMinutes: 24 * 60 });
     chrome.alarms.create('syncBlocklist', { periodInMinutes: 24 * 60 });
+    chrome.alarms.create('syncGlobalSafeList', { periodInMinutes: 12 * 60 }); // Sync every 12 hours
 }
 
 // ============================================================================
@@ -267,6 +279,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         submitReport,
         submitUserReport,
         submitFalsePositive,
+        submitSafeListAppeal,
         tabStateManager,
         cacheScan
     };

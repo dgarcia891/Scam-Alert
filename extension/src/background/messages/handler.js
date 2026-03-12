@@ -7,11 +7,16 @@ import { submitReport, submitUserReport, submitCorrection } from '../../lib/supa
 import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
 import { checkUrlsWithSafeBrowsing } from '../../lib/google-safe-browsing.js';
 
-export async function handleIncomingMessage(message, sender, context) {
-    const { type, data, payload } = message; // Support both for transition
-    const msgData = payload || data;
-    const { scanAndHandle, getStats, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, submitReport, submitUserReport, submitFalsePositive, tabStateManager } = context;
+export async function handleIncomingMessage(message, sender, context = {}) {
+    const { type, data } = message;
+    const { 
+        scanAndHandle, getStats, updateSettings, getCachedScan, 
+        isWhitelisted, addToWhitelist, getWhitelist, repairStatistics, 
+        submitReport, submitUserReport, submitFalsePositive, 
+        tabStateManager, cacheScan, submitSafeListAppeal
+    } = context;
 
+    const msgData = typeof message.data === 'string' ? JSON.parse(message.data) : message.data;
     switch (type) {
         case MessageTypes.GET_TAB_STATUS:
             return handleGetTabStatus(getCachedScan);
@@ -26,7 +31,7 @@ export async function handleIncomingMessage(message, sender, context) {
         case MessageTypes.UPDATE_SETTINGS:
             return handleUpdateSettings(data, updateSettings);
         case MessageTypes.ADD_TO_WHITELIST:
-            return handleAddToWhitelist(data, addToWhitelist);
+            return handleAddToWhitelist(data, addToWhitelist, submitSafeListAppeal);
         case MessageTypes.RESET_STATS:
             return handleResetStats(repairStatistics);
         case MessageTypes.REPORT_SCAM:
@@ -88,10 +93,29 @@ async function handleUpdateSettings(data, updateSettings) {
     return { success: true };
 }
 
-async function handleAddToWhitelist(data, addToWhitelist) {
+async function handleAddToWhitelist(data, addToWhitelist, submitSafeListAppeal) {
     let identity = data.domain.toLowerCase();
     if (!identity.includes('@')) identity = identity.replace(/^www\\./, '');
+    
+    // 1. Add to local whitelist for immediate effect
     await addToWhitelist(identity);
+    
+    // 2. Dispatch appeal to global safe list queue
+    if (submitSafeListAppeal) {
+        try {
+            const encoder = new TextEncoder();
+            const hashData = encoder.encode(identity);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', hashData);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const urlHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            // Fire and forget (don't block the UI)
+            submitSafeListAppeal(urlHash, data.domain).catch(e => console.warn('[Hydra Guard] Silent appeal failure:', e));
+        } catch (e) {
+            console.warn('[Hydra Guard] Failed to hash domain for appeal:', e);
+        }
+    }
+
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (activeTab) chrome.action.setBadgeText({ tabId: activeTab.id, text: '' });
     return { success: true };

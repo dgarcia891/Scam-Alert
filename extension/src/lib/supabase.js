@@ -166,6 +166,40 @@ export async function submitUserReport(url, type, description = '', metadata = {
     }
 }
 
+/**
+ * Fetch the AI-moderated Global Safe List.
+ * @returns {Promise<string[]>} Array of trusted domains
+ */
+export async function fetchGlobalSafeList() {
+    try {
+        const result = await postEdgeFunction('sa-get-safe-list', {});
+        return result.safe_list || [];
+    } catch (error) {
+        console.error('[Hydra Guard] Failed to fetch global safe list:', error);
+        return [];
+    }
+}
+
+/**
+ * Queue a user's "Mark as Safe" submission for AI review.
+ * @param {string} urlHash - Hashed URL
+ * @param {string} rawUrl - The actual URL to review
+ * @returns {Promise<Object>}
+ */
+export async function submitSafeListAppeal(urlHash, rawUrl) {
+    try {
+        const result = await postEdgeFunction('sa-submit-safe-appeal', {
+            url_hash: urlHash,
+            url: rawUrl,
+            extension_version: chrome.runtime.getManifest().version
+        });
+        return { success: true, appealId: result.id };
+    } catch (error) {
+        console.error('[Hydra Guard] Failed to submit safe list appeal:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // ----- Legacy compatibility shims -----
 // These map old function signatures to the new edge function calls.
 

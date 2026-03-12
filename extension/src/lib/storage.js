@@ -16,7 +16,8 @@ const STORAGE_KEYS = {
     LICENSE_KEY: 'license_key',
     PLAN_TYPE: 'plan_type',
     REMOTE_PATTERNS: 'remoteScamPatterns',
-    LAST_SYNC: 'lastPatternSync'
+    LAST_SYNC: 'lastPatternSync',
+    GLOBAL_SAFE_LIST: 'globalSafeList'
 };
 
 /**
@@ -281,6 +282,26 @@ export async function addToWhitelist(domain) {
 }
 
 /**
+ * Get the AI-moderated global safe list
+ * @returns {Promise<Array>} Trusted domains
+ */
+export async function getGlobalSafeList() {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.GLOBAL_SAFE_LIST);
+    return result[STORAGE_KEYS.GLOBAL_SAFE_LIST] || [];
+}
+
+/**
+ * Cache the global safe list from the backend
+ * @param {Array} list - Array of trusted domains
+ * @returns {Promise<void>}
+ */
+export async function cacheGlobalSafeList(list) {
+    if (Array.isArray(list)) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.GLOBAL_SAFE_LIST]: list });
+    }
+}
+
+/**
  * Remove domain from whitelist
  * @param {string} domain - Domain to remove
  * @returns {Promise<void>}
@@ -292,7 +313,7 @@ export async function removeFromWhitelist(domain) {
 }
 
 /**
- * Check if domain is whitelisted
+ * Check if domain is whitelisted (Local + Global)
  * @param {string} url - URL to check
  * @returns {Promise<boolean>} True if whitelisted
  */
@@ -300,12 +321,14 @@ export async function isWhitelisted(urlOrEmail) {
     if (!urlOrEmail) return false;
 
     try {
-        const whitelist = await getWhitelist();
+        const localWhitelist = await getWhitelist();
+        const globalSafeList = await getGlobalSafeList();
+        const combinedSafeList = [...localWhitelist, ...globalSafeList];
 
         // Handle Email Addresses or raw domains directly
         if (!urlOrEmail.includes('://')) {
             const identity = urlOrEmail.toLowerCase().trim();
-            return whitelist.some(whitelisted =>
+            return combinedSafeList.some(whitelisted =>
                 identity === whitelisted || identity.endsWith(`@${whitelisted}`)
             );
         }
@@ -314,7 +337,7 @@ export async function isWhitelisted(urlOrEmail) {
         const urlObj = new URL(urlOrEmail);
         const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
 
-        return whitelist.some(whitelisted =>
+        return combinedSafeList.some(whitelisted =>
             domain === whitelisted || domain.endsWith(`.${whitelisted}`)
         );
     } catch (e) {
