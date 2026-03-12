@@ -506,6 +506,9 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             if (msgData?.tabId) {
                 chrome.action.setBadgeText({ text: '!', tabId: msgData.tabId }).catch(() => {});
                 chrome.action.setBadgeBackgroundColor({ color: '#f43f5e', tabId: msgData.tabId }).catch(() => {});
+                import('../lib/icon-manager.js').then(module => {
+                    module.setActionIconForTab(msgData.tabId, 'CRITICAL');
+                }).catch(err => console.warn('[Hydra Guard] Failed to update action icon:', err));
             }
 
             // 2. Dispatch telemetry (reportThreatIndicators checks user opt-in internally)

@@ -17,7 +17,7 @@ const scrollbarStyles = `
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
 `;
 
-const getStatusConfig = (status) => {
+const getStatusConfig = (status, contextType = 'WEB') => {
     const configs = {
         secure: {
             tone: "safe", dot: "bg-emerald-400", ring: "ring-emerald-400/30",
@@ -35,7 +35,7 @@ const getStatusConfig = (status) => {
         },
         danger: {
             tone: "danger", dot: "bg-rose-500", ring: "ring-rose-500/30",
-            title: "High Risk", subtitle: "Go back \u2014 don't enter information here.",
+            title: "High Risk", subtitle: contextType === 'EMAIL' ? "Do not click any links or reply to this email." : "Go back \u2014 don't enter information here.",
             cardBg: "bg-slate-900/40", cardBorder: "border-rose-900/20",
             titleColor: "text-rose-50", subColor: "text-rose-200/70",
             accent: "bg-rose-500", icon: ShieldAlert
@@ -946,7 +946,8 @@ const Popup = () => {
 
 
 
-    const config = getStatusConfig(status);
+    const isEmail = currentUrl.includes('mail.google.com') || currentUrl.includes('outlook.') || currentUrl.includes('mail.yahoo.com');
+    const config = getStatusConfig(status, isEmail ? 'EMAIL' : 'WEB');
 
     return (
         <div className={cn(

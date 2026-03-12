@@ -19,27 +19,28 @@ export async function reportThreatIndicators(indicators, contextType = 'WEB') {
 
         console.log('[Telemetry] Reporting threat indicators to community DB...', indicators);
 
-        // Stub for the future Supabase Edge Function 'sa-report-telemetry'
-        // We catch errors gracefully so it never breaks the user experience if the endpoint is down.
-        const endpoint = 'https://your-supabase-project.supabase.co/functions/v1/sa-report-telemetry';
-        
-        // This is a fire-and-forget telemetry ping. 
-        // We don't await the response to avoid blocking background processes.
-        fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Dummy auth for the stub
-                'Authorization': `Bearer ${settings?.gsbApiKey || 'anonymous'}`
-            },
-            body: JSON.stringify({
-                source: 'extension_ai',
-                contextType,
-                indicators,
-                timestamp: new Date().toISOString()
-            })
+        // Fetch current tab URL to report
+        let currentUrl = 'unknown';
+        try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs.length > 0 && tabs[0].url) {
+                currentUrl = tabs[0].url;
+            }
+        } catch (e) {
+            console.warn('[Telemetry] Could not fetch current tab URL:', e);
+        }
+
+        import('./supabase.js').then(supabase => {
+            supabase.submitUserReport(
+                currentUrl,
+                'suspicious',
+                `AI Extracted Indicators (${contextType})`,
+                { indicators, severity: 'HIGH' }
+            ).catch(err => {
+                console.warn('[Telemetry] Telemetry submission failed:', err);
+            });
         }).catch(err => {
-            console.warn('[Telemetry] Telemetry ping failed (expected if endpoint is stubbed):', err.message);
+            console.warn('[Telemetry] Failed to load supabase module:', err);
         });
 
         return { success: true };
