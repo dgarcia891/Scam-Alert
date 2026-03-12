@@ -259,7 +259,10 @@ export function createOverlay(result) {
         <div id="pnl-details" class="details"><ul>${findings}</ul></div>
         <div style="display:flex; flex-direction:column; gap:1rem; margin-top:2rem;">
             <button class="primary" id="btn-back">Go back to safety</button>
-            <button style="background:none; border:none; color:#9ca3af; text-decoration:underline; cursor:pointer;" id="btn-proceed">I understand the risks, proceed anyway</button>
+            <div style="display:flex; justify-content:center; gap:1.5rem;">
+                <button style="background:none; border:none; color:#9ca3af; text-decoration:underline; cursor:pointer;" id="btn-proceed">I understand the risks, proceed anyway</button>
+                <button style="background:none; border:none; color:#9ca3af; text-decoration:underline; cursor:pointer;" id="btn-whitelist">Trust this site (Mark as safe)</button>
+            </div>
         </div>
     `;
     shadow.appendChild(wrapper);
@@ -282,6 +285,21 @@ export function createOverlay(result) {
         }, 500);
     };
     shadow.getElementById('btn-proceed').onclick = () => {
+        container.remove();
+        warningAcknowledged = true;
+        try {
+            window.sessionStorage.setItem('hydra_guard_suppressed', 'true');
+        } catch (e) {
+            // Ignore Storage access errors
+        }
+        _applyHighlightsIfEnabled(result);
+    };
+    shadow.getElementById('btn-whitelist').onclick = () => {
+        const domain = window.location.hostname;
+        chrome.runtime.sendMessage({ 
+            type: MessageTypes.ADD_TO_WHITELIST, 
+            data: { domain } 
+        });
         container.remove();
         warningAcknowledged = true;
         try {

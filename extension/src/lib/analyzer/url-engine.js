@@ -36,7 +36,7 @@ export function isLegitimateUrl(hostname, brand) {
     const legitimateDomains = {
         'paypal': ['paypal.com', 'paypal-business.com'],
         'amazon': ['amazon.com', 'amazon.co.uk', 'amazonwebservices.com'],
-        'google': ['google.com', 'gmail.com', 'youtube.com', '.google'],
+        'google': ['google.com', 'gmail.com', 'youtube.com', 'google.dev', '.google'],
         'microsoft': ['microsoft.com', 'live.com', 'outlook.com'],
         'apple': ['apple.com', 'icloud.com'],
     };
