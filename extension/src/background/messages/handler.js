@@ -401,17 +401,42 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                 isReply: false
             };
         } else {
-            // NEW: Fetch from active tab for popup AI
+            // Fetch live email context from the active tab for popup AI
             try {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab && (tab.url.includes('mail.google.com') || tab.url.includes('outlook'))) {
-                    const timeoutResponse = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'Content script timed out (1500ms).' }), 1500));
-                    const fetchResponse = chrome.tabs.sendMessage(tab.id, { type: 'GET_EMAIL_CONTEXT' }).catch((e) => ({ success: false, error: e.message || 'Content script unreachable.' }));
-                    const response = await Promise.race([fetchResponse, timeoutResponse]);
+                    // Helper: attempt to fetch email context from the content script
+                    const attemptFetch = () => {
+                        const timeoutResponse = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'Content script timed out (1500ms).' }), 1500));
+                        const fetchResponse = chrome.tabs.sendMessage(tab.id, { type: 'GET_EMAIL_CONTEXT' }).catch((e) => ({ success: false, error: e.message || 'Content script unreachable.' }));
+                        return Promise.race([fetchResponse, timeoutResponse]);
+                    };
+
+                    let response = await attemptFetch();
+
+                    // BUG-118: If the content script is not reachable (common in Gmail SPA
+                    // navigation or after a service worker restart), programmatically re-inject
+                    // the email scanner and retry once.
+                    if (!response?.success && response?.error?.includes('Receiving end does not exist')) {
+                        console.log('[Hydra Guard] Content script unreachable — re-injecting email scanner...');
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId: tab.id },
+                                files: ['dist/assets/emailScanner.js']
+                            });
+                            // Give the freshly injected script a moment to initialize
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            response = await attemptFetch();
+                            if (response?.success) {
+                                console.log('[Hydra Guard] Re-injection succeeded — email context fetched.');
+                            }
+                        } catch (injectErr) {
+                            console.warn('[Hydra Guard] Programmatic injection failed:', injectErr.message);
+                        }
+                    }
 
                     if (response?.success && response.context) {
                         const ec = response.context;
-                        // Map the new context format to what AI verifier expects
                         emailContext = {
                             senderName: ec.senderName || '',
                             senderEmail: ec.senderEmail || '',
