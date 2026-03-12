@@ -46,6 +46,13 @@ const getStatusConfig = (status) => {
             cardBg: "bg-slate-900/40", cardBorder: "border-slate-800",
             titleColor: "text-slate-50", subColor: "text-slate-300",
             accent: "bg-violet-400", icon: Loader2
+        },
+        empty: {
+            tone: "neutral", dot: "bg-slate-500", ring: "ring-slate-500/30",
+            title: "No Data Found", subtitle: "Analysis has not run for this page yet.",
+            cardBg: "bg-slate-900/40", cardBorder: "border-slate-800",
+            titleColor: "text-slate-400", subColor: "text-slate-500",
+            accent: "bg-slate-600", icon: Info
         }
     };
     return configs[status] || configs.loading;
@@ -65,8 +72,11 @@ const SeverityPill = ({ severity }) => {
     };
     return (
         <span 
-            className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border inline-block cursor-help", map[severity] || (severity ? map.SAFE : "bg-slate-500/20 text-slate-400 border-slate-500/30"))}
-            title={severity ? `Current risk assessment: ${severity}` : "No complete scan data available yet."}
+            className={cn(
+                "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border inline-block cursor-help align-middle", 
+                map[severity] || (severity ? map.SAFE : "bg-slate-500/10 text-slate-500 border-slate-700/50")
+            )}
+            title={severity ? `Current Risk Level: ${severity}` : "Scanning Required: No analysis results were found for this URL. High-risk indicators will appear here after a scan."}
         >
             {severity || 'NO SCAN'}
         </span>
@@ -721,7 +731,7 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
 // ═══════════════════════════════════════════════════════════════
 function deriveStatusFromResults(res, scanInProgress) {
     if (scanInProgress) return 'loading';
-    if (!res) return 'secure'; // Or 'loading' if we want to be even stricter
+    if (!res) return 'empty';
 
     if (res.whitelisted) return 'secure';
 
@@ -804,8 +814,9 @@ const Popup = () => {
                         setStatus(newStatus);
                         if (res?.whitelisted) setIsWhitelisted(true);
                     } else {
-                        // Truly no results and not scanning
-                        setStatus('secure');
+                        // Truly no results and not scanning -> show empty and trigger auto-scan
+                        setStatus('empty');
+                        handleForceRescan();
                     }
                 });
             });
