@@ -64,8 +64,11 @@ const SeverityPill = ({ severity }) => {
         SAFE: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
     };
     return (
-        <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border inline-block", map[severity] || (severity ? map.SAFE : "bg-slate-500/20 text-slate-400 border-slate-500/30"))}>
-            {severity || 'PENDING'}
+        <span 
+            className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border inline-block cursor-help", map[severity] || (severity ? map.SAFE : "bg-slate-500/20 text-slate-400 border-slate-500/30"))}
+            title={severity ? `Current risk assessment: ${severity}` : "No complete scan data available yet."}
+        >
+            {severity || 'NO SCAN'}
         </span>
     );
 };
@@ -78,20 +81,20 @@ const StatusIcon = ({ status }) => {
     return <span className="text-slate-600 text-[10px]">—</span>;
 };
 
-const StageHeader = ({ icon: Icon, title, status, timing, children, defaultOpen = false }) => {
+const StageHeader = ({ icon: Icon, title, status, timing, children, defaultOpen = false, description = "" }) => {
     const [open, setOpen] = useState(defaultOpen);
     const statusColor = {
         pass: "text-emerald-400", flag: "text-rose-400", skip: "text-slate-500",
         error: "text-orange-400", clean: "text-emerald-400"
     };
     return (
-        <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg overflow-hidden">
+        <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg overflow-hidden" title={description}>
             <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-2.5 py-2 hover:bg-slate-800/50 transition-colors">
                 <ChevronDown size={10} className={cn("text-slate-500 transition-transform shrink-0", !open && "-rotate-90")} />
                 {Icon && <Icon size={12} className="text-slate-500 shrink-0" />}
                 <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex-1 text-left">{title}</span>
                 {status && <span className={cn("text-[9px] font-bold uppercase", statusColor[status] || "text-slate-500")}>{status}</span>}
-                {timing != null && <span className="text-[9px] text-slate-600 font-mono">{timing}ms</span>}
+                {timing != null && <span className="text-[9px] text-slate-600 font-mono" title="Execution time">{timing}ms</span>}
             </button>
             {open && <div className="px-2.5 pb-2.5 space-y-1">{children}</div>}
         </div>
@@ -215,30 +218,30 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             </div>
 
             {/* ── A2. PIPELINE SUMMARY ──────────────────────────────────────────── */}
-            <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg px-2.5 py-2">
+            <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg px-2.5 py-2 cursor-help" title="High-level overview of the security checks executed on this page.">
                 <div className="flex items-center gap-1.5 mb-1.5">
                     <Activity size={10} className="text-violet-400 shrink-0" />
                     <span className="text-[9px] font-bold text-violet-300 uppercase tracking-wider">Pipeline Overview</span>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-[10px] text-slate-300">
+                    <span className="text-[10px] text-slate-300" title="Total number of individual checks run against this page.">
                         <span className="font-bold text-white">{totalChecks}</span> checks run
                     </span>
                     {totalFlagged > 0 && (
-                        <span className="text-[10px] text-rose-400">
+                        <span className="text-[10px] text-rose-400" title="Checks that found malicious or highly suspicious indicators.">
                             <span className="font-bold">{totalFlagged}</span> flagged
                         </span>
                     )}
-                    <span className="text-[10px] text-emerald-400/70">
+                    <span className="text-[10px] text-emerald-400/70" title="Checks that reported no issues.">
                         <span className="font-bold">{totalPassed}</span> passed
                     </span>
                     {totalSkipped > 0 && (
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-[10px] text-slate-500" title="Checks skipped (e.g., Pro features unavailable on free tier).">
                             <span className="font-bold">{totalSkipped}</span> skipped
                         </span>
                     )}
                     <span className="text-slate-700">|</span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-slate-400" title="Number of underlying analysis engines currently active.">
                         <span className="font-bold text-slate-300">{activeStages}</span>/{stageCount} stages
                     </span>
                 </div>
@@ -246,7 +249,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
 
             {/* ── B. URL & CONTEXT ──────────────────────────────────────────── */}
             <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg px-2.5 py-2 space-y-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" title="The communication protocol of the current page. HTTPS is secure; HTTP is not.">
                     {protocol === 'HTTPS' ? (
                         <Lock size={10} className="text-emerald-400 shrink-0" />
                     ) : (
@@ -281,6 +284,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 status={scanResults?.overallSeverity === 'CRITICAL' && signals.hard?.some(s => (typeof s === 'string' ? s : s.code) === 'USER_BLOCK') ? 'flag' : 'pass'}
                 timing={timing.blocklist}
                 defaultOpen={timing.blocklist != null}
+                description="Checks if this domain has been manually added to your personal blocklist."
             >
                 <div className="text-[10px] text-slate-400">
                     {signals.hard?.some(s => (typeof s === 'string' ? s : s.code) === 'USER_BLOCK')
@@ -297,6 +301,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 status={flaggedChecks.length > 0 ? 'flag' : 'pass'}
                 timing={timing.patterns}
                 defaultOpen={checkEntries.length > 0}
+                description="Scans the page structure, content, and headers against known scam heuristics."
             >
                 <div className="space-y-0.5">
                     {/* Flagged checks first */}
@@ -342,7 +347,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 const gsbCheck = checks.googleSafeBrowsing;
                 const gsbStatus = !gsb ? 'skip' : gsb.status === 'success' ? (gsbCheck?.flagged ? 'flag' : 'pass') : gsb.status === 'failed' ? 'error' : 'skip';
                 return (
-                    <StageHeader icon={Globe} title="3. Google Safe Browsing" status={gsbStatus} timing={timing.gsb} defaultOpen={gsb?.status === 'success' || gsbCheck?.flagged}>
+                    <StageHeader icon={Globe} title="3. Google Safe Browsing" status={gsbStatus} timing={timing.gsb} defaultOpen={gsb?.status === 'success' || gsbCheck?.flagged} description="Checks the URL against Google's constantly updated list of unsafe web resources.">
                         {!gsb ? (
                             <div className="text-[10px] text-slate-600 italic">Not in scan data</div>
                         ) : gsb.status === 'skipped' ? (
@@ -366,7 +371,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                 const aiSkippedReason = !settings?.aiEnabled ? 'not enabled' : !settings?.aiApiKey ? 'no API key' : 'severity too low';
                 const aiStatus = hasAI ? (aiVerification.verdict === 'ESCALATED' ? 'flag' : aiVerification.verdict === 'DOWNGRADED' ? 'pass' : 'pass') : 'skip';
                 return (
-                    <StageHeader icon={Cpu} title="5. AI Second Opinion" status={aiStatus} timing={timing.ai} defaultOpen={hasAI}>
+                    <StageHeader icon={Cpu} title="5. AI Second Opinion" status={aiStatus} timing={timing.ai} defaultOpen={hasAI} description="Sends the page context to a Large Language Model for deep semantic analysis.">
                         {!hasAI ? (
                             <div className="text-[10px] text-slate-500">Skipped — {aiSkippedReason}</div>
                         ) : (
@@ -393,12 +398,12 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             })()}
 
             {/* ── D. SEVERITY TRACE ──────────────────────────────────────────── */}
-            <div className="flex items-center gap-1.5 px-1 pt-1">
+            <div className="flex items-center gap-1.5 px-1 pt-1" title="The logical breakdown of how the final severity rating was calculated.">
                 <Zap size={10} className="text-slate-500" />
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Analysis</span>
                 <div className="flex-1 h-px bg-slate-800" />
             </div>
-            <StageHeader icon={Zap} title="Severity Trace" defaultOpen={signals.hard?.length > 0 || signals.soft?.length > 0}>
+            <StageHeader icon={Zap} title="Severity Trace" defaultOpen={signals.hard?.length > 0 || signals.soft?.length > 0} description="Detailed log of the scoring rules evaluated to determine the final UI state.">
                 <div className="space-y-1.5 text-[10px]">
                     {/* Signals collected */}
                     <div>
@@ -616,11 +621,12 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                 <button
                     onClick={handleAskAI}
                     disabled={aiAsking}
+                    title="Sends page content and metadata to your configured AI for an advanced, context-aware security check."
                     className={cn(
                         "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all border",
                         aiAsking
                             ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 cursor-wait"
-                            : "bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/30"
+                            : "bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/30 cursor-pointer"
                     )}
                 >
                     {aiAsking ? (
@@ -901,7 +907,7 @@ const Popup = () => {
 
             {/* ── HEADER ────────────────────────────────────────────────────────────────────── */}
             <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" title="Hydra Guard active security scan">
                     <div className={cn("w-2 h-2 rounded-full", config.dot)} />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Security Check</span>
                 </div>
@@ -909,18 +915,18 @@ const Popup = () => {
                     <button
                         onClick={toggleDevMode}
                         className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest transition-all border",
+                            "flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest transition-all border cursor-pointer",
                             devMode
                                 ? "bg-violet-500/20 text-violet-400 border-violet-500/30"
                                 : "bg-slate-800/60 text-slate-600 border-slate-700/50 hover:text-slate-400"
                         )}
-                        title="Toggle Developer Mode"
+                        title="Toggle Developer Mode: View detailed scan logs and raw data"
                     >
                         <Bug size={10} />
                         DEV
                     </button>
                     {isPro && (
-                        <span className="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-slate-700">PRO</span>
+                        <span className="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-slate-700 cursor-help" title="Active Pro Subscription">PRO</span>
                     )}
                 </div>
             </div>
@@ -934,10 +940,13 @@ const Popup = () => {
             )}
 
             {/* ── MAIN STATUS CARD ─────────────────────────────────────────────────────────────── */}
-            <div className={cn(
-                "relative rounded-2xl border p-5 overflow-hidden transition-all duration-300",
-                config.cardBg, config.cardBorder
-            )}>
+            <div 
+                className={cn(
+                    "relative rounded-2xl border p-5 overflow-hidden transition-all duration-300 cursor-default",
+                    config.cardBg, config.cardBorder
+                )}
+                title={`Hydra Guard Conclusion: ${config.title}. ${config.subtitle}`}
+            >
                 <div className={cn("absolute left-0 top-0 h-full w-1.5", config.accent)} />
                 <div className="flex flex-col gap-1">
                     <h1 className={cn("text-xl font-bold tracking-tight", config.titleColor)}>
@@ -947,7 +956,7 @@ const Popup = () => {
                         {config.subtitle}
                     </p>
                     {!devMode && status === 'secure' && currentUrl && (
-                        <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex items-center gap-1 mt-0.5" title="The specific checks that passed to earn this rating.">
                             <span className="text-[10px] font-medium text-slate-400">
                                 Checked: URL + connection security
                                 {scanResults?.meta?.sources?.some(s => s.id === 'gsb' && s.status === 'success') && ' + reputation'}
