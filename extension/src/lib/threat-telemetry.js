@@ -33,7 +33,7 @@ export async function reportThreatIndicators(indicators, contextType = 'WEB') {
         import('./supabase.js').then(supabase => {
             supabase.submitUserReport(
                 currentUrl,
-                'suspicious',
+                'telemetry',
                 `AI Extracted Indicators (${contextType})`,
                 { indicators, severity: 'HIGH' }
             ).catch(err => {
