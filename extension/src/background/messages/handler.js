@@ -10,7 +10,7 @@ import { checkUrlsWithSafeBrowsing } from '../../lib/google-safe-browsing.js';
 export async function handleIncomingMessage(message, sender, context = {}) {
     const { type, data } = message;
     const { 
-        scanAndHandle, getStats, updateSettings, getCachedScan, 
+        scanAndHandle, getStats, updateSettings, getCachedScan, getSettings,
         isWhitelisted, addToWhitelist, getWhitelist, repairStatistics, 
         submitReport, submitUserReport, submitFalsePositive, 
         tabStateManager, cacheScan, submitSafeListAppeal
@@ -460,7 +460,10 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             return { success: true, ...aiVerification };
         }
 
-        const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext }, { apiKey: settings.aiApiKey });
+        const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || (cached && cached.checks && !!cached.checks.emailScams);
+        const contextType = isEmailContext ? 'EMAIL' : 'WEB';
+
+        const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext, contextType }, { apiKey: settings.aiApiKey });
 
         const aiVerification = {
             verdict: result.verdict,

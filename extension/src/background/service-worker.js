@@ -269,6 +269,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const context = {
         scanAndHandle,
+        getSettings,
         getStats,
         updateSettings,
         getCachedScan,
