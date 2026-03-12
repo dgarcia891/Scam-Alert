@@ -535,7 +535,13 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
         chrome.runtime.sendMessage(
             { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl, tabId: currentTabId } },
             (response) => {
+                const lastError = chrome.runtime.lastError;
                 setAiAsking(false);
+                if (lastError) {
+                    console.warn('[Hydra Guard] AI opinion port error:', lastError.message);
+                    setAiResult({ verdict: 'ERROR', reason: 'Could not reach AI background service.' });
+                    return;
+                }
                 if (response?.success) {
                     setAiResult(response);
                 } else {

@@ -284,7 +284,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         tabStateManager,
         cacheScan
     };
-    handleIncomingMessage(message, sender, context).then(sendResponse);
+    handleIncomingMessage(message, sender, context)
+        .then(sendResponse)
+        .catch(err => {
+            console.error('[Hydra Guard] Fatal message error:', err);
+            sendResponse({ success: false, error: err.message || 'Internal extension error' });
+        });
     return true; // Keep channel open for async
 });
 
