@@ -155,7 +155,8 @@ async function handleGetScanResults(msgData, tabStateManager, getCachedScan) {
     return {
         results: results,
         url: state?.url || null,
-        context: state?.context || null
+        context: state?.context || null,
+        scanInProgress: !!state?.scanInProgress
     };
 }
 

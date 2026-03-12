@@ -39,9 +39,16 @@ const getStatusConfig = (status) => {
             cardBg: "bg-slate-900/40", cardBorder: "border-rose-900/20",
             titleColor: "text-rose-50", subColor: "text-rose-200/70",
             accent: "bg-rose-500", icon: ShieldAlert
+        },
+        loading: {
+            tone: "caution", dot: "bg-violet-400", ring: "ring-violet-400/30",
+            title: "Analyzing Safety...", subtitle: "Verifying page security signals.",
+            cardBg: "bg-slate-900/40", cardBorder: "border-slate-800",
+            titleColor: "text-slate-50", subColor: "text-slate-300",
+            accent: "bg-violet-400", icon: Loader2
         }
     };
-    return configs[status] || configs.secure;
+    return configs[status] || configs.loading;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -57,8 +64,8 @@ const SeverityPill = ({ severity }) => {
         SAFE: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
     };
     return (
-        <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border inline-block", map[severity] || map.SAFE)}>
-            {severity || 'SAFE'}
+        <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border inline-block", map[severity] || (severity ? map.SAFE : "bg-slate-500/20 text-slate-400 border-slate-500/30"))}>
+            {severity || 'PENDING'}
         </span>
     );
 };
@@ -698,9 +705,24 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
 // ═══════════════════════════════════════════════════════════════
 // MAIN POPUP COMPONENT
 // ═══════════════════════════════════════════════════════════════
+// HELPER: Derive UI status from scan results
+// ═══════════════════════════════════════════════════════════════
+function deriveStatusFromResults(res, scanInProgress) {
+    if (scanInProgress) return 'loading';
+    if (!res) return 'secure'; // Or 'loading' if we want to be even stricter
 
+    if (res.whitelisted) return 'secure';
+
+    const severity = res.overallSeverity || res.severity;
+    if (['CRITICAL', 'HIGH'].includes(severity)) return 'danger';
+    if (['MEDIUM'].includes(severity)) return 'caution';
+
+    return 'secure';
+}
+
+// ═══════════════════════════════════════════════════════════════
 const Popup = () => {
-    const [status, setStatus] = useState('secure');
+    const [status, setStatus] = useState('loading');
     const [stats, setStats] = useState({ totalScans: 0, threatsBlocked: 0 });
     const [scanResults, setScanResults] = useState(null);
     const [isWhitelisted, setIsWhitelisted] = useState(false);
@@ -761,13 +783,17 @@ const Popup = () => {
 
                 chrome.runtime.sendMessage({ type: MessageTypes.GET_SCAN_RESULTS, data: { tabId: tab.id } }, (response) => {
                     const data = response?.data;
-                    if (data?.results) {
-                        const res = data.results;
+                    const res = data?.results;
+                    const scanInProgress = data?.scanInProgress;
+
+                    if (res || scanInProgress) {
                         setScanResults(res);
-                        if (res.whitelisted) { setIsWhitelisted(true); setStatus('secure'); }
-                        else if (['CRITICAL', 'HIGH'].includes(res.overallSeverity)) setStatus('danger');
-                        else if (['MEDIUM'].includes(res.overallSeverity)) setStatus('caution');
-                        else setStatus('secure');
+                        const newStatus = deriveStatusFromResults(res, scanInProgress);
+                        setStatus(newStatus);
+                        if (res?.whitelisted) setIsWhitelisted(true);
+                    } else {
+                        // Truly no results and not scanning
+                        setStatus('secure');
                     }
                 });
             });
@@ -781,10 +807,9 @@ const Popup = () => {
             if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
                 const res = message.data.result;
                 setScanResults(res);
-                if (res.whitelisted) { setIsWhitelisted(true); setStatus('secure'); }
-                else if (['CRITICAL', 'HIGH'].includes(res.overallSeverity)) setStatus('danger');
-                else if (['MEDIUM'].includes(res.overallSeverity)) setStatus('caution');
-                else setStatus('secure');
+                const newStatus = deriveStatusFromResults(res, false);
+                setStatus(newStatus);
+                if (res.whitelisted) setIsWhitelisted(true);
             }
         };
         chrome.runtime.onMessage.addListener(handleScanUpdate);
