@@ -188,12 +188,26 @@ function showReportModal() {
         btn.textContent = 'Submitting...';
         btn.disabled = true;
 
+        const liveContext = detectContext();
+        const liveMetadata = liveContext.type === 'email' ? detectEmailMetadata(liveContext) : null;
+
+        const reportMetadata = {
+            timestamp: new Date().toISOString(),
+            title: document.title,
+            body_text: liveMetadata?.bodySnippet || document.body.innerText.substring(0, 4000),
+            sender: liveMetadata?.senderEmail || null,
+            subject: liveMetadata?.subject || null,
+            severity: currentScanResult?.overallSeverity || 'UNKNOWN',
+            indicators: currentScanResult ? Object.values(currentScanResult.checks || {}).filter(c => c.flagged).map(c => c.description || c.title) : [],
+            scan_result: currentScanResult || {}
+        };
+
         chrome.runtime.sendMessage({
             type: MessageTypes.REPORT_SCAM,
             data: {
                 url: window.location.href,
                 description: desc,
-                metadata: { timestamp: new Date().toISOString(), title: document.title }
+                metadata: reportMetadata
             }
         }, (response) => {
             if (response?.success) {
