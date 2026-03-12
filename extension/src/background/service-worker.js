@@ -15,7 +15,7 @@ import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cach
 import { MessageTypes, createMessageHandler, sendMessageToTab, createMessage } from '../lib/messaging.js';
 import { scanUrl } from '../lib/detector.js';
 import { syncPatterns } from '../lib/database.js';
-import { submitReport, submitUserReport, submitFalsePositive, fetchGlobalSafeList } from '../lib/supabase.js';
+import { submitReport, submitUserReport, submitFalsePositive, fetchGlobalSafeList, submitSafeListAppeal } from '../lib/supabase.js';
 import { syncManager } from './lib/sync-manager.js';
 
 // Decentralized Modules (v19.2)
@@ -267,29 +267,34 @@ chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
 }));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    const context = {
-        scanAndHandle,
-        getSettings,
-        getStats,
-        updateSettings,
-        getCachedScan,
-        isWhitelisted,
-        addToWhitelist,
-        getWhitelist,
-        repairStatistics,
-        submitReport,
-        submitUserReport,
-        submitFalsePositive,
-        submitSafeListAppeal,
-        tabStateManager,
-        cacheScan
-    };
-    handleIncomingMessage(message, sender, context)
-        .then(sendResponse)
-        .catch(err => {
-            console.error('[Hydra Guard] Fatal message error:', err);
-            sendResponse({ success: false, error: err.message || 'Internal extension error' });
-        });
+    try {
+        const context = {
+            scanAndHandle,
+            getSettings,
+            getStats,
+            updateSettings,
+            getCachedScan,
+            isWhitelisted,
+            addToWhitelist,
+            getWhitelist,
+            repairStatistics,
+            submitReport,
+            submitUserReport,
+            submitFalsePositive,
+            submitSafeListAppeal,
+            tabStateManager,
+            cacheScan
+        };
+        handleIncomingMessage(message, sender, context)
+            .then(sendResponse)
+            .catch(err => {
+                console.error('[Hydra Guard] Fatal message error:', err);
+                sendResponse({ success: false, error: err.message || 'Internal extension error' });
+            });
+    } catch (syncErr) {
+        console.error('[Hydra Guard] Sync message listener error:', syncErr);
+        sendResponse({ success: false, error: syncErr.message || 'Extension initialization error' });
+    }
     return true; // Keep channel open for async
 });
 
