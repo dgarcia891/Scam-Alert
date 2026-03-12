@@ -9,7 +9,8 @@
 const FALLBACK_VERDICT = {
     verdict: 'CONFIRMED',
     reason: 'AI validation inconclusive.',
-    confidence: 50
+    confidence: 50,
+    indicators: []
 };
 
 /**
@@ -59,7 +60,8 @@ export function validateAIResponse(rawResponse) {
     return {
         verdict: parsed.verdict,
         reason: (typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : 'No reason provided.'),
-        confidence: (typeof parsed.confidence === 'number' ? Math.max(0, Math.min(100, parsed.confidence)) : 50)
+        confidence: (typeof parsed.confidence === 'number' ? Math.max(0, Math.min(100, parsed.confidence)) : 50),
+        indicators: Array.isArray(parsed.indicators) ? parsed.indicators.filter(i => typeof i === 'string').slice(0, 10) : []
     };
 }
 
@@ -197,13 +199,16 @@ ${contextType === 'EMAIL' ? emailLogic : webLogic}
 Respond ONLY with a single valid JSON object. No explanation, no markdown.
 If you are unsure, you MUST default verdict to "CONFIRMED" and confidence to 50.
 Unknown or missing fields must use their default values.
+If you identify any suspicious emails, domains, IPs, or unusual URLs from the context, extract them into the "indicators" array.
 
 Required format:
 {
   "verdict": "CONFIRMED" | "DOWNGRADED" | "ESCALATED",
   "reason": "<max 25 words, plain English>",
-  "confidence": <integer 0-100>
-}`;
+  "confidence": <integer 0-100>,
+  "indicators": ["<suspicious_email>", "<suspicious_domain>"]
+}
+`;
 
     try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${options.apiKey}`;
@@ -235,7 +240,11 @@ Required format:
         }
 
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        // Remove the starting ```json if the model outputs it
+        let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text && text.startsWith('```json')) {
+            text = text.replace('```json\n', '');
+        }
 
         if (!text) {
             return { ...FALLBACK_VERDICT, _debug: { promptSent: prompt, rawResponse: '(empty response from API)' } };

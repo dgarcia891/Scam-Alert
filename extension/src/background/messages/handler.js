@@ -494,8 +494,29 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             verdict: result.verdict,
             reason: result.reason,
             confidence: result.confidence,
+            indicators: result.indicators || [],
             _debug: result._debug || null
         };
+
+        // FEAT-119: Telemetry & UI Badge propagation
+        if (aiVerification.verdict === 'ESCALATED') {
+            console.log('[Hydra Guard] AI Escalated threat. Enforcing UI sync & potentially sending telemetry.');
+            
+            // 1. Force icon badge to RED instantly
+            if (msgData?.tabId) {
+                chrome.action.setBadgeText({ text: '!', tabId: msgData.tabId }).catch(() => {});
+                chrome.action.setBadgeBackgroundColor({ color: '#f43f5e', tabId: msgData.tabId }).catch(() => {});
+            }
+
+            // 2. Dispatch telemetry (reportThreatIndicators checks user opt-in internally)
+            if (aiVerification.indicators && aiVerification.indicators.length > 0) {
+                import('../../lib/threat-telemetry.js').then(module => {
+                    module.reportThreatIndicators(aiVerification.indicators, contextType);
+                }).catch(err => {
+                    console.warn('[Hydra Guard] Failed to load telemetry module:', err);
+                });
+            }
+        }
 
         // FEAT-088 Fix: Persist AI verdict in persistent scan cache so it survives popup re-opens
         if (cached && cacheScan) {

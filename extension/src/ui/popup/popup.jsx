@@ -539,6 +539,7 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
     const [debugOpen, setDebugOpen] = useState(false);
     const [showConsent, setShowConsent] = useState(false);
     const [consentChecked, setConsentChecked] = useState(false);
+    const [telemetryChecked, setTelemetryChecked] = useState(settings?.telemetryOptIn ?? true);
 
     const executeAskAI = useCallback(() => {
         if (!currentUrl || aiAsking) return;
@@ -575,14 +576,20 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
     }, [settings?.aiConsentGiven, executeAskAI]);
 
     const handleConsentProceed = useCallback(async () => {
+        const current = await chrome.storage.local.get('settings');
+        const newSettings = { ...(current.settings || {}) };
+        
         if (consentChecked) {
-            // Save consent so they aren't asked again
-            const current = await chrome.storage.local.get('settings');
-            const newSettings = { ...(current.settings || {}), aiConsentGiven: true };
-            await chrome.storage.local.set({ settings: newSettings });
+            newSettings.aiConsentGiven = true;
         }
+        
+        // Save the telemetry preference user chose
+        newSettings.telemetryOptIn = telemetryChecked;
+        
+        await chrome.storage.local.set({ settings: newSettings });
+
         executeAskAI();
-    }, [consentChecked, executeAskAI]);
+    }, [consentChecked, telemetryChecked, executeAskAI]);
 
     if (!settings?.aiEnabled || !settings?.aiApiKey) return null;
 
@@ -598,15 +605,29 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                     <br/><br/>
                     <strong className="text-white">No data is ever saved on Hydra Guard servers.</strong> Please do not use this on highly sensitive emails.
                 </p>
-                <label className="flex items-center gap-2 mb-3 cursor-pointer group">
-                    <input 
-                        type="checkbox" 
-                        checked={consentChecked}
-                        onChange={(e) => setConsentChecked(e.target.checked)}
-                        className="rounded border-slate-600 bg-slate-900/50 text-indigo-500 focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-slate-400 group-hover:text-slate-300 transition-colors">Don't ask me again</span>
-                </label>
+                <div className="space-y-3 mb-4 bg-slate-900/40 p-2.5 rounded-lg border border-slate-700/50">
+                    <label className="flex items-start gap-2 cursor-pointer group">
+                        <input 
+                            type="checkbox" 
+                            checked={telemetryChecked}
+                            onChange={(e) => setTelemetryChecked(e.target.checked)}
+                            className="mt-0.5 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <span className="text-[10px] text-slate-300 group-hover:text-white transition-colors leading-tight">
+                            Help protect the community by anonymously reporting discovered scam indicators (emails, malicious links) to our heuristics database.
+                        </span>
+                    </label>
+                    <div className="h-px bg-slate-800/50 w-full" />
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                        <input 
+                            type="checkbox" 
+                            checked={consentChecked}
+                            onChange={(e) => setConsentChecked(e.target.checked)}
+                            className="rounded border-slate-600 bg-slate-900 text-slate-500 focus:ring-1 focus:ring-offset-0 focus:ring-slate-500 cursor-pointer"
+                        />
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-300 transition-colors">Don't show this privacy notice again</span>
+                    </label>
+                </div>
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={() => setShowConsent(false)}
@@ -733,6 +754,11 @@ function deriveStatusFromResults(res, scanInProgress) {
     if (scanInProgress) return 'loading';
     if (!res) return 'empty';
 
+    // FEAT-119: Override status if AI escalates
+    if (res.aiVerification && res.aiVerification.verdict === 'ESCALATED') {
+        return 'danger';
+    }
+
     if (res.whitelisted) return 'secure';
 
     const severity = res.overallSeverity || res.severity;
@@ -765,6 +791,15 @@ const Popup = () => {
             setAiResult(scanResults.aiVerification);
         }
     }, [scanResults]);
+
+    // FEAT-119: Sync localized AI verdict instantly back to main UI state so dynamic overrides apply
+    useEffect(() => {
+        if (aiResult && scanResults && (!scanResults.aiVerification || scanResults.aiVerification.verdict !== aiResult.verdict)) {
+            const updatedResults = { ...scanResults, aiVerification: aiResult };
+            setScanResults(updatedResults);
+            setStatus(deriveStatusFromResults(updatedResults, false));
+        }
+    }, [aiResult, scanResults]);
 
     // Load dev mode + settings on mount
     useEffect(() => {
