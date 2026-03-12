@@ -157,34 +157,42 @@ export function extractEmailContext(url, meta = {}, emailCheck = null) {
 /**
  * Call Gemini API to verify a suspicious URL.
  * @param {string} url - The URL to verify
- * @param {Object} details - { signals, phrases, intentKeywords, emailContext }
+ * @param {Object} details - { signals, phrases, intentKeywords, emailContext, contextType }
  * @param {Object} options - { apiKey }
  * @returns {Object} - { verdict, reason, confidence, _debug: { promptSent, rawResponse } }
  */
-export async function verifyWithAI(url, { signals = [], phrases = [], intentKeywords = [], emailContext = null }, options = {}) {
+export async function verifyWithAI(url, { signals = [], phrases = [], intentKeywords = [], emailContext = null, contextType = 'WEB' }, options = {}) {
     if (!options.apiKey) throw new Error('Gemini API Key missing');
 
     const hostname = new URL(url).hostname;
     const cleanPhrases = sanitizeForPrompt(phrases);
     const signalCodes = signals.map(s => s.code || s);
-    const emailSection = buildEmailSection(emailContext);
+    const emailSection = contextType === 'EMAIL' ? buildEmailSection(emailContext) : '';
+
+    const webLogic = `
+Contextual logic for REGULAR WEBSITES:
+1. If the phrases relate to high-trust brands (Google, Amazon, Banks) but the hostname is unrelated, it's likely a typosquat/scam.
+2. If there are "payment failed" or "account expired" lures pointing to non-official domains, it's a critical threat.
+3. If the domain uses a suspicious TLD or has unusual port numbers, be more cautious.`;
+
+    const emailLogic = `
+Contextual logic for EMAILS:
+1. If the sender display name does NOT match the sender email address (e.g., name "John" but email "maria@example.pl"), that is a strong scam indicator.
+2. If the email body contains URLs with unusual ports (e.g., :8443, :8080) or unfamiliar domains, that is suspicious.
+3. If the email is unsolicited (not a reply to a previous thread) and contains links, be more suspicious.
+4. If the sender email domain looks like an educational or foreign domain unrelated to the message content, flag it.`;
 
     const prompt = `You are a phishing and scam classifier integrated into a browser security extension.
 Your job is to validate whether the following content is likely a scam or phishing attempt.
 
+Context Type: ${contextType}
 URL Hostname: ${hostname}
 Detected Phrases/Keywords: ${JSON.stringify(cleanPhrases)}
 Detected Intent Category: ${JSON.stringify(intentKeywords)}
 Local engine signals: ${JSON.stringify(signalCodes)}
 ${emailSection}
 
-Contextual logic:
-1. If the phrases relate to high-trust brands (Google, Amazon, Banks) but the hostname is unrelated, it's likely a scam.
-2. If there are "payment failed" or "account expired" lures pointing to non-official domains, it's a critical threat.
-3. If the sender display name does NOT match the sender email address (e.g., name "John" but email "maria@example.pl"), that is a strong scam indicator.
-4. If the email body contains URLs with unusual ports (e.g., :8443, :8080) or unfamiliar domains, that is suspicious.
-5. If the email is unsolicited (not a reply to a previous thread) and contains links, be more suspicious.
-6. If the sender email domain looks like an educational or foreign domain unrelated to the message content, flag it.
+${contextType === 'EMAIL' ? emailLogic : webLogic}
 
 Respond ONLY with a single valid JSON object. No explanation, no markdown.
 If you are unsure, you MUST default verdict to "CONFIRMED" and confidence to 50.

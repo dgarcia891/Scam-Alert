@@ -235,12 +235,16 @@ export async function scanUrl(url, options = {}, onProgress = null) {
                 return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
             };
 
+            const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || !!finalChecks.emailScams;
+            const contextType = isEmailContext ? 'EMAIL' : 'WEB';
+
             const aiResult = await withTimeout(
                 verifyWithAI(url, {
                     signals: [...hardSignals, ...softSignals],
                     phrases,
                     intentKeywords,
-                    emailContext: extractEmailContext(url, options.metadata || {}, finalChecks.emailScams || null)
+                    emailContext: extractEmailContext(url, options.metadata || {}, finalChecks.emailScams || null),
+                    contextType
                 }, { apiKey: options.aiApiKey }),
                 4000,
                 { verdict: 'CONFIRMED', reason: 'AI validation timed out.', confidence: 50 }
