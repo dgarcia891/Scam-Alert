@@ -7,6 +7,7 @@
  * data is available the hardcoded lists still provide full coverage.
  */
 import { getExplanation, INDICATOR_EXPLANATIONS } from './explanations.js';
+import { checkSuspiciousPort, checkUrlObfuscation, checkSuspiciousTLD, checkIPAddress } from './url-engine.js';
 
 /**
  * @param {Object} pageContent        — extracted email data (bodyText, senderEmail, links, etc.)
@@ -91,6 +92,24 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         score += 40;
     }
 
+    // 3.5 Display Name / Email Mismatch Check (NEW)
+    // Extract the email prefix (e.g., marek.bartis022 from marek.bartis022@skolavdf.cz)
+    const emailPrefix = sender.split('@')[0];
+    let mismatchScoreAdded = false;
+
+    if (displayName && emailPrefix && displayName !== emailPrefix) {
+        const nameParts = displayName.split(/\s+/).filter(p => p.length > 2);
+        if (nameParts.length > 0) {
+            // Check if ANY part of the display name is in the email prefix
+            const hasOverlap = nameParts.some(part => emailPrefix.includes(part));
+            if (!hasOverlap) {
+                mismatchScoreAdded = true;
+                indicators.push('Sender display name does not match email address');
+                score += 35; 
+            }
+        }
+    }
+
     // 4. Intent-Link Mismatch Detection (FEAT-094)
     const emailSubject = (pageContent.subject || '').toLowerCase();
     const fullText = (emailSubject + ' ' + emailBody);
@@ -131,6 +150,26 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
     if (mismatchFound) {
         indicators.push('Intent-link mismatch: suspicious destination');
         score += 50;
+    }
+
+    // 4.5 Embedded Link URL Checks (NEW)
+    for (const link of externalLinks) {
+        if (checkSuspiciousPort(link).flagged) {
+            indicators.push('Suspicious port in embedded link');
+            score += 25;
+        }
+        if (checkUrlObfuscation(link).flagged) {
+            indicators.push('Obfuscated embedded link');
+            score += 20;
+        }
+        if (checkSuspiciousTLD(link).flagged) {
+            indicators.push('Suspicious TLD in embedded link');
+            score += 20;
+        }
+        if (checkIPAddress(link).flagged) {
+            indicators.push('IP address used instead of domain in link');
+            score += 25;
+        }
     }
 
     // 5. Invoice/Wire Fraud (hardcoded + dynamic)
@@ -214,6 +253,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
             securityKeywordsFound: hasSecurityLure,
             authoritySignalsFound: authorityFound || [],
             senderMismatch: senderFound ? { displayName, sender } : null,
+            generalizedSenderMismatch: mismatchScoreAdded,
             intentMismatch: mismatchFound,
             detectedBrands: detectedBrands
         },
