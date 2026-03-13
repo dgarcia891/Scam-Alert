@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTriangle, ChevronRight, ArrowRight, Bug, Copy, Check, ChevronDown, RefreshCw, Trash2, Terminal, Globe, Mail, Lock, Unlock, Clock, Zap, Database, Key, Cpu, Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
+import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTriangle, ChevronRight, Share2, ArrowRight, Bug, Copy, Check, ChevronDown, RefreshCw, Trash2, Terminal, Globe, Mail, Lock, Unlock, Clock, Zap, Database, Key, Cpu, Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
@@ -540,6 +540,10 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
     const [showConsent, setShowConsent] = useState(false);
     const [consentChecked, setConsentChecked] = useState(false);
     const [telemetryChecked, setTelemetryChecked] = useState(settings?.telemetryOptIn ?? true);
+    const [submitOpen, setSubmitOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+    const [submitOptions, setSubmitOptions] = useState({ sender: true, subject: true, body: true });
 
     const executeAskAI = useCallback(() => {
         if (!currentUrl || aiAsking) return;
@@ -738,7 +742,99 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                                 {debugOpen ? 'Hide details' : 'Show details'}
                             </button>
                         )}
+                        <div className="flex-1" />
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSubmitOpen(!submitOpen);
+                                setDebugOpen(false);
+                            }}
+                            className={cn(
+                                "flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-bold uppercase transition-all",
+                                submitOpen 
+                                    ? "bg-indigo-500 text-white" 
+                                    : "text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10"
+                            )}
+                        >
+                            {isSubmitted ? (
+                                <><Check size={10} /> Submitted</>
+                            ) : (
+                                <><Share2 size={10} /> Submit to Hydra Guard</>
+                            )}
+                        </button>
                     </div>
+
+                    {/* Submit Data Panel */}
+                    {submitOpen && !isSubmitted && (
+                        <div className="mx-3 mb-3 p-3 bg-slate-900/60 rounded-xl border border-indigo-500/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                </span>
+                                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Help the community</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mb-3 leading-snug">Choose what information to share with Hydra Guard to help us identify similar scams.</p>
+                            
+                            <div className="space-y-2 mb-3">
+                                {[
+                                    { id: 'sender', label: 'Sender Info', checked: submitOptions.sender },
+                                    { id: 'subject', label: 'Email Subject', checked: submitOptions.subject },
+                                    { id: 'body', label: 'Body Snippet', checked: submitOptions.body },
+                                ].map(opt => (
+                                    <label key={opt.id} className="flex items-center gap-2 cursor-pointer group">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={opt.checked}
+                                            onChange={(e) => setSubmitOptions({...submitOptions, [opt.id]: e.target.checked})}
+                                            className="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-0 cursor-pointer"
+                                        />
+                                        <span className="text-[10px] text-slate-300 group-hover:text-white transition-colors">{opt.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={async () => {
+                                    setIsSubmitting(true);
+                                    const metadata = {};
+                                    if (submitOptions.sender) {
+                                        metadata.sender = scanResults?.metadata?.sender;
+                                        metadata.senderEmail = scanResults?.metadata?.senderEmail;
+                                    }
+                                    if (submitOptions.subject) metadata.subject = scanResults?.metadata?.subject;
+                                    if (submitOptions.body) metadata.bodyText = scanResults?.metadata?.bodySnippet || scanResults?.metadata?.body_text;
+                                    
+                                    chrome.runtime.sendMessage({
+                                        type: MessageTypes.REPORT_SCAM,
+                                        data: {
+                                            url: currentUrl,
+                                            type: 'community_contribution',
+                                            description: 'Manual Popup Contribution',
+                                            metadata: {
+                                                ...metadata,
+                                                aiVerdict: aiResult.verdict,
+                                                aiConfidence: aiResult.confidence,
+                                                isManualContribution: true
+                                            }
+                                        }
+                                    }, (res) => {
+                                        setIsSubmitting(false);
+                                        if (res?.success) {
+                                            setIsSubmitted(true);
+                                            setSubmitOpen(false);
+                                        } else {
+                                            alert('Submission failed: ' + (res?.error || 'Unknown error'));
+                                        }
+                                    });
+                                }}
+                                disabled={isSubmitting || (!submitOptions.sender && !submitOptions.subject && !submitOptions.body)}
+                                className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

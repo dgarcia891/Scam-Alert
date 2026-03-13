@@ -82,6 +82,15 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         .sa-btn-dismiss:hover { background: rgba(100, 116, 139, 0.2); }
         .sa-btn-safe { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
         .sa-btn-safe:hover { background: rgba(16, 185, 129, 0.2); }
+        .sa-pulse-dot { width: 8px; height: 8px; background: #60a5fa; border-radius: 50%; display: inline-block; margin-right: 6px; position: relative; }
+        .sa-pulse-dot::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background: #60a5fa; animation: sa-pulse 2s infinite; }
+        @keyframes sa-pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(3); opacity: 0; } }
+        .sa-submit-ui { margin-top: 12px; padding: 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 12px; animation: sa-fade-in 0.3s ease-out; }
+        @keyframes sa-fade-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .sa-checkbox-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; cursor: pointer; }
+        .sa-checkbox-row:last-child { margin-bottom: 0; }
+        .sa-checkbox-row input { margin-top: 3px; cursor: pointer; }
+        .sa-checkbox-label { font-size: 11px; color: #cbd5e1; line-height: 1.4; }
     `;
     shadow.appendChild(style);
 
@@ -446,7 +455,7 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                         aiPrompt.innerHTML = `
                             <div style="font-weight: 800; margin-bottom: 6px;">AI SECOND OPINION</div>
                             <div style="font-size: 13px; color: #94a3b8; margin-bottom: 10px;">${response.reason || 'AI analysis complete.'}</div>
-                            <div style="display: flex; gap: 12px;">
+                            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
                                 <div style="flex: 1;">
                                     <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Verdict</div>
                                     <div style="font-size: 14px; font-weight: 700; color: ${verdictColor};">${verdictLabel}</div>
@@ -456,7 +465,91 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                                     <div style="font-size: 14px; font-weight: 700;">${response.confidence ?? '—'}%</div>
                                 </div>
                             </div>
+
+                            <div style="border-top: 1px solid #1e293b; padding-top: 12px;">
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div class="sa-pulse-dot"></div>
+                                    <div style="font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.02em;">Recommended: Inform Hydra Guard</div>
+                                </div>
+                                <button class="sa-jump-btn" id="sa-submit-hydra-btn" style="width: 100%; background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.2); color: #60a5fa;">Submit to Hydra Guard</button>
+                                <div id="sa-submit-form" class="sa-submit-ui" style="display: none;">
+                                    <div style="font-size: 10px; color: #94a3b8; margin-bottom: 10px; font-weight: 600; text-transform: uppercase;">Information to share:</div>
+                                    <label class="sa-checkbox-row">
+                                        <input type="checkbox" checked data-key="senderName">
+                                        <span class="sa-checkbox-label">Sender Name: <strong>${_escapeHtml(emailData.senderName)}</strong></span>
+                                    </label>
+                                    <label class="sa-checkbox-row">
+                                        <input type="checkbox" checked data-key="senderEmail">
+                                        <span class="sa-checkbox-label">Sender Email: <strong>${_escapeHtml(emailData.senderEmail)}</strong></span>
+                                    </label>
+                                    <label class="sa-checkbox-row">
+                                        <input type="checkbox" checked data-key="subject">
+                                        <span class="sa-checkbox-label">Subject: <strong>${_escapeHtml(emailData.subject)}</strong></span>
+                                    </label>
+                                    <label class="sa-checkbox-row">
+                                        <input type="checkbox" checked data-key="body">
+                                        <span class="sa-checkbox-label">Body Snippet: <span style="opacity: 0.7;">${_escapeHtml(emailData.bodyText.substring(0, 60))}...</span></span>
+                                    </label>
+                                    <button class="sa-btn sa-btn-safe" id="sa-confirm-submit-btn" style="margin-top: 10px; font-size: 12px; padding: 8px;">Confirm & Submit</button>
+                                </div>
+                            </div>
                         `;
+
+                        // Handle submit button logic
+                        const submitMsgBtn = aiPrompt.querySelector('#sa-submit-hydra-btn');
+                        const submitForm = aiPrompt.querySelector('#sa-submit-form');
+                        const confirmBtn = aiPrompt.querySelector('#sa-confirm-submit-btn');
+
+                        submitMsgBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            submitForm.style.display = submitForm.style.display === 'none' ? 'block' : 'none';
+                            submitMsgBtn.style.display = submitForm.style.display === 'none' ? 'block' : 'none';
+                        };
+
+                        confirmBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            const checkboxes = submitForm.querySelectorAll('input[type="checkbox"]');
+                            const selectedData = {};
+                            checkboxes.forEach(cb => {
+                                if (cb.checked) {
+                                    const key = cb.dataset.key;
+                                    if (key === 'senderName') selectedData.senderName = emailData.senderName;
+                                    if (key === 'senderEmail') selectedData.senderEmail = emailData.senderEmail;
+                                    if (key === 'subject') selectedData.subject = emailData.subject;
+                                    if (key === 'body') selectedData.bodyText = emailData.bodyText.substring(0, 500);
+                                }
+                            });
+
+                            confirmBtn.textContent = 'Submitting...';
+                            confirmBtn.disabled = true;
+
+                            chrome.runtime.sendMessage({
+                                type: MessageTypes.REPORT_SCAM,
+                                data: {
+                                    url: window.location.href,
+                                    type: 'community_contribution',
+                                    description: 'Manual Hydra Guard Contribution',
+                                    metadata: {
+                                        ...selectedData,
+                                        aiVerdict: response.verdict,
+                                        aiConfidence: response.confidence,
+                                        isManualContribution: true
+                                    }
+                                }
+                            }, (res) => {
+                                if (res?.success) {
+                                    submitForm.innerHTML = `<div style="font-size: 12px; color: #34d399; font-weight: 700; text-align: center; padding: 10px;">\u2713 Submitted! Thanks for helping.</div>`;
+                                } else {
+                                    submitForm.innerHTML = `<div style="font-size: 12px; color: #fb7185; font-weight: 700; text-align: center; padding: 10px;">Error: ${res?.error || 'Failed to submit.'}</div>`;
+                                }
+                                setTimeout(() => {
+                                    submitForm.style.display = 'none';
+                                    submitMsgBtn.style.display = 'block';
+                                    submitMsgBtn.textContent = 'Submitted to Hydra Guard';
+                                    submitMsgBtn.disabled = true;
+                                }, 3000);
+                            });
+                        };
                     } else {
                         aiPrompt.innerHTML = `
                             <div style="display: flex; align-items: center; gap: 10px;">
