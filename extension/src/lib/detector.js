@@ -235,7 +235,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
                 return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
             };
 
-            const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || !!finalChecks.emailScams;
+            const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || !!finalChecks.emailScams?.flagged;
             const contextType = isEmailContext ? 'EMAIL' : 'WEB';
 
             const aiResult = await withTimeout(
