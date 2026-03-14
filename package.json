@@ -1,6 +1,6 @@
 {
   "name": "hydra-guard-root",
-  "version": "1.0.149",
+  "version": "1.0.150",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -10,7 +10,10 @@
     "scan": "node scripts/security_scan.cjs",
     "drift": "node scripts/drift_check.cjs",
     "handoff": "node scripts/handoff.cjs",
-    "test:unit": "echo \"Running tests...\" && exit 0"
+    "release": "node scripts/release.cjs",
+    "visual:audit": "node scripts/visual_audit.cjs",
+    "test:unit": "echo \"Running tests...\" && exit 0",
+    "test": "npm run test:unit"
   },
   "devDependencies": {
     "eslint": "^8.0.0"

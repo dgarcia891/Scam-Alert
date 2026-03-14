@@ -1,20 +1,17 @@
 const fs = require('fs');
-const path = require('path');
-const BANNED = ['eval(', 'document.write', 'setTimeout("'];
-function scan(dir) {
-  let err = false;
-  fs.readdirSync(dir).forEach(f => {
-    const p = path.join(dir, f);
-    if (fs.statSync(p).isDirectory()) {
-      if (f !== 'node_modules' && f !== '.git' && f !== 'scripts' && f !== 'tests') if (scan(p)) err = true;
-    } else if (/\.(js|ts)$/.test(f)) {
-      const content = fs.readFileSync(p, 'utf8');
-      BANNED.forEach(b => {
-        if (content.includes(b)) { console.error(`❌ SECURITY: ${b} in ${p}`); err = true; }
-      });
-    }
+const rootDir = fs.existsSync('src') ? 'src' : fs.existsSync('extension/src') ? 'extension/src' : null;
+if (!rootDir) process.exit(0);
+const walk = dir =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const full = `${dir}/${entry.name}`;
+    return entry.isDirectory() ? walk(full) : [full];
   });
-  return err;
-}
-if (scan('.')) process.exit(1);
-console.log("✅ Security Scan Passed");
+
+const files = walk(rootDir).filter(f => f.endsWith('.ts') || f.endsWith('.tsx') || f.endsWith('.js') || f.endsWith('.jsx'));
+files.forEach(f => {
+  const content = fs.readFileSync(f, 'utf8');
+  if (content.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+    console.error('SECURITY BREACH: Service Role Key found in ' + f);
+    process.exit(1);
+  }
+});

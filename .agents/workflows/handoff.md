@@ -1,23 +1,6 @@
 ---
-description: Session archive (Global Rules §6.2)
+name: handoff
+description: "Session Archival and State Continuity"
 ---
-## Steps
-
-### 1. Generate Handoff
-
-```bash
-node scripts/handoff.cjs
-```
-
-### 2. Complete Template
-
-Fill in the generated template in `docs/logs/SESSION_LOG.md`.
-
-### 3. Commit
-
-```bash
-git add docs/logs/SESSION_LOG.md docs/architecture/CONTEXT.md
-git commit -m "docs: session handoff [orchestrator]"
-```
-
-# Push logic handled by user preference or deploy script
+1. Run `npm run handoff`.
+2. Summarize the current session state and next steps for the next agent.
