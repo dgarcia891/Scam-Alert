@@ -535,7 +535,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     );
 };
 
-const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking, aiResult, setAiResult }) => {
+const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking, aiResult, setAiResult, scanResults }) => {
     const [debugOpen, setDebugOpen] = useState(false);
     const [showConsent, setShowConsent] = useState(false);
     const [consentChecked, setConsentChecked] = useState(false);
@@ -1042,7 +1042,7 @@ const Popup = () => {
 
 
 
-    const isEmail = currentUrl.includes('mail.google.com') || currentUrl.includes('outlook.') || currentUrl.includes('mail.yahoo.com');
+    const isEmail = currentUrl.includes('mail.google.com') || currentUrl.includes('outlook.') || currentUrl.includes('mail.yahoo.com') || currentUrl.includes('roundcube');
     const config = getStatusConfig(status, isEmail ? 'EMAIL' : 'WEB');
 
     return (
@@ -1127,10 +1127,12 @@ const Popup = () => {
                     <AskAIButton
                         settings={settings}
                         currentUrl={currentUrl}
+                        currentTabId={currentTabId}
                         aiAsking={aiAsking}
                         setAiAsking={setAiAsking}
                         aiResult={aiResult}
                         setAiResult={setAiResult}
+                        scanResults={scanResults}
                     />
                 </>
             )}
@@ -1146,6 +1148,7 @@ const Popup = () => {
                         setAiAsking={setAiAsking}
                         aiResult={aiResult}
                         setAiResult={setAiResult}
+                        scanResults={scanResults}
                     />
 
                     {/* Action buttons for caution/danger */}

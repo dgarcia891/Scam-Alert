@@ -112,7 +112,7 @@ function buildEmailSection(emailContext) {
  * @returns {Object|null}
  */
 export function extractEmailContext(url, meta = {}, emailCheck = null) {
-    const isEmailPage = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com');
+    const isEmailPage = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || url.includes('roundcube');
     if (!isEmailPage && !meta.subject && !meta.sender && !emailCheck?.flagged) return null;
 
     let senderName = '';

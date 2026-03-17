@@ -485,7 +485,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             return { success: true, ...aiVerification };
         }
 
-        const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || (cached && cached.checks?.emailScams?.flagged);
+        const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || url.includes('roundcube') || (cached && cached.checks?.emailScams?.flagged);
         const contextType = isEmailContext ? 'EMAIL' : 'WEB';
 
         const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext, contextType }, { apiKey: settings.aiApiKey });
