@@ -4,6 +4,7 @@ import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTrian
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
+import { isKnownEmailClient, getMatchingClient } from '../../config/email-clients';
 import '../index.css';
 
 export function cn(...inputs) {
@@ -181,7 +182,8 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     const hasEmailChecks = checks.emailScams !== undefined;
     const isGmail = currentUrl?.includes('mail.google.com');
     const isOutlook = currentUrl?.includes('outlook.live.com') || currentUrl?.includes('outlook.office');
-    const pageContext = hasEmailChecks ? (isGmail ? 'EMAIL (Gmail)' : isOutlook ? 'EMAIL (Outlook)' : 'EMAIL') : 'WEB';
+    const matchedClient = getMatchingClient(currentUrl || '');
+    const pageContext = hasEmailChecks ? (matchedClient ? `EMAIL (${matchedClient.label})` : 'EMAIL') : 'WEB';
 
     // Source lookup helper
     const getSource = (id) => sources.find(s => s.id === id) || null;
@@ -1042,7 +1044,7 @@ const Popup = () => {
 
 
 
-    const isEmail = currentUrl.includes('mail.google.com') || currentUrl.includes('outlook.') || currentUrl.includes('mail.yahoo.com') || currentUrl.includes('roundcube');
+    const isEmail = isKnownEmailClient(currentUrl);
     const config = getStatusConfig(status, isEmail ? 'EMAIL' : 'WEB');
 
     return (

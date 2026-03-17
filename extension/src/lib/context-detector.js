@@ -3,6 +3,8 @@
  * Identifies page types and extracts specialized metadata.
  */
 
+import { EMAIL_CLIENTS, getMatchingClient } from '../config/email-clients.js';
+
 export const ContextTypes = {
     EMAIL: 'email',
     BANKING: 'banking',
@@ -11,35 +13,19 @@ export const ContextTypes = {
     GENERIC: 'generic'
 };
 
-const PROVIDERS = {
-    gmail: {
-        pattern: /mail\.google\.com/,
-        dom: ["div[role='main']", ".aDP", ".ii.gt"],
+// Build PROVIDERS lookup from central config for backward compatibility
+const PROVIDERS = {};
+for (const client of EMAIL_CLIENTS) {
+    PROVIDERS[client.id] = {
+        pattern: client.urlRegex,
+        dom: client.dom || [],
         selectors: {
-            sender: ".gD[email], .go",
-            subject: "h2.hP",
-            body: ".ii.gt .a3s"
+            sender: client.selectors.sender,
+            subject: client.selectors.subject,
+            body: client.selectors.messageBody
         }
-    },
-    outlook: {
-        pattern: /outlook\.(live|office)\.com/,
-        dom: ["[data-app='mail']", ".customScrollBar"],
-        selectors: {
-            sender: "[aria-label*='From']",
-            subject: "[aria-label='Subject']",
-            body: "[aria-label='Message body']"
-        }
-    },
-    yahoo: {
-        pattern: /mail\.yahoo\.com/,
-        dom: [".msg-body", "[data-test-id='message-view']"],
-        selectors: {
-            sender: "[data-test-id='from']",
-            subject: "[data-test-id='subject']",
-            body: ".msg-body"
-        }
-    }
-};
+    };
+}
 
 /**
  * Main entry point: Detect page context

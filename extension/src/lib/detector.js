@@ -13,6 +13,7 @@ import { checkUrl } from './google-safe-browsing.js';
 import { checkUrlWithPhishTank, checkUrlOffline } from './phishtank.js';
 import { analyzeUrl } from './pattern-analyzer.js';
 import { getMergedScamPhrases } from './database.js';
+import { isKnownEmailClient } from '../config/email-clients.js';
 import { createScanResult, SEVERITY, ACTION } from './scan-schema.js';
 import { determineSeverity } from './analysis/scoring.js';
 import { normalizeUrl, isBlocked } from './storage.js';
@@ -235,7 +236,7 @@ export async function scanUrl(url, options = {}, onProgress = null) {
                 return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
             };
 
-            const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || url.includes('roundcube') || !!finalChecks.emailScams?.flagged;
+            const isEmailContext = isKnownEmailClient(url) || !!finalChecks.emailScams?.flagged;
             const contextType = isEmailContext ? 'EMAIL' : 'WEB';
 
             const aiResult = await withTimeout(

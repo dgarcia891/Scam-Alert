@@ -6,6 +6,7 @@ import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, r
 import { submitReport, submitUserReport, submitCorrection } from '../../lib/supabase.js';
 import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
 import { checkUrlsWithSafeBrowsing } from '../../lib/google-safe-browsing.js';
+import { isKnownEmailClient } from '../../config/email-clients.js';
 
 export async function handleIncomingMessage(message, sender, context = {}) {
     const { type, data } = message;
@@ -404,7 +405,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             // Fetch live email context from the active tab for popup AI
             try {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-                if (tab && (tab.url.includes('mail.google.com') || tab.url.includes('outlook'))) {
+                if (tab && isKnownEmailClient(tab.url)) {
                     // Helper: attempt to fetch email context from the content script
                     const attemptFetch = () => {
                         const timeoutResponse = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'Content script timed out (1500ms).' }), 1500));
@@ -485,7 +486,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             return { success: true, ...aiVerification };
         }
 
-        const isEmailContext = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || url.includes('roundcube') || (cached && cached.checks?.emailScams?.flagged);
+        const isEmailContext = isKnownEmailClient(url) || (cached && cached.checks?.emailScams?.flagged);
         const contextType = isEmailContext ? 'EMAIL' : 'WEB';
 
         const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext, contextType }, { apiKey: settings.aiApiKey });

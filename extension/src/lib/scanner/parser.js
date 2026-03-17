@@ -12,7 +12,10 @@ export function extractEmailText() {
         'div[dir="ltr"]',        // Gmail: LTR content block (generic fallback)
         '[data-test-id="message-view-body"]', // Outlook body
         '.Email-Message-Body',   // Generic
-        '.gs .ii.gt'             // Gmail: last resort thread body
+        '.gs .ii.gt',            // Gmail: last resort thread body
+        '[data-testid="message-content"]',    // ProtonMail body
+        '.msg-body',             // Yahoo body
+        '.zmMailBody, .zmail-content'          // Zoho body
     ];
 
     for (const sel of selectors) {
@@ -99,6 +102,10 @@ export function extractSubject() {
         '[data-thread-id] .hP',            // Gmail: scoped subject
         '[data-testid="message-subject"]', // Outlook
         '.ha h2',                           // Gmail: header subject fallback
+        'h2.subject, .subject',             // Roundcube subject
+        '[data-testid="message-header:subject"]', // ProtonMail
+        '[data-test-id="subject"]',         // Yahoo
+        '.zmSubject',                        // Zoho
         'title'                             // Last resort: page title
     ];
 
@@ -122,7 +129,10 @@ export function extractEmailLinks() {
         '.a3s.aiL a',
         '.a3s a',
         '[data-test-id="message-view-body"] a',
-        '.Email-Message-Body a'
+        '.Email-Message-Body a',
+        '[data-testid="message-content"] a', // ProtonMail
+        '.msg-body a',                        // Yahoo
+        '.zmMailBody a'                       // Zoho
     ];
 
     const links = [];

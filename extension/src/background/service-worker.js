@@ -25,6 +25,7 @@ import { checkProStatus } from './services/auth.js';
 import { maybeShowHttpNotification, setActionIconForTab, syncIconForTabFromCache, ignoreTabError, resetActionUIForTab } from './lib/icon-manager.js';
 import { createNavigationHandler } from './lib/navigation-handler.js';
 import { tabStateManager } from '../lib/tab-state-manager.js';
+import { isKnownEmailClient } from '../config/email-clients.js';
 
 console.log('[Hydra Guard] Service worker v1.0.59 initializing (Hydra Hub)...');
 
@@ -265,6 +266,25 @@ chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
     tabStateManager,
     resetActionUIForTab
 }));
+
+// Passive injection for self-hosted or unknown-domain email clients (e.g., Roundcube)
+// because manifest.json `matches` can't statically cover arbitrary domains.
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+    if (details.frameId !== 0) return;
+    
+    if (isKnownEmailClient(details.url)) {
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId: details.tabId },
+                files: ['dist/assets/emailScanner.js']
+            });
+            console.log(`[Hydra Guard] Passively injected emailScanner into known email client: ${details.url}`);
+        } catch (e) {
+            // Can fail if user navigates away extremely fast or if host permissions are missing
+            console.warn('[Hydra Guard] Failed to passively inject emailScanner:', e);
+        }
+    }
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {

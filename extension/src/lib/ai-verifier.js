@@ -6,6 +6,8 @@
  * Returns prompt + raw response for debug transparency.
  */
 
+import { isKnownEmailClient } from '../config/email-clients.js';
+
 const FALLBACK_VERDICT = {
     verdict: 'CONFIRMED',
     reason: 'AI validation inconclusive.',
@@ -112,7 +114,7 @@ function buildEmailSection(emailContext) {
  * @returns {Object|null}
  */
 export function extractEmailContext(url, meta = {}, emailCheck = null) {
-    const isEmailPage = url.includes('mail.google.com') || url.includes('outlook.') || url.includes('mail.yahoo.com') || url.includes('roundcube');
+    const isEmailPage = isKnownEmailClient(url);
     if (!isEmailPage && !meta.subject && !meta.sender && !emailCheck?.flagged) return null;
 
     let senderName = '';

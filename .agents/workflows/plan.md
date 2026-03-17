@@ -24,3 +24,15 @@ description: "Contextual Planner, Lessons Intake, and Gap Analysis"
      - References any relevant ADRs.
      - Notes DB impact (Destructive/Risky/Safe) if database changes are likely.
    - STOP after outputting the plan. Do NOT modify any files or run terminal commands until explicitly instructed to implement.
+5. Review (Critic Agent):
+   - SPAWN: `Review Agent` (Planning mode) with this task:
+     - "Review the Implementation Plan, the original user request, and any referenced code paths.
+      Check for:
+      - Missing edge cases or requirements
+      - Missing or weak tests
+      - Unstated database impact (Destructive/Risky/Safe)
+      - Cross-surface gaps (e.g., extension vs web, if applicable)
+      - Security and performance concerns
+      Output a short list of potential gaps or explicitly state that the plan is sufficiently robust."
+   - The Review Agent MUST NOT modify any files or run terminal commands.
+   - STOP after Review Agent output. Wait for the user to confirm before implementation.
