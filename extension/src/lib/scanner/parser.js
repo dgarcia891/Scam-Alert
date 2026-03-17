@@ -153,3 +153,42 @@ export function extractEmailLinks() {
 
     return { links, rawUrls };
 }
+
+export function extractHiddenHeaders() {
+    const headers = {};
+    
+    try {
+        // Gmail: look for the security details table (accessible via the 'Show details' dropdown if opened,
+        // or sometimes rendered invisibly in the DOM).
+        const detailsTables = document.querySelectorAll('table.cf.ajC td');
+        for (let i = 0; i < detailsTables.length; i++) {
+            const text = detailsTables[i].innerText || '';
+            if (text.includes('Reply-to:')) {
+                const nextTd = detailsTables[i].nextElementSibling;
+                if (nextTd) headers['Reply-To'] = nextTd.innerText.trim();
+            } else if (text.includes('mailed-by:')) {
+                const nextTd = detailsTables[i].nextElementSibling;
+                if (nextTd) headers['mailed-by'] = nextTd.innerText.trim();
+            } else if (text.includes('signed-by:')) {
+                const nextTd = detailsTables[i].nextElementSibling;
+                if (nextTd) headers['signed-by'] = nextTd.innerText.trim();
+            }
+        }
+
+        // Generic fallback for raw headers in pre blocks (sometimes seen in "show original" or raw viewers)
+        const preBlocks = document.querySelectorAll('pre');
+        preBlocks.forEach(pre => {
+            const content = pre.innerText || '';
+            const rpMatch = content.match(/^Return-Path:\s*(.+)$/im);
+            if (rpMatch) headers['Return-Path'] = rpMatch[1].trim();
+            
+            const rtMatch = content.match(/^Reply-To:\s*(.+)$/im);
+            if (rtMatch) headers['Reply-To'] = rtMatch[1].trim();
+        });
+        
+    } catch (e) {
+        console.warn('[Hydra Guard] Failed to extract hidden headers:', e);
+    }
+    
+    return headers;
+}

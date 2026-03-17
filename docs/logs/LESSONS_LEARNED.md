@@ -16,3 +16,8 @@
 - **What was deployed**: Migrated email client detection to a central registry (`email-clients.js`). Added support for Roundcube, Yahoo, ProtonMail, and Zoho. Tightened URL matching regexes and added passive programmatic injection for non-manifest domains.
 - **Notable risks**: Programmatic injection via `chrome.scripting.executeScript` depends on broad host permissions. If permissions are missing for a specific self-hosted client, the scanner won't load until an active fetch.
 - **Follow-up ideas**: Standardise the `senderExtractor` strategies into reusable utility functions to make adding clients even more declarative.
+
+## 2026-03-17: Deployment v1.0.153 - AI Feedback Loop & Text Context Extraction (HG-FEAT-02/03)
+- **What was deployed**: Autonomous AI pattern promotion (Gemini pushes to `sa_patterns` if confidence >= 90%). Community URL blocklist sync. Dynamic AI privacy notices in `popup.jsx`. Fixed the "Something looks off" error by injecting light-weight body text extraction for generic (non-email) web pages.
+- **Notable risks**: Gemini's autonomous insert assumes the AI stays within the whitelist of categories. If it invents a new category, the extension heuristics engine will ignore it.
+- **Follow-up ideas**: Move most `senderExtractor` and `bodyExtractor` logic into the content script (or a shared library) so we rely less on repetitive `chrome.scripting` round-trips for core scans.

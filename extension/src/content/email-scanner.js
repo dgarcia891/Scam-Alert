@@ -10,7 +10,7 @@ import { showActivationPrompt } from './email/activation-prompt.js';
 import { showThreatDashboard } from './email/dashboard.js';
 import { setupEmailObserver } from './email/mutation-observer.js';
 import { highlightDetections } from './highlighter.js';
-import { extractEmailText, parseSenderInfo, extractEmailLinks, extractSubject } from '../lib/scanner/parser.js';
+import { extractEmailText, parseSenderInfo, extractEmailLinks, extractSubject, extractHiddenHeaders } from '../lib/scanner/parser.js';
 import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
 
@@ -67,10 +67,12 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         const senderInfo = parseSenderInfo();
         const linkData = extractEmailLinks();
         const subject = extractSubject();
+        const headers = extractHiddenHeaders();
 
         console.log('[Hydra Guard] Intentional scan triggered...');
         console.log('[Hydra Guard] Sender:', senderInfo.name, senderInfo.email);
         console.log('[Hydra Guard] Subject:', subject);
+        console.log('[Hydra Guard] Headers:', headers);
         console.log('[Hydra Guard] Links found:', linkData.rawUrls.length);
         console.log('[Hydra Guard] Body length:', data.length);
 
@@ -84,6 +86,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                     senderName: senderInfo.name,
                     senderEmail: senderInfo.email,
                     subject: subject,
+                    headers: headers,
                     links: linkData.links,
                     rawUrls: linkData.rawUrls
                 }
@@ -121,6 +124,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                 const senderInfo = parseSenderInfo() || { name: '', email: '' };
                 const subject = extractSubject() || '';
                 const linkData = extractEmailLinks() || { links: [] };
+                const headers = extractHiddenHeaders() || {};
 
                 sendResponse({
                     success: true,
@@ -128,6 +132,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                         senderName: senderInfo.name || '',
                         senderEmail: senderInfo.email || '',
                         subject: subject,
+                        headers: headers,
                         snippet: data.substring(0, 500),
                         embeddedLinks: linkData.links.map(l => l.href)
                     }

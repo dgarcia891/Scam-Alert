@@ -97,6 +97,10 @@ function buildEmailSection(emailContext) {
         lines.push(`URLs found in email body: ${JSON.stringify(safeLinks)}`);
     }
 
+    if (emailContext.headers && Object.keys(emailContext.headers).length > 0) {
+        lines.push(`Hidden HTML Headers / Security Data: ${JSON.stringify(emailContext.headers)}`);
+    }
+
     if (emailContext.isReply !== undefined) {
         lines.push(`Is Reply/Thread: ${emailContext.isReply ? 'Yes' : 'No (unsolicited)'}`);
     }
