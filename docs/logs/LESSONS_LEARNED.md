@@ -11,3 +11,8 @@
 - **What was deployed**: Fixed the AI Second Opinion "Submitting..." freeze (BUG-119) and added support for Roundcube Webmail detection/extraction (BUG-120).
 - **Notable risks**: Adding `roundcube` to global URL heuristics might trigger email-specific UI on non-email pages that happen to have "roundcube" in the path (e.g., development blogs). Monitor for false-positive context triggers.
 - **Follow-up ideas**: Move email client detection from hardcoded strings to a configuration-driven or DOM-signature-driven engine to support a wider array of self-hosted clients without core code changes.
+
+## 2026-03-17: Deployment v1.0.152 - Configuration-Driven Email Detection (HG-FEAT-01)
+- **What was deployed**: Migrated email client detection to a central registry (`email-clients.js`). Added support for Roundcube, Yahoo, ProtonMail, and Zoho. Tightened URL matching regexes and added passive programmatic injection for non-manifest domains.
+- **Notable risks**: Programmatic injection via `chrome.scripting.executeScript` depends on broad host permissions. If permissions are missing for a specific self-hosted client, the scanner won't load until an active fetch.
+- **Follow-up ideas**: Standardise the `senderExtractor` strategies into reusable utility functions to make adding clients even more declarative.

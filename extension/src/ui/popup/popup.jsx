@@ -607,9 +607,19 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                     <span className="font-bold">Privacy Notice</span>
                 </div>
                 <p className="text-[10.5px] text-slate-300 leading-snug mb-3">
-                    Analyzing this email transmits the sender details, subject, and a 500-character body snippet directly to your configured AI provider. 
-                    <br/><br/>
-                    <strong className="text-white">No data is ever saved on Hydra Guard servers.</strong> Please do not use this on highly sensitive emails.
+                    {isKnownEmailClient(currentUrl) ? (
+                        <>
+                            Analyzing this email transmits the sender details, subject, and a 500-character body snippet directly to your configured AI provider.
+                            <br/><br/>
+                            <strong className="text-white">No data is ever saved on Hydra Guard servers.</strong> Please do not use this on highly sensitive emails.
+                        </>
+                    ) : (
+                        <>
+                            Analyzing this webpage transmits visible text content and links directly to your configured AI provider.
+                            <br/><br/>
+                            <strong className="text-white">No data is ever saved on Hydra Guard servers.</strong> Please do not use this on pages with highly sensitive personal information.
+                        </>
+                    )}
                 </p>
                 <div className="space-y-3 mb-4 bg-slate-900/40 p-2.5 rounded-lg border border-slate-700/50">
                     <label className="flex items-start gap-2 cursor-pointer group">
@@ -620,7 +630,7 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                             className="mt-0.5 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 cursor-pointer"
                         />
                         <span className="text-[10px] text-slate-300 group-hover:text-white transition-colors leading-tight">
-                            Help protect the community by anonymously reporting discovered scam indicators (emails, malicious links) to our heuristics database.
+                                Help protect the community by anonymously reporting discovered scam indicators (URLs, emails, phrases) to our heuristics database.
                         </span>
                     </label>
                     <div className="h-px bg-slate-800/50 w-full" />

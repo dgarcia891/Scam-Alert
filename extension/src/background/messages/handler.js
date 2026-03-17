@@ -451,6 +451,19 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                         fetchError = response.error;
                         console.warn('[Hydra Guard] Live email context fetch failed:', fetchError);
                     }
+                } else if (tab) {
+                    try {
+                        const injection = await chrome.scripting.executeScript({
+                            target: { tabId: tab.id },
+                            func: () => document.body.innerText.substring(0, 3000)
+                        });
+                        if (injection && injection[0]?.result) {
+                            emailContext = { pageText: injection[0].result };
+                            console.log('[Hydra Guard] Extracted live page text for generic AI scan.');
+                        }
+                    } catch (e) {
+                        console.warn('[Hydra Guard] Failed to exact live page text:', e.message);
+                    }
                 }
             } catch (e) {
                 fetchError = e.message;
@@ -465,9 +478,9 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
             }
         }
 
-        // EMPTY CONTEXT GUARD: Prevent false positives on safe pages with no email context
-        const hasUsefulEmail = emailContext && (emailContext.bodySnippet || emailContext.subject || emailContext.senderName || emailContext.senderEmail);
-        if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !hasUsefulEmail) {
+        // EMPTY CONTEXT GUARD: Prevent false positives on safe pages with no readable textual or email context
+        const hasUsefulContext = emailContext && (emailContext.bodySnippet || emailContext.subject || emailContext.senderName || emailContext.senderEmail || (emailContext.pageText && emailContext.pageText.trim().length > 50));
+        if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !hasUsefulContext) {
             console.log('[Hydra Guard] AI Context Guard triggered: Insufficient data for AI analysis.');
             const errorReport = fetchError ? `\n\n[FETCH ERROR]: The extension tried to pull live data but failed: ${fetchError}` : '';
             const aiVerification = {
@@ -475,7 +488,7 @@ async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan
                 reason: 'Insufficient suspicious context or email data found to analyze.',
                 confidence: 50,
                 _debug: {
-                    promptSent: `--- Context Guard Triggered ---\nI prevented sending an empty prompt to the AI to avoid a 'Looks safe' false positive.\n\nHere is the exact evidence the extension successfully extracted from this tab (Tab ID: ${msgData?.tabId}):\n\n1. Threat Signals: ${JSON.stringify(signals)}\n2. Found Phrases: ${JSON.stringify(phrases)}\n3. Intent Keywords: ${JSON.stringify(intentKeywords)}\n4. Email Context Data: ${JSON.stringify(emailContext)}${errorReport}\n\nIf everything above is empty, the webpage content was not successfully extracted or didn't contain anything readable. Refresh the page to trigger a new extraction.`,
+                    promptSent: `--- Context Guard Triggered ---\nI prevented sending an empty prompt to the AI to avoid a 'Looks safe' false positive.\n\nHere is the exact evidence the extension successfully extracted from this tab (Tab ID: ${msgData?.tabId}):\n\n1. Threat Signals: ${JSON.stringify(signals)}\n2. Found Phrases: ${JSON.stringify(phrases)}\n3. Intent Keywords: ${JSON.stringify(intentKeywords)}\n4. Context Data: ${JSON.stringify(emailContext)}${errorReport}\n\nIf everything above is empty, the webpage content was not successfully extracted or didn't contain anything readable. Refresh the page to trigger a new extraction.`,
                     rawResponse: `No API call was made to Google Gemini. The extension blocked the request to save API costs and prevent false positives because there was zero data to analyze.`
                 }
             };

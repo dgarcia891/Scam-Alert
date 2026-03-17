@@ -177,7 +177,9 @@ export async function verifyWithAI(url, { signals = [], phrases = [], intentKeyw
 Contextual logic for REGULAR WEBSITES:
 1. If the phrases relate to high-trust brands (Google, Amazon, Banks) but the hostname is unrelated, it's likely a typosquat/scam.
 2. If there are "payment failed" or "account expired" lures pointing to non-official domains, it's a critical threat.
-3. If the domain uses a suspicious TLD or has unusual port numbers, be more cautious.`;
+3. If the domain uses a suspicious TLD or has unusual port numbers, be more cautious.
+
+Page Text Snippet: ${emailContext?.pageText ? JSON.stringify(emailContext.pageText.slice(0, 500)) : '(None)'}`;
 
     const emailLogic = `
 Contextual logic for EMAILS:

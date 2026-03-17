@@ -146,16 +146,32 @@ export async function submitCorrection(urlHash, feedback, options = {}) {
  */
 export async function submitUserReport(url, type, description = '', metadata = {}) {
     try {
+        const sender = metadata.sender || null;
+        let senderDomain = null;
+        let isFreeProvider = false;
+        
+        if (sender) {
+            const domainMatch = sender.match(/@(.+)$/);
+            if (domainMatch) {
+                senderDomain = domainMatch[1].toLowerCase();
+                const freeProviders = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'protonmail.com', 'icloud.com'];
+                isFreeProvider = freeProviders.includes(senderDomain);
+            }
+        }
+
         const result = await postEdgeFunction('sa-report-user', {
             url: url,
             report_type: type || 'scam',
             description: description,
-            sender_email: metadata.sender || null,
+            sender_email: sender,
+            sender_domain: senderDomain,
+            is_free_provider: isFreeProvider,
             subject: metadata.subject || null,
             body_preview: metadata.body_text ? metadata.body_text.substring(0, 4000) : null,
             user_notes: metadata.notes || null,
             severity: metadata.severity || 'UNKNOWN',
             indicators: metadata.indicators || [],
+            trigger_indicators: metadata.trigger_indicators || [],
             scan_result: metadata.scan_result || {},
             extension_version: chrome.runtime.getManifest().version,
         });
@@ -231,9 +247,40 @@ export async function submitFalsePositive(payload) {
 /**
  * @deprecated Community blocklist will use sa-sync-patterns in the future.
  */
-export async function getVerifiedScams() {
-    console.warn('[Hydra Guard] getVerifiedScams() is deprecated. Community blocklist coming soon.');
-    return [];
+export async function getVerifiedScams(since = 0) {
+    try {
+        const apiKey = await getApiKey();
+        const urlObj = new URL(`${FUNCTIONS_BASE_URL}/sa-sync-blocklist`);
+        if (since > 0) urlObj.searchParams.append('since', since);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(urlObj.toString(), {
+            method: 'GET',
+            headers: {
+                'x-sa-api-key': apiKey,
+            },
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            console.warn('[Hydra Guard] Blocklist sync returned:', response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        if (data.ok && Array.isArray(data.blocklist)) {
+            console.log(`[Hydra Guard] Synced ${data.blocklist.length} domains from blocklist.`);
+            return data.blocklist;
+        }
+        return [];
+    } catch (err) {
+        console.error('[Hydra Guard] Failed to fetch verified scams:', err);
+        return [];
+    }
 }
 
 /**
