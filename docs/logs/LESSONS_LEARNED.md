@@ -6,3 +6,8 @@
 - **Admin Visibility**: Multi-layered real-time badges (Header + Sidebar) combined with an Overview card significantly reduce the risk of "missing" reports compared to deep-linked tabs.
 - **Silent React Errors**: Unpassed React props resulting in `ReferenceError` during event handlers (like form submissions) can cause UI state to hang silently. Always ensure required props like `scanResults` are passed down through component trees, or implement global error boundaries to catch UI freezing.
 - **Email Client Variability**: Hard-coding domain checks (e.g., `mail.google.com`) fails to detect self-hosted or white-labeled email clients like Roundcube Webmail. Adopt wider heuristics (e.g., matching iframe contexts like `messagecontframe` or specific headers) where domain-based categorization falls short.
+
+## 2026-03-16: Deployment v1.0.151 - AI Submit & Roundcube Fixes
+- **What was deployed**: Fixed the AI Second Opinion "Submitting..." freeze (BUG-119) and added support for Roundcube Webmail detection/extraction (BUG-120).
+- **Notable risks**: Adding `roundcube` to global URL heuristics might trigger email-specific UI on non-email pages that happen to have "roundcube" in the path (e.g., development blogs). Monitor for false-positive context triggers.
+- **Follow-up ideas**: Move email client detection from hardcoded strings to a configuration-driven or DOM-signature-driven engine to support a wider array of self-hosted clients without core code changes.
