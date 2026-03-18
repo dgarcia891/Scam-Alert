@@ -1,6 +1,7 @@
 # Lessons Learned
 
 ## 2026-03-13: Hydra Guard Visibility & Quality Gate Refinement
+
 - **Drift Violations**: Discovered that several legacy files in the extension (`handler.js`, `dashboard.js`, `options.jsx`, `popup.jsx`) exceed the standard 500-line limit. Updated `drift_check.cjs` with an explicit exclusion list to allow deployment while maintaining the check for new code.
 - **ESM Fallback**: Root `package.json` with `"type": "module"` prevents `.js` files from using `require()`. Renamed script helpers to `.cjs` and updated `package.json` scripts to use them directly, avoiding redundant fallback logic.
 - **Admin Visibility**: Multi-layered real-time badges (Header + Sidebar) combined with an Overview card significantly reduce the risk of "missing" reports compared to deep-linked tabs.
@@ -48,3 +49,9 @@
 - **Root cause**: Gmail renders the email reading pane differently depending on the view. In spam/search/filter views, the body is wrapped in `.adn.ads .a3s` rather than the standard `.a3s.aiL`. Our selector list was built from in-box observations only.
 - **Lesson**: Always test email extraction in Gmail's spam, search, and label views — not just the inbox. Gmail uses different container classes for each view mode. The 'in:spam' indicator in the screenshot was the key clue.
 - **Follow-up ideas**: Add a debug panel in the extension that logs which selector matched (or missed), so future extraction gaps can be pinpointed without needing dev tools.
+
+## 2026-03-17: Deployment v1.0.202 - Robustness & UI Sync (BUG-127/128)
+- **What was deployed**: Implemented 3-stage retry logic in `email-scanner.js` for lazy Gmail views (BUG-127). Enhanced `validateAIResponse` with robust JSON extraction and trailing comma filtering. Synchronized `reason` and `details` fields across background/UI. Fixed `CONFIRMED` verdict color mapping to rose/danger (BUG-128).
+- **Notable risks**: Aggressive JSON extraction using brace matching (`{...}`) could theoretically capture a partial object if the AI returns malformed nested structures. Added depth-counting brace tracker to mitigate this.
+- **Lesson**: UI-background field desyncs often hide valid data. Always provide aliased fields (e.g. `reason` AND `details`) during migrations to prevent "Inconclusive" fallbacks in legacy UI components.
+- **Follow-up ideas**: Move the JSON parsing robustness logic into a shared utility library so all background message handlers can benefit from "fuzzy" JSON parsing.

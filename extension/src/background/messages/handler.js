@@ -1,7 +1,7 @@
 /**
  * Background Message Handler (v19.2 Refactored)
  */
-import { MessageTypes } from '../../lib/messaging.js';
+import { MessageTypes, sendMessageToTab } from '../../lib/messaging.js';
 import { getStats, getSettings, updateSettings, getCachedScan, addToWhitelist, repairStatistics, getWhitelist, normalizeUrl } from '../../lib/storage.js';
 import { submitReport, submitUserReport, submitCorrection } from '../../lib/supabase.js';
 import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
@@ -200,7 +200,39 @@ async function handleNavigateBack(sender) {
 async function handleForceRescan(sender, msgData, scanAndHandle) {
     const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (tab) {
-        await scanAndHandle(tab.id, tab.url, { forceRefresh: true });
+        const scanOptions = { forceRefresh: true };
+
+        // BUG-129: On email clients, fetch live email context before rescanning
+        // so email heuristics actually run (sender, body, subject, links).
+        if (isKnownEmailClient(tab.url)) {
+            try {
+                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'timeout' }), 2000));
+                const fetchPromise = sendMessageToTab(tab.id, { type: 'GET_EMAIL_CONTEXT' })
+                    .then(res => res || { success: false, error: 'no response' })
+                    .catch(e => ({ success: false, error: e.message }));
+                const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+                if (response?.success && response.context) {
+                    scanOptions.pageContent = {
+                        bodyText: response.context.snippet || '',
+                        isEmailView: true,
+                        senderName: response.context.senderName || '',
+                        senderEmail: response.context.senderEmail || '',
+                        subject: response.context.subject || '',
+                        headers: response.context.headers || {},
+                        links: (response.context.embeddedLinks || []).map(l => ({ href: l })),
+                        rawUrls: response.context.embeddedLinks || []
+                    };
+                    console.log('[Hydra Guard] FORCE_RESCAN: Fetched email context for enriched scan.');
+                } else {
+                    console.warn('[Hydra Guard] FORCE_RESCAN: Could not fetch email context:', response?.error);
+                }
+            } catch (e) {
+                console.warn('[Hydra Guard] FORCE_RESCAN: Email context fetch failed:', e.message);
+            }
+        }
+
+        await scanAndHandle(tab.id, tab.url, scanOptions);
     }
     return { success: true };
 }

@@ -982,6 +982,7 @@ const Popup = () => {
                 const newStatus = deriveStatusFromResults(res, false);
                 setStatus(newStatus);
                 if (res.whitelisted) setIsWhitelisted(true);
+                setIsRescanning(false); // BUG-129: Clear spinner on live result
             }
         };
         chrome.runtime.onMessage.addListener(handleScanUpdate);
@@ -1029,21 +1030,11 @@ const Popup = () => {
     const handleForceRescan = useCallback(() => {
         setIsRescanning(true);
         chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: {} }, () => {
-            // Wait a moment for the scan to complete, then re-fetch results
-            setTimeout(() => {
-                chrome.runtime.sendMessage({ type: MessageTypes.GET_SCAN_RESULTS, data: { tabId: currentTabId } }, (response) => {
-                    const data = response?.data;
-                    if (data?.results) {
-                        const res = data.results;
-                        setScanResults(res);
-                        if (res.whitelisted) { setIsWhitelisted(true); setStatus('secure'); }
-                        else if (['CRITICAL', 'HIGH'].includes(res.overallSeverity)) setStatus('danger');
-                        else if (['MEDIUM'].includes(res.overallSeverity)) setStatus('caution');
-                        else setStatus('secure');
-                    }
-                    setIsRescanning(false);
-                });
-            }, 3000);
+            // BUG-129: Results arrive via the SCAN_RESULT_UPDATED listener.
+            // The old setTimeout re-fetch was racing with the broadcast and
+            // overwriting email-enriched results with stale URL-only data.
+            // Safety timeout to clear spinner if broadcast is missed.
+            setTimeout(() => setIsRescanning(false), 8000);
         });
     }, [currentTabId]);
 
