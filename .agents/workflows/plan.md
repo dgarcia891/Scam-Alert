@@ -12,19 +12,27 @@ description: "Contextual Planner, Lessons Intake, and Gap Analysis"
    - Read docs/architecture/DECISIONS.md.
    - Identify any bugs, anti-patterns, or decisions relevant to the current request.
    - Explicitly state in the plan how you will avoid repeating known failed approaches.
-3. Gap Analysis:
+3. Lovable Architect Activation (if relevant):
+   - If the request involves Lovable UI, Supabase schema/data, MCP project/database analysis, or GitHub ↔ Lovable sync:
+     - Explicitly activate and use the `lovable_architect` skill.
+     - Use MCP tools such as `analyze_project` and `analyze_database_schema` as recommended by the skill before finalizing the Implementation Plan.
+   - Incorporate the skill’s constraints:
+     - Respect forbidden zones (e.g., `src/integrations/supabase/*`).
+     - Use dead-drop migrations instead of direct DB pushes.
+     - Align with Lovable’s directory and component conventions.
+4. Gap Analysis:
    - Compare the user request against docs/architecture/architecture.md (or equivalent architecture doc).
    - Identify gaps in:
      - Features
      - Tests
      - Docs
      - Data model / Supabase
-4. Output:
+5. Output:
    - Produce a concise Implementation Plan that:
      - References any relevant ADRs.
      - Notes DB impact (Destructive/Risky/Safe) if database changes are likely.
    - STOP after outputting the plan. Do NOT modify any files or run terminal commands until explicitly instructed to implement.
-5. Review (Critic Agent):
+6. Review (Critic Agent):
    - SPAWN: `Review Agent` (Planning mode) with this task:
      - "Review the Implementation Plan, the original user request, and any referenced code paths.
       Check for:

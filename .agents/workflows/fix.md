@@ -8,9 +8,23 @@ description: "Two-Strike Bug Repair, Lessons Reuse, and Silent Learning"
      - What approaches were tried before.
      - Why those approaches failed or were insufficient.
    - Commit to a different or improved fix strategy rather than repeating a previously failed approach.
-2. Reproduce:
+2. Lovable Architect for Lovable/Supabase bugs:
+   - If the bug involves:
+     - Lovable pages or flows,
+     - Supabase queries, RLS policies, or auth,
+     - GitHub ↔ Lovable sync issues,
+     THEN:
+     - Activate `lovable_architect`.
+     - Use its MCP-first recommendations (e.g., `analyze_database_schema`, project analysis) to:
+       - Understand current schema and policies.
+       - Identify potential side effects of the fix.
+   - Incorporate these findings into:
+       - The regression test design.
+       - The chosen fix approach.
+   - Do not violate forbidden zones or DB safety rules defined by the skill.
+3. Reproduce:
    - Write or update a failing regression test in tests/regression/ that reliably reproduces the bug.
-3. Review (Critic Agent):
+4. Review (Critic Agent):
    - SPAWN: `Review Agent` (Planning mode) with this task:
      - "Review the bug description, related BUG_LOG / LESSONS_LEARNED entries, the regression test(s), and the proposed fix approach.
       Check for:
@@ -20,14 +34,14 @@ description: "Two-Strike Bug Repair, Lessons Reuse, and Silent Learning"
       - Any risky side effects not addressed
       Output a short list of corrections or confirm that the fix plan is sound."
    - The Review Agent MUST NOT directly change code or tests; it only comments on the plan.
-4. Attempt 1:
+5. Attempt 1:
    - Implement the fix in code.
    - Run the relevant tests (regression + affected unit tests).
-5. Attempt 2 (if needed):
+6. Attempt 2 (if needed):
    - If Attempt 1 fails, try a second fix with an adjusted strategy.
    - Re-run tests.
    - If Attempt 2 also fails, STOP and spawn a Research Agent; do NOT keep guessing.
-6. Log & Learn (MANDATORY once tests pass):
+7. Log & Learn (MANDATORY once tests pass):
    - Update docs/logs/BUG_LOG.md with the bug and status: FIXED, referencing the regression test file.
    - Update docs/logs/LESSONS_LEARNED.md with the core lesson.
    - If the lesson is architectural or process-level, consider:

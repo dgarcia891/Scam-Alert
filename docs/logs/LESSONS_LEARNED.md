@@ -62,3 +62,8 @@
 - **Notable risks**: The `GET_EMAIL_CONTEXT` content script message may time out (2s) if the email scanner hasn't initialized yet, gracefully falling back to a URL-only scan.
 - **Lesson**: Rescan handlers that don't pass `pageContent` will silently skip all email-specific heuristics. Any background scan path that targets email clients must fetch context from the active tab — URL-only scans are meaningless on Gmail/Outlook because the "page" is just `mail.google.com`.
 - **Follow-up ideas**: Consider making `pageContent` injection a first-class concern in `scanAndHandle` itself rather than relying on each caller to provide it.
+
+## 2026-03-18: Deployment v1.0.204 - Scan Transparency & Observability
+
+- **What was deployed**: Added DevPanel "Scanned Content" panel showing sender/subject/body snippet/link count extracted before the scan. Added human-readable check labels. Expanded `emailScams` flagged detail to show matched signal labels and impersonated brands. Added amber "Email not yet scanned" banner in the normal popup view. Stored `bodySnippet`/`linkCount`/`senderEmail` in `result.metadata` after every scan.
+- **Lesson**: When debugging a "0 checks" result, the most valuable information is what was *fed in* to the scanner — not just what was *found*. Surfacing extracted content gives instant visual confirmation of whether email context was present.

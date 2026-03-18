@@ -7,3 +7,4 @@
 5. **The Push Catch:** You cannot mark a feature as COMPLETE until `git status` is clean and `git push origin main` has been successfully executed to trigger Lovable sync.
 6. **YAML Parser Safety:** You are FORBIDDEN from using single quotes (`'`) inside the `description:` field of any `.agents/workflows/*.md` file. It breaks the IDE parser. Use double quotes (`"`) only.
 8. **Critic Review:** For any non-trivial plan or fix, a dedicated Review Agent must review the plan and tests before implementation or deploy. The Review Agent never edits code directly; it only surfaces gaps and risks.
+9. **Lovable Architect Required:** For any task involving Lovable, Supabase, MCP analysis, or GitHub ↔ Lovable sync, you MUST activate and follow the `lovable_architect` skill. Consult its guidance (forbidden zones, MCP usage, dead-drop migrations, sync discipline) before planning or implementing such work.
