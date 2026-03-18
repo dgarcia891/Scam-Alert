@@ -241,6 +241,10 @@ export const INDICATOR_EXPLANATIONS = {
     'Vague social lure with external link': {
         category: 'Social Engineering',
         reason: 'A disarming, friendly message paired with an external link is a delivery mechanism for phishing and malware.'
+    },
+    'Multi-domain redirect chain link': {
+        category: 'Link Obfuscation',
+        reason: 'This link contains multiple @ symbols and chained domain segments designed to hide the real destination — a strong phishing signal.'
     }
 };
 

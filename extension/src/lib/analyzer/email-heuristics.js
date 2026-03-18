@@ -7,7 +7,7 @@
  * data is available the hardcoded lists still provide full coverage.
  */
 import { getExplanation, INDICATOR_EXPLANATIONS } from './explanations.js';
-import { checkSuspiciousPort, checkUrlObfuscation, checkSuspiciousTLD, checkIPAddress } from './url-engine.js';
+import { checkSuspiciousPort, checkUrlObfuscation, checkSuspiciousTLD, checkIPAddress, checkRedirectChain } from './url-engine.js';
 
 /**
  * @param {Object} pageContent        — extracted email data (bodyText, senderEmail, links, etc.)
@@ -169,6 +169,11 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         if (checkIPAddress(link).flagged) {
             indicators.push('IP address used instead of domain in link');
             score += 25;
+        }
+        const redirectCheck = checkRedirectChain(link);
+        if (redirectCheck.flagged) {
+            indicators.push('Multi-domain redirect chain link');
+            score += redirectCheck.score;
         }
     }
 

@@ -869,9 +869,12 @@ function deriveStatusFromResults(res, scanInProgress) {
 
     if (res.whitelisted) return 'secure';
 
+    // BUG-SYNC: Align with background isAlert logic
     const severity = res.overallSeverity || res.severity;
-    if (['CRITICAL', 'HIGH'].includes(severity)) return 'danger';
-    if (['MEDIUM'].includes(severity)) return 'caution';
+    const isThreat = res.overallThreat || ['CRITICAL', 'HIGH'].includes(severity);
+    
+    if (isThreat) return 'danger';
+    if (severity === 'MEDIUM') return 'caution';
 
     return 'secure';
 }

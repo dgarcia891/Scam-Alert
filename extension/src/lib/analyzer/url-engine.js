@@ -246,3 +246,77 @@ export function checkSuspiciousPort(url) {
     };
 }
 
+/**
+ * Detects multi-domain redirect chain phishing URLs.
+ * These URLs abuse multiple @ symbols and embed many domain-like segments
+ * (e.g., .co.uk, .net, .com) in the path to obfuscate the real destination.
+ *
+ * Example attack URL:
+ *   https://x.org.uk/@/foo.co.uk/bvg@bar.com/@/baz.in.net/...
+ */
+export function checkRedirectChain(url) {
+    if (!url || typeof url !== 'string') {
+        return { title: 'check_redirect_chain', flagged: false, severity: 'NONE', score: 0, details: 'No URL', dataChecked: '' };
+    }
+
+    const flagged = [];
+    let totalScore = 0;
+
+    // 1. Multiple @ symbols — 2+ is a near-certain phishing signal
+    const atCount = (url.match(/@/g) || []).length;
+    if (atCount >= 3) {
+        flagged.push(`${atCount} @ symbols (heavy obfuscation)`);
+        totalScore += 50;
+    } else if (atCount >= 2) {
+        flagged.push(`${atCount} @ symbols (domain hiding)`);
+        totalScore += 40;
+    }
+
+    // 2. Domain-like segments in the URL path
+    //    Count occurrences of TLD patterns after the hostname portion
+    const TLD_PATTERN = /\.(com|net|org|co\.uk|org\.uk|in\.net|info|biz|me|io|cc|us|uk|de|fr|ru|cn|xyz|top|site|online|club|live|store|app|dev|pro|tech|ltd)\b/gi;
+    try {
+        const urlObj = new URL(url);
+        const pathAndQuery = urlObj.pathname + urlObj.search + urlObj.hash;
+        const domainSegments = pathAndQuery.match(TLD_PATTERN) || [];
+        if (domainSegments.length >= 5) {
+            flagged.push(`${domainSegments.length} domain-like segments in path (redirect chain)`);
+            totalScore += 45;
+        } else if (domainSegments.length >= 3) {
+            flagged.push(`${domainSegments.length} domain-like segments in path`);
+            totalScore += 35;
+        }
+    } catch {
+        // If new URL() fails, try raw string matching (the URL might be malformed)
+        const domainSegments = url.match(TLD_PATTERN) || [];
+        // Subtract 1 for the actual hostname TLD
+        const pathSegments = Math.max(0, domainSegments.length - 1);
+        if (pathSegments >= 5) {
+            flagged.push(`${pathSegments}+ domain-like segments (malformed redirect chain)`);
+            totalScore += 45;
+        } else if (pathSegments >= 3) {
+            flagged.push(`${pathSegments}+ domain-like segments`);
+            totalScore += 35;
+        }
+    }
+
+    // 3. Excessive URL length bonus (common in redirect chains)
+    if (url.length > 200 && flagged.length > 0) {
+        flagged.push(`Excessive URL length (${url.length} chars)`);
+        totalScore += 10;
+    }
+
+    const severity = totalScore >= 45 ? 'CRITICAL' : (totalScore >= 30 ? 'HIGH' : 'NONE');
+
+    return {
+        title: 'check_redirect_chain',
+        description: 'Detects multi-domain redirect chain URLs that abuse @ symbols and embed many domain-like segments to hide the real destination.',
+        flagged: flagged.length > 0,
+        severity,
+        details: flagged.length > 0 ? flagged.join('; ') : 'No redirect chain detected',
+        patterns: flagged,
+        dataChecked: url,
+        score: totalScore
+    };
+}
+

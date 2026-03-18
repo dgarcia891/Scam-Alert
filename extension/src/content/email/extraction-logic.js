@@ -126,7 +126,7 @@ export function extractEmailData() {
 
         // Extract sender
         if (client.selectors.sender) {
-            const senderEl = doc.querySelector(client.selectors.sender);
+            const senderEl = document.querySelector(client.selectors.sender) || doc.querySelector(client.selectors.sender);
             if (senderEl) {
                 const senderInfo = extractSender(senderEl, client);
                 senderName = senderInfo.name;
@@ -140,7 +140,7 @@ export function extractEmailData() {
 
         // Extract subject
         if (client.selectors.subject) {
-            const subj = doc.querySelector(client.selectors.subject);
+            const subj = document.querySelector(client.selectors.subject) || doc.querySelector(client.selectors.subject);
             if (subj) subject = subj.innerText;
         }
     } catch (e) {

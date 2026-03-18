@@ -11,7 +11,9 @@ import { handleReportScam, handleReportFalsePositive, handleSubmitCorrectionUnif
 import { handleAskAIOpinion } from './ai-handler.js';
 
 export async function handleIncomingMessage(message, sender, context = {}) {
-    const { type, data } = message;
+    const { type } = message;
+    const data = (message.data !== undefined) ? message.data : message.payload;
+    
     const { 
         scanAndHandle, getStats, updateSettings, getCachedScan, getSettings,
         isWhitelisted, addToWhitelist, getWhitelist, repairStatistics, 
@@ -19,7 +21,7 @@ export async function handleIncomingMessage(message, sender, context = {}) {
         tabStateManager, cacheScan, submitSafeListAppeal
     } = context;
 
-    const msgData = typeof message.data === 'string' ? JSON.parse(message.data) : message.data;
+    const msgData = typeof data === 'string' ? JSON.parse(data) : data;
     switch (type) {
         case MessageTypes.GET_TAB_STATUS:
             return handleGetTabStatus(getCachedScan);

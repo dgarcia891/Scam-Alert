@@ -17,7 +17,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
 
     chrome.runtime.sendMessage({
         type: MessageTypes.CONTEXT_DETECTED,
-        payload: {
+        data: {
             context: initialContext,
             emailMetadata: initialMetadata
         }
@@ -417,7 +417,7 @@ async function handleExecuteScan(options = {}) {
     };
     try {
         const result = await scanUrl(window.location.href, scanOptions, (progress) => {
-            chrome.runtime.sendMessage({ type: MessageTypes.SCAN_PROGRESS, payload: progress });
+            chrome.runtime.sendMessage({ type: MessageTypes.SCAN_PROGRESS, data: progress });
         });
         currentScanResult = result;
         return { success: true, result };

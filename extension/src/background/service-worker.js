@@ -155,7 +155,7 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             }
         });
 
-        const isAlert = result.overallThreat || (result.overallSeverity !== 'SAFE' && result.overallSeverity !== 'LOW');
+        const isAlert = result.overallThreat || result.overallSeverity === 'CRITICAL' || result.overallSeverity === 'HIGH' || result.overallSeverity === 'MEDIUM';
         if (isAlert) {
             await handleThreat(tabId, url, result, settings);
         } else {
@@ -308,7 +308,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         handleIncomingMessage(message, sender, context)
             .then(sendResponse)
             .catch(err => {
-                console.error('[Hydra Guard] Fatal message error:', err);
+                console.error(`[Hydra Guard] Fatal message error (${type}):`, err);
                 sendResponse({ success: false, error: err.message || 'Internal extension error' });
             });
     } catch (syncErr) {

@@ -5,6 +5,7 @@
 
 import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
 import { isKnownEmailClient } from '../../config/email-clients.js';
+import { sendMessageToTab } from '../../lib/messaging.js';
 
 export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan, tabStateManager) {
     try {
@@ -15,11 +16,15 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         }
 
         // Get the current tab URL if not provided
+        let targetTabId = msgData?.tabId;
         let url = msgData?.url;
-        if (!url) {
+        
+        if (!targetTabId) {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            url = tab?.url;
+            targetTabId = tab?.id;
+            url = tab?.url || url;
         }
+
         if (!url) {
             return { success: false, error: 'No URL to analyze.' };
         }
@@ -68,13 +73,14 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         } else {
             // Fetch live email context from the active tab for popup AI
             try {
-                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-                if (tab && isKnownEmailClient(tab.url)) {
+                if (targetTabId && isKnownEmailClient(url)) {
                     // Helper: attempt to fetch email context from the content script
                     const attemptFetch = () => {
                         const timeoutResponse = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'Content script timed out (1500ms).' }), 1500));
-                        const fetchResponse = chrome.tabs.sendMessage(tab.id, { type: 'GET_EMAIL_CONTEXT' }).catch((e) => ({ success: false, error: e.message || 'Content script unreachable.' }));
-                        return Promise.race([fetchResponse, timeoutResponse]);
+                        const fetchPromise = sendMessageToTab(targetTabId, { type: 'GET_EMAIL_CONTEXT' })
+                            .then(res => res || { success: false, error: 'Content script unreachable.' })
+                            .catch(e => ({ success: false, error: e.message || 'Content script unreachable.' }));
+                        return Promise.race([fetchPromise, timeoutResponse]);
                     };
 
                     let response = await attemptFetch();
@@ -86,7 +92,7 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                         console.log('[Hydra Guard] Content script unreachable — re-injecting email scanner...');
                         try {
                             await chrome.scripting.executeScript({
-                                target: { tabId: tab.id },
+                                target: { tabId: targetTabId },
                                 files: ['dist/assets/emailScanner.js']
                             });
                             // Give the freshly injected script a moment to initialize
@@ -115,10 +121,10 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                         fetchError = response.error;
                         console.warn('[Hydra Guard] Live email context fetch failed:', fetchError);
                     }
-                } else if (tab) {
+                } else if (targetTabId) {
                     try {
                         const injection = await chrome.scripting.executeScript({
-                            target: { tabId: tab.id },
+                            target: { tabId: targetTabId },
                             func: () => document.body.innerText.substring(0, 3000)
                         });
                         if (injection && injection[0]?.result) {
@@ -211,6 +217,6 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         };
     } catch (err) {
         console.error('[Hydra Guard] ASK_AI_OPINION failed:', err);
-        return { success: false, error: err.message };
+        return { success: false, error: err.stack || err.message };
     }
 }

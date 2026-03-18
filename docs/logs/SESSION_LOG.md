@@ -330,3 +330,83 @@ NEXT STEPS:
 • Monitor AI feedback loop for intent-mismatch accuracy.
 • Proceed to Layer 5: Community Defense (Global Blocklist & Reporting Sync).
 ═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+HANDOFF: 2026-03-17T18:33:59.546Z
+═══════════════════════════════════════════════════
+CURRENT STATE:
+Branch: main
+Last Commit: 8b19c5b FEAT-088 v2: Phase 2 AI Context & Refactoring - v1.0.154
+GIT STATUS:
+m acmezone_deploy_sync
+ M docs/ENHANCEMENTS.md
+ M docs/logs/LESSONS_LEARNED.md
+
+COMPLETED:
+• Refactored `handler.js` (< 300 lines) by extracting AI and Reporting logic into `ai-handler.js` and `report-handler.js`.
+• Enriched AI email context gathering by extracting hidden headers (`Return-Path`, `Reply-To`, `mailed-by`, `signed-by`) in `parser.js`.
+• Integrated EmailRep API (`emailrep.io`) into `sa-report-user` Edge Function to provide proactive sender reputation context to Gemini.
+• Updated docs: `LESSONS_LEARNED.md`, `ENHANCEMENTS.md`.
+• Successfully released `v1.0.154`.
+
+IN PROGRESS:
+• Ready for next feature assignment.
+
+BLOCKERS:
+• None.
+
+KEY FILES MODIFIED:
+• `extension/src/background/messages/handler.js`, `ai-handler.js`, `report-handler.js`
+• `extension/src/content/email-scanner.js`
+• `extension/src/lib/scanner/parser.js`
+• `extension/src/lib/ai-verifier.js`
+• `acmezone_deploy_sync/supabase/functions/sa-report-user/index.ts`
+
+NEXT STEPS:
+• Consider implementing the 'Confidence Visualizer' in the Admin UI (HG-FEAT-02 backlog) to expose the raw Gemini verification reasoning.
+• Validate Edge Function autonomous promotion logs in Supabase.
+═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+HANDOFF: 2026-03-18T01:25:26.028Z
+═══════════════════════════════════════════════════
+CURRENT STATE:
+Branch: main
+Last Commit: 8b19c5b FEAT-088 v2: Phase 2 AI Context & Refactoring - v1.0.154
+GIT STATUS:
+m acmezone_deploy_sync
+ M docs/BUG_LOG.md
+ M docs/ENHANCEMENTS.md
+ M docs/logs/LESSONS_LEARNED.md
+ M docs/logs/SESSION_LOG.md
+ M extension/src/background/messages/ai-handler.js
+ M extension/src/background/messages/handler.js
+ M extension/src/background/service-worker.js
+ M extension/src/content/content.js
+ M extension/src/content/email/extraction-logic.js
+ M extension/src/ui/popup/popup.jsx
+
+COMPLETED:
+• Resolved **BUG-121**: Fixed Roundcube extraction logic by correctly scoping querySelector to the main document for sender and subject.
+• Fixed **Service Worker Crash**: Resolved `TypeError` in message listener by standardizing 'payload' vs 'data' naming between `content.js` and `handler.js`.
+• Resolved **UI/Icon Discrepancy**: Aligned 'isAlert' logic in `service-worker.js` and `deriveStatusFromResults` in `popup.jsx` to ensure consistent threat thresholds.
+• Improved background resilience: Added better error logging (including message type) and defensive naming fallback in `handler.js`.
+• Enriched `ai-handler.js` to return full stack traces for AI-related failures.
+
+IN PROGRESS:
+• State is stable. Ready for next feature or bug fix.
+
+BLOCKERS:
+• None.
+
+KEY FILES MODIFIED:
+• `extension/src/content/email/extraction-logic.js`
+• `extension/src/background/messages/handler.js`, `ai-handler.js`
+• `extension/src/background/service-worker.js`
+• `extension/src/content/content.js`
+• `extension/src/ui/popup/popup.jsx`
+
+NEXT STEPS:
+• Monitor Roundcube and other email clients for similar UI extraction scope issues.
+• Validate UI/Badge sync after MV3 service worker termination/wakeup cycles.
+═══════════════════════════════════════════════════

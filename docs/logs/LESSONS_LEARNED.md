@@ -21,3 +21,19 @@
 - **What was deployed**: Autonomous AI pattern promotion (Gemini pushes to `sa_patterns` if confidence >= 90%). Community URL blocklist sync. Dynamic AI privacy notices in `popup.jsx`. Fixed the "Something looks off" error by injecting light-weight body text extraction for generic (non-email) web pages.
 - **Notable risks**: Gemini's autonomous insert assumes the AI stays within the whitelist of categories. If it invents a new category, the extension heuristics engine will ignore it.
 - **Follow-up ideas**: Move most `senderExtractor` and `bodyExtractor` logic into the content script (or a shared library) so we rely less on repetitive `chrome.scripting` round-trips for core scans.
+
+## 2026-03-17: Deployment v1.0.154 - Rich Context & Refactoring (HG-FEAT-02 v2)
+- **What was deployed**: Background logic refactored (`handler.js` split into `ai-handler.js` and `report-handler.js`). Richer email context extraction (hidden headers like `Reply-To`). Backend integration (Edge Function) with `EmailRep.io` to provide Gemini with proactive sender reputation data.
+- **Notable risks**: Parsing DOM-based hidden headers in Gmail can be brittle if Google updates their 'Show Details' table structure. Added fallback to raw header matching in `pre` blocks.
+- **Follow-up ideas**: Implement a 'Confidence Visualizer' in the Admin UI so admins can see why the AI assigned a specific reputation or verdict (exposing the debug logs more clearly).
+
+## 2026-03-17: Extension Extraction Scope Issue (BUG-121)
+- **What was deployed**: Fixed an issue in `extraction-logic.js` where the document query selector was incorrectly restricted to the `iframe` document for email clients with `iframeExtraction: true` (like Roundcube).
+- **Notable risks**: Querying the main document before the iframe document could potentially match unexpected elements if the main page has elements matching the email client's sender/subject selectors. However, since the selectors are specific, this risk is minimal.
+- **Follow-up ideas**: Implement a more robust testing environment (e.g., using JSDOM or Playwright) to simulate complex DOM structures like iframes for unit testing extraction logic.
+
+## 2026-03-17: Redirect Chain Link Detection Gap (BUG-123)
+- **What happened**: A phishing email's "Report the user" button had a massively obfuscated URL with 10+ `@` symbols and dozens of chained domain-like segments (`.co.uk`, `.net`, `.com`). The existing `checkUrlObfuscation` only detected a single `@` with a modest +30 score — not enough to escalate severity for the extreme multi-`@` case, and it had no detection for domain-like segments chained in the URL path.
+- **Root cause**: The URL heuristic engine lacked a dedicated "redirect chain" detector. Individual signals (single `@`, single suspicious TLD) existed but there was no amplification for the *combination* of many `@` symbols + many path domains + extreme length.
+- **Lesson**: When designing detection heuristics, always consider the *amplified* version of existing signals. A single `@` is suspicious; 10 `@` symbols is near-certain phishing. Build dedicated detectors for extreme cases rather than relying on generic single-signal checks.
+- **Follow-up ideas**: Consider adding a visual indicator in the dashboard that shows the actual destination URL when `@` obfuscation is detected (resolving e.g., `user@fake.com@real-destination.com` into just `real-destination.com`).
