@@ -125,7 +125,7 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                     try {
                         const injection = await chrome.scripting.executeScript({
                             target: { tabId: targetTabId },
-                            func: () => document.body.innerText.substring(0, 3000)
+                            func: function extractPageText() { return document.body.innerText.substring(0, 3000); }  // BUG-124: must use function keyword — arrow funcs cause Vite to try to resolve `document` in the SW bundle scope
                         });
                         if (injection && injection[0]?.result) {
                             emailContext = { pageText: injection[0].result };
