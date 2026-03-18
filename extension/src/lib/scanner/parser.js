@@ -5,9 +5,13 @@
 
 export function extractEmailText() {
     const selectors = [
-        '.a3s.aiL',              // Gmail: Primary email body (most reliable)
+        '.a3s.aiL',              // Gmail: Primary email body (most reliable, standard inbox)
+        '.adn.ads .a3s',         // Gmail: Spam/search preview pane body (BUG-125)
+        '.aqs.aqq .a3s',         // Gmail: another search/filter pane variant
+        '.adn .a3s',             // Gmail: Generic reading pane body (BUG-125)
         '.a3s',                  // Gmail: Email body fallback
         '.ii.gt .a3s',           // Gmail: body within thread item
+        '.gs .ii.gt .a3s',       // Gmail: expanded thread body
         '[data-message-id] .a3s', // Gmail: scoped to message container
         'div[dir="ltr"]',        // Gmail: LTR content block (generic fallback)
         '[data-test-id="message-view-body"]', // Outlook body
@@ -28,6 +32,22 @@ export function extractEmailText() {
             }
         }
     }
+
+    // BUG-125: Last resort — try any iframe body (e.g. Roundcube or sandboxed Gmail previews)
+    try {
+        for (const iframe of document.querySelectorAll('iframe')) {
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (iframeDoc?.body) {
+                    const text = (iframeDoc.body.innerText || '').trim();
+                    if (text.length > 50) {
+                        console.log(`[Hydra Guard] extractEmailText: found in iframe body (${text.length} chars)`);
+                        return text;
+                    }
+                }
+            } catch { /* cross-origin iframe, skip */ }
+        }
+    } catch { /* ignore */ }
 
     console.warn('[Hydra Guard] extractEmailText: NO body text found — all selectors missed');
     return '';
@@ -127,6 +147,8 @@ export function extractSubject() {
 export function extractEmailLinks() {
     const selectors = [
         '.a3s.aiL a',
+        '.adn.ads .a3s a',                    // Gmail spam/search pane (BUG-125)
+        '.adn .a3s a',                        // Gmail alternate reading pane (BUG-125)
         '.a3s a',
         '[data-test-id="message-view-body"] a',
         '.Email-Message-Body a',
@@ -137,12 +159,14 @@ export function extractEmailLinks() {
 
     const links = [];
     const rawUrls = [];
+    const seen = new Set();
 
     for (const sel of selectors) {
         const els = document.querySelectorAll(sel);
         if (els.length > 0) {
             els.forEach(el => {
-                if (el.href) {
+                if (el.href && !seen.has(el.href)) {
+                    seen.add(el.href);
                     links.push({ href: el.href, text: el.innerText || '' });
                     rawUrls.push(el.href);
                 }

@@ -37,3 +37,14 @@
 - **Root cause**: The URL heuristic engine lacked a dedicated "redirect chain" detector. Individual signals (single `@`, single suspicious TLD) existed but there was no amplification for the *combination* of many `@` symbols + many path domains + extreme length.
 - **Lesson**: When designing detection heuristics, always consider the *amplified* version of existing signals. A single `@` is suspicious; 10 `@` symbols is near-certain phishing. Build dedicated detectors for extreme cases rather than relying on generic single-signal checks.
 - **Follow-up ideas**: Consider adding a visual indicator in the dashboard that shows the actual destination URL when `@` obfuscation is detected (resolving e.g., `user@fake.com@real-destination.com` into just `real-destination.com`).
+## 2026-03-17: Deployment v1.0.157 - AI Context & Service Worker Stability (BUG-122/124)
+- **What was deployed**: Resolved AI "Context Guard" failure (BUG-122) and fixed the `ReferenceError: document is not defined` crash in the service worker (BUG-124).
+- **Notable risks**: Moving from arrow functions to named function declarations in `chrome.scripting.executeScript` is a common fix for Vite/Rollup bundling issues, but we should audit other similar background-to-tab injections for this pattern.
+- **Lesson**: Vite's bundling of service workers can mistakenly capture arrow function closures. Always use proper `function` declarations for code intended to be serialized and injected into tabs to ensure `document` and `window` are never evaluated in the background scope.
+- **Follow-up ideas**: Audit all `executeScript` calls to ensure they use named functions and don't rely on background-scope variables.
+
+## 2026-03-17: Gmail Spam/Search Folder Extraction Gap (BUG-125)
+- **What happened**: A clearly phishing email (account suspended, data purge, final notice) was completely invisible to the extension when viewed in Gmail's spam folder. The Context Guard triggered with null context.
+- **Root cause**: Gmail renders the email reading pane differently depending on the view. In spam/search/filter views, the body is wrapped in `.adn.ads .a3s` rather than the standard `.a3s.aiL`. Our selector list was built from in-box observations only.
+- **Lesson**: Always test email extraction in Gmail's spam, search, and label views — not just the inbox. Gmail uses different container classes for each view mode. The 'in:spam' indicator in the screenshot was the key clue.
+- **Follow-up ideas**: Add a debug panel in the extension that logs which selector matched (or missed), so future extraction gaps can be pinpointed without needing dev tools.

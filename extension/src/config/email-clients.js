@@ -14,7 +14,7 @@ export const EMAIL_CLIENTS = [
         titlePatterns: [],
         selectors: {
             container: '.nH.hx',
-            messageBody: '.a3s.aiL, .a3s, .ii.gt .a3s, [data-message-id] .a3s',
+            messageBody: '.a3s.aiL, .adn.ads .a3s, .adn .a3s, .a3s, .ii.gt .a3s, [data-message-id] .a3s',  // BUG-125: added spam/search pane selectors
             sender: '.gD, .go',
             subject: 'h2.hP, .hP',
             composeButton: "[aria-label*='Compose' i]"

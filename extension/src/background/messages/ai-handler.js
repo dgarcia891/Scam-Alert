@@ -123,9 +123,30 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                     }
                 } else if (targetTabId) {
                     try {
+                        // BUG-125: use known email body selectors before falling back to raw body text
                         const injection = await chrome.scripting.executeScript({
                             target: { tabId: targetTabId },
-                            func: function extractPageText() { return document.body.innerText.substring(0, 3000); }  // BUG-124: must use function keyword — arrow funcs cause Vite to try to resolve `document` in the SW bundle scope
+                            func: function extractSmartPageText() {
+                                var emailSelectors = [
+                                    '.a3s.aiL', '.adn.ads .a3s', '.adn .a3s', '.a3s', '.ii.gt .a3s',
+                                    '[data-test-id="message-view-body"]',
+                                    '[data-testid="message-content"]',
+                                    '.msg-body', '.rps_2003', '.rps_2016'
+                                ];
+                                for (var i = 0; i < emailSelectors.length; i++) {
+                                    var el = document.querySelector(emailSelectors[i]);
+                                    if (el) {
+                                        var t = (el.innerText || '').trim();
+                                        if (t.length > 20) return t.substring(0, 3000);
+                                    }
+                                }
+                                var body = document.body;
+                                if (!body) return '';
+                                var clone = body.cloneNode(true);
+                                var noise = clone.querySelectorAll('nav,header,footer,script,style,[role="navigation"],[role="banner"]');
+                                for (var j = 0; j < noise.length; j++) noise[j].remove();
+                                return (clone.innerText || '').trim().substring(0, 3000);
+                            }
                         });
                         if (injection && injection[0]?.result) {
                             emailContext = { pageText: injection[0].result };
