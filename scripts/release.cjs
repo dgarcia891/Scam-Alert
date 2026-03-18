@@ -60,7 +60,16 @@ filesToSync.forEach(file => {
   }
 });
 
-// 3. Git actions
+// 3. Rebuild extension to refresh dist/
+try {
+  console.log('🏗️ Rebuilding extension...');
+  execSync('cd extension && npm run build', { stdio: 'pipe' });
+  console.log('✅ Extension rebuilt successfully');
+} catch (e) {
+  console.error('❌ Build failed during release:', e.message);
+}
+
+// 4. Git actions
 try {
   execSync('git add -A', { stdio: 'ignore' });
   execSync(`git commit -m "chore: release v${nextVersion}"`, { stdio: 'ignore' });

@@ -49,6 +49,11 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     /**
      * Main Trigger Logic
      */
+    // BUG-127: Retry state for lazy-loaded Gmail spam/search views
+    let extractionRetryCount = 0;
+    const MAX_EXTRACTION_RETRIES = 3;
+    let retryTimer = null;
+
     async function triggerScan() {
         if (!chrome.runtime?.id) return;
 
@@ -62,7 +67,24 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         }
 
         const data = extractEmailText();
-        if (!data) return;
+        if (!data) {
+            // BUG-127: Gmail spam/search views lazy-load content.
+            // Retry with increasing delay up to MAX_EXTRACTION_RETRIES times.
+            if (extractionRetryCount < MAX_EXTRACTION_RETRIES) {
+                extractionRetryCount++;
+                const delay = extractionRetryCount * 1000; // 1s, 2s, 3s
+                console.log(`[Hydra Guard] Body empty — retry ${extractionRetryCount}/${MAX_EXTRACTION_RETRIES} in ${delay}ms`);
+                if (retryTimer) clearTimeout(retryTimer);
+                retryTimer = setTimeout(() => triggerScan(), delay);
+            } else {
+                console.warn('[Hydra Guard] Body empty after all retries — giving up for this view.');
+            }
+            return;
+        }
+
+        // Reset retry counter on successful extraction
+        extractionRetryCount = 0;
+        if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
 
         const senderInfo = parseSenderInfo();
         const linkData = extractEmailLinks();
@@ -96,6 +118,15 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
     // Initialize DOM Observer
     setupEmailObserver(triggerScan);
+
+    // BUG-127: Fire an initial scan after a short delay.
+    // The mutation observer only catches *future* DOM changes.
+    // If the email is already rendered when the script loads (e.g. direct
+    // navigation to a spam email), the observer never fires.
+    setTimeout(() => {
+        console.log('[Hydra Guard] Initial scan trigger (1.5s post-load)');
+        triggerScan();
+    }, 1500);
 
     // Initialize Link Interceptor
     setupLinkInterceptor((href) => {
