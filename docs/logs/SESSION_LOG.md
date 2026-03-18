@@ -410,3 +410,37 @@ NEXT STEPS:
 • Monitor Roundcube and other email clients for similar UI extraction scope issues.
 • Validate UI/Badge sync after MV3 service worker termination/wakeup cycles.
 ═══════════════════════════════════════════════════
+═══════════════════════════════════════════════════
+HANDOFF: 2026-03-17T19:48:00.000Z
+═══════════════════════════════════════════════════
+CURRENT STATE:
+Branch: main
+Last Commit: b0d0c03 chore: release v1.0.155 - Fix AI context extraction (BUG-122) and multi-domain redirect chain detection (BUG-123)
+
+GIT STATUS:
+(clean)
+
+COMPLETED:
+• Resolved **BUG-122**: Fixed AI "Context Guard" failure in ai-handler.js by prioritizing msgData.tabId and switching to sendMessageToTab wrapper.
+• Resolved **BUG-123**: Implemented checkRedirectChain in url-engine.js to detect multi-@ and domain-chain phishing links.
+• Updated explanations.js with friendly reasoning for the new redirect chain detection.
+• Added regression tests in tests/unit/redirect-chain.test.js.
+• Deployed **v1.0.155** to origin main.
+
+IN PROGRESS:
+• Deployment complete. Extension is in a stable, verified state.
+
+BLOCKERS:
+• None.
+
+KEY FILES MODIFIED:
+• extension/src/background/messages/ai-handler.js
+• extension/src/lib/analyzer/url-engine.js
+• extension/src/lib/analyzer/email-heuristics.js
+• extension/src/lib/analyzer/explanations.js
+• tests/unit/redirect-chain.test.js
+
+NEXT STEPS:
+• Monitor user reports for similar redirect-chain variants that might bypass current counts.
+• Implement HG-FEAT-03 (Visual Destination Resolver) to expose the raw destination of obfuscated links.
+═══════════════════════════════════════════════════

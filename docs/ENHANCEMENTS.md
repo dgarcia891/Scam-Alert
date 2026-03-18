@@ -8,3 +8,4 @@ Format: | ID | Title | Status | Priority | Notes |
 | HG-DEBT-03 | Clean up unused `.js` scripts in root | Backlog | Low | Redundant with `.cjs` versions in many cases. |
 | HG-FEAT-01 | Config-driven Email Client Detection | Complete | Medium | Migrated to central registry in v1.0.152. |
 | HG-FEAT-02 | AI Confidence Visualizer in Admin UI | Backlog | Low | Expose AI reputation checks & Gemini debug logs to admins. |
+| HG-FEAT-03 | Visual Destination Resolver | Backlog | Low | Shows the actual destination URL when @ obfuscation is detected (resolving `user@fake.com@real-destination.com`). |
