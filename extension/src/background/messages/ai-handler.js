@@ -177,6 +177,7 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
             const aiVerification = {
                 verdict: 'INCONCLUSIVE',
                 reason: 'Insufficient suspicious context or email data found to analyze.',
+                details: 'Insufficient suspicious context or email data found to analyze.',
                 confidence: 50,
                 _debug: {
                     promptSent: `--- Context Guard Triggered ---\nI prevented sending an empty prompt to the AI to avoid a 'Looks safe' false positive.\n\nHere is the exact evidence the extension successfully extracted from this tab (Tab ID: ${msgData?.tabId}):\n\n1. Threat Signals: ${JSON.stringify(signals)}\n2. Found Phrases: ${JSON.stringify(phrases)}\n3. Intent Keywords: ${JSON.stringify(intentKeywords)}\n4. Context Data: ${JSON.stringify(emailContext)}${errorReport}\n\nIf everything above is empty, the webpage content was not successfully extracted or didn't contain anything readable. Refresh the page to trigger a new extraction.`,
@@ -198,6 +199,7 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         const aiVerification = {
             verdict: result.verdict,
             reason: result.reason,
+            details: result.reason, // BUG-128 Sync: Provide both field names for UI compatibility
             confidence: result.confidence,
             indicators: result.indicators || [],
             _debug: result._debug || null

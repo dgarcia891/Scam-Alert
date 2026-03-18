@@ -381,7 +381,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
             {(() => {
                 const hasAI = aiVerification != null;
                 const aiSkippedReason = !settings?.aiEnabled ? 'not enabled' : !settings?.aiApiKey ? 'no API key' : 'severity too low';
-                const aiStatus = hasAI ? (aiVerification.verdict === 'ESCALATED' ? 'flag' : aiVerification.verdict === 'DOWNGRADED' ? 'pass' : 'pass') : 'skip';
+                const aiStatus = hasAI ? (['ESCALATED', 'CONFIRMED'].includes(aiVerification.verdict) ? 'flag' : aiVerification.verdict === 'DOWNGRADED' ? 'pass' : 'pass') : 'skip';
                 return (
                     <StageHeader icon={Cpu} title="5. AI Second Opinion" status={aiStatus} timing={timing.ai} defaultOpen={hasAI} description="Sends the page context to a Large Language Model for deep semantic analysis.">
                         {!hasAI ? (
@@ -396,10 +396,10 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                                     )}>{aiVerification.verdict}</span>
                                     <span className="text-slate-500">Confidence</span>
                                     <span className="text-slate-300">{aiVerification.confidence != null ? `${aiVerification.confidence}%` : 'N/A'}</span>
-                                    {aiVerification.details && (
+                                    {aiVerification.reason && (
                                         <>
                                             <span className="text-slate-500">Reason</span>
-                                            <span className="text-slate-400 text-[9px]">{aiVerification.details}</span>
+                                            <span className="text-slate-400 text-[9px]">{aiVerification.reason}</span>
                                         </>
                                     )}
                                 </div>
@@ -693,7 +693,7 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                     "w-full rounded-xl border text-xs font-medium overflow-hidden",
                     aiResult.verdict === 'DOWNGRADED'
                         ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                        : aiResult.verdict === 'ESCALATED'
+                        : (aiResult.verdict === 'ESCALATED' || aiResult.verdict === 'CONFIRMED')
                             ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
                             : aiResult.verdict === 'ERROR'
                                 ? "bg-slate-800/50 border-slate-700 text-slate-400"
@@ -708,7 +708,7 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                             <Sparkles size={12} />
                             <span className="font-bold flex-1">
                                 {aiResult.verdict === 'DOWNGRADED' ? 'AI says: Looks safe'
-                                    : aiResult.verdict === 'ESCALATED' ? 'AI says: This looks dangerous'
+                                    : (aiResult.verdict === 'ESCALATED' || aiResult.verdict === 'CONFIRMED') ? 'AI says: This looks dangerous'
                                         : aiResult.verdict === 'ERROR' ? 'AI unavailable'
                                             : 'AI says: Something looks off'}
                             </span>

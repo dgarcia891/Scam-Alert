@@ -11,6 +11,7 @@ import { isKnownEmailClient } from '../config/email-clients.js';
 const FALLBACK_VERDICT = {
     verdict: 'CONFIRMED',
     reason: 'AI validation inconclusive.',
+    details: 'AI validation inconclusive.',
     confidence: 50,
     indicators: []
 };
@@ -41,27 +42,59 @@ function sanitizeText(text, maxLen = 200) {
 
 /**
  * Validate and sanitize the AI's JSON response.
+ * Handles markdown blocks, leading/trailing junk, and trailing commas.
  * @param {string} rawResponse 
  * @returns {Object} Validated verdict object
  */
 export function validateAIResponse(rawResponse) {
     let parsed;
     try {
-        // Strip potential markdown code blocks if the model included them
-        const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        // Step 1: Broad cleaning (strip markdown markers)
+        let cleaned = rawResponse.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+        
+        // Step 2: Extract the JSON object — find the LAST '{' before the last '}'
+        // Using lastIndexOf for '}' and searching backward for its matching '{'
+        // prevents grabbing stray braces in leading prose (e.g., "Here is the {result}:")
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (lastBrace !== -1) {
+            // Walk backwards from lastBrace to find the opening brace at the same depth
+            let depth = 0;
+            let firstBrace = -1;
+            for (let i = lastBrace; i >= 0; i--) {
+                if (cleaned[i] === '}') depth++;
+                else if (cleaned[i] === '{') {
+                    depth--;
+                    if (depth === 0) { firstBrace = i; break; }
+                }
+            }
+            if (firstBrace !== -1) {
+                cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+            }
+        }
+
+        // Step 3: Handle trailing commas (Gemini occasionally returns invalid JSON with them)
+        // This simple regex handles trailing commas in objects/arrays before the closing brace
+        cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+
         parsed = JSON.parse(cleaned);
     } catch (err) {
-        console.warn('[AI Verifier] Failed to parse AI response:', err);
+        console.warn('[AI Verifier] Failed to parse AI response:', err.message);
         return FALLBACK_VERDICT;
     }
 
     // Schema Validation
     const VALID_VERDICTS = ['CONFIRMED', 'DOWNGRADED', 'ESCALATED'];
-    if (!VALID_VERDICTS.includes(parsed.verdict)) return FALLBACK_VERDICT;
+    if (!VALID_VERDICTS.includes(parsed.verdict)) {
+        console.warn('[AI Verifier] Invalid or missing verdict:', parsed.verdict);
+        return FALLBACK_VERDICT;
+    }
+
+    const reason = (typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : (typeof parsed.details === 'string' ? parsed.details.slice(0, 200) : 'No reason provided.'));
 
     return {
         verdict: parsed.verdict,
-        reason: (typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : 'No reason provided.'),
+        reason: reason,
+        details: reason, // BUG-128 sync: Provide both names to ensure both DevPanel and Main UI work
         confidence: (typeof parsed.confidence === 'number' ? Math.max(0, Math.min(100, parsed.confidence)) : 50),
         indicators: Array.isArray(parsed.indicators) ? parsed.indicators.filter(i => typeof i === 'string').slice(0, 10) : []
     };
