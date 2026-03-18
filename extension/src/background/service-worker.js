@@ -131,6 +131,19 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             if (existingCache?.aiVerification) {
                 result.aiVerification = existingCache.aiVerification;
             }
+
+            // Transparency: Store extracted content metadata so DevPanel can show what was actually scanned.
+            // Without this, a "0 checks" result looks identical to "scan ran but found nothing."
+            if (pageContent) {
+                result.metadata = result.metadata || {};
+                if (pageContent.bodyText) {
+                    result.metadata.bodySnippet = pageContent.bodyText.substring(0, 200);
+                }
+                result.metadata.linkCount = (pageContent.rawUrls || pageContent.links || []).length;
+                if (pageContent.senderEmail && !result.metadata.senderEmail) {
+                    result.metadata.senderEmail = pageContent.senderEmail;
+                }
+            }
             
             await cacheScan(url, result);
         }

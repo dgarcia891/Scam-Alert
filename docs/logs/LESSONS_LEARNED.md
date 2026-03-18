@@ -55,3 +55,10 @@
 - **Notable risks**: Aggressive JSON extraction using brace matching (`{...}`) could theoretically capture a partial object if the AI returns malformed nested structures. Added depth-counting brace tracker to mitigate this.
 - **Lesson**: UI-background field desyncs often hide valid data. Always provide aliased fields (e.g. `reason` AND `details`) during migrations to prevent "Inconclusive" fallbacks in legacy UI components.
 - **Follow-up ideas**: Move the JSON parsing robustness logic into a shared utility library so all background message handlers can benefit from "fuzzy" JSON parsing.
+
+## 2026-03-17: Deployment v1.0.203 - Email Scan Pipeline Fix (BUG-129)
+
+- **What was deployed**: Fixed `handleForceRescan` to fetch live email context from content script before rescanning on email client URLs. Fixed popup race condition where a `setTimeout` re-fetch overwrote email-enriched results with stale URL-only data.
+- **Notable risks**: The `GET_EMAIL_CONTEXT` content script message may time out (2s) if the email scanner hasn't initialized yet, gracefully falling back to a URL-only scan.
+- **Lesson**: Rescan handlers that don't pass `pageContent` will silently skip all email-specific heuristics. Any background scan path that targets email clients must fetch context from the active tab — URL-only scans are meaningless on Gmail/Outlook because the "page" is just `mail.google.com`.
+- **Follow-up ideas**: Consider making `pageContent` injection a first-class concern in `scanAndHandle` itself rather than relying on each caller to provide it.

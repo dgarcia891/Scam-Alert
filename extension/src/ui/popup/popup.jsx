@@ -160,6 +160,23 @@ function deriveSeverityRule(signals) {
 // DEV PANEL (the main developer mode view)
 // ═══════════════════════════════════════════════════════════════
 
+// Human-readable labels for check keys
+const CHECK_LABELS = {
+    emailScams: '✉️ Email Scam Patterns',
+    urgencySignals: '⏰ Urgency / Pressure Signals',
+    typosquatting: '🎭 Typosquatting (Fake Domain)',
+    advancedTyposquatting: '🎭 Advanced Typosquatting',
+    suspiciousKeywords: '🔍 Suspicious Keywords in URL',
+    nonHttps: '🔓 Unencrypted Connection (HTTP)',
+    suspiciousTLD: '🌐 Suspicious Domain Extension',
+    ipAddress: '📍 IP Address as URL',
+    urlObfuscation: '🕵️ URL Obfuscation',
+    excessiveSubdomains: '🌿 Excessive Subdomains',
+    suspiciousPort: '🔌 Non-standard Port',
+    contentAnalysis: '📄 Page Content Analysis',
+    googleSafeBrowsing: '🛡️ Google Safe Browsing',
+};
+
 const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCache, isRescanning, userIsPro }) => {
     const version = (() => { try { return chrome.runtime.getManifest().version; } catch { return '?.?.?'; } })();
     const meta = scanResults?.meta || {};
@@ -168,6 +185,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     const signals = scanResults?.signals || { hard: [], soft: [] };
     const sources = meta.sources || [];
     const aiVerification = scanResults?.aiVerification || checks?.aiVerification || null;
+    const metadata = scanResults?.metadata || {};
 
     // Parse URL
     let hostname = '', protocol = '', tld = '';
@@ -183,6 +201,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     const isGmail = currentUrl?.includes('mail.google.com');
     const isOutlook = currentUrl?.includes('outlook.live.com') || currentUrl?.includes('outlook.office');
     const matchedClient = getMatchingClient(currentUrl || '');
+    const isEmailUrl = !!(isGmail || isOutlook || matchedClient);
     const pageContext = hasEmailChecks ? (matchedClient ? `EMAIL (${matchedClient.label})` : 'EMAIL') : 'WEB';
 
     // Source lookup helper
@@ -201,6 +220,13 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
     const totalSkipped = skippedChecks.length;
     const stageCount = 4; // Blocklist, Patterns, GSB, AI
     const activeStages = sources.filter(s => s.status === 'success' && s.id !== 'phishtank').length + 1; // +1 for blocklist always
+
+    // Scanned Content: what was fed into the scan
+    const scannedSender = metadata.sender || null;
+    const scannedSubject = metadata.subject || null;
+    const scannedBodySnippet = metadata.bodySnippet || null;
+    const scannedLinkCount = metadata.linkCount ?? null;
+    const hasContentData = !!(scannedSender || scannedSubject || scannedBodySnippet);
 
     return (
         <div className="space-y-2 mt-3 custom-scrollbar" style={{ maxHeight: '480px', overflowY: 'auto', paddingRight: '2px' }}>
@@ -258,6 +284,38 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                     </span>
                 </div>
             </div>
+
+            {/* ── A3. SCANNED CONTENT (email URLs only) ──────────────────────────── */}
+            {isEmailUrl && (
+                <StageHeader
+                    icon={Mail}
+                    title="📥 Scanned Content"
+                    defaultOpen={true}
+                    description="The email data that was extracted and fed into the scanner. If Sender/Body are missing, the scan ran without email context and heuristics were skipped."
+                >
+                    <div className="space-y-1">
+                        {[  
+                            { label: 'Sender', value: scannedSender, missing: 'Not extracted — scan lacked email context' },
+                            { label: 'Subject', value: scannedSubject, missing: 'Not captured' },
+                            { label: 'Body', value: scannedBodySnippet ? `"${scannedBodySnippet.substring(0, 100)}${scannedBodySnippet.length > 100 ? '…' : ''}"` : null, missing: 'No body text — email heuristics likely skipped' },
+                            { label: 'Links', value: scannedLinkCount != null ? `${scannedLinkCount} found` : null, missing: 'Not checked' },
+                        ].map(({ label, value, missing }) => (
+                            <div key={label} className="grid grid-cols-[50px_1fr] gap-x-2 text-[10px] py-0.5">
+                                <span className="text-slate-500 font-bold">{label}</span>
+                                {value
+                                    ? <span className="text-slate-300 break-words leading-tight">{value}</span>
+                                    : <span className="text-rose-400/80 italic">{missing}</span>
+                                }
+                            </div>
+                        ))}
+                        {!hasContentData && (
+                            <div className="text-[10px] text-rose-400 font-semibold mt-1 py-1 px-2 bg-rose-900/20 rounded">
+                                ⚠️ No content was extracted. The scan only checked the URL (mail.google.com) — email heuristics did not run. Try clicking Force Rescan.
+                            </div>
+                        )}
+                    </div>
+                </StageHeader>
+            )}
 
             {/* ── B. URL & CONTEXT ──────────────────────────────────────────── */}
             <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg px-2.5 py-2 space-y-1">
@@ -322,11 +380,26 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                             <StatusIcon status="flag" />
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-rose-300 font-mono font-semibold">{key}</span>
+                                    <span className="text-[10px] text-rose-300 font-semibold">{CHECK_LABELS[key] || key}</span>
                                     {val.severity && val.severity !== 'NONE' && <SeverityPill severity={val.severity} />}
                                 </div>
                                 {(val.details || val.message || val.description) && (
-                                    <div className="text-[9px] text-slate-500 truncate">{val.details || val.message || val.description}</div>
+                                    <div className="text-[9px] text-slate-500 leading-tight mt-0.5">{val.details || val.message || val.description}</div>
+                                )}
+                                {/* emailScams: show matched signals */}
+                                {key === 'emailScams' && val.visualIndicators?.length > 0 && (
+                                    <div className="mt-1 space-y-0.5">
+                                        {val.visualIndicators.map((ind, i) => (
+                                            <div key={i} className="text-[9px] text-rose-300/70 pl-2 border-l border-rose-500/30">
+                                                ↳ {ind.label || ind.phrase} {ind.score ? `(score: ${ind.score})` : ''}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {key === 'emailScams' && val.evidence?.detectedBrands?.length > 0 && (
+                                    <div className="text-[9px] text-amber-400/70 mt-0.5">
+                                        Impersonated: {val.evidence.detectedBrands.join(', ')}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -336,7 +409,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                         <div key={key} className="flex items-start gap-1.5 py-0.5">
                             <StatusIcon status="pass" />
                             <div className="flex-1 min-w-0">
-                                <span className="text-[10px] text-emerald-400/60 font-mono">{key}</span>
+                                <span className="text-[10px] text-emerald-400/60">{CHECK_LABELS[key] || key}</span>
                                 {val.details && <span className="text-[9px] text-slate-600 ml-1.5">{typeof val.details === 'string' ? val.details : ''}</span>}
                             </div>
                         </div>
@@ -345,11 +418,11 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                     {skippedChecks.map(([key]) => (
                         <div key={key} className="flex items-start gap-1.5 py-0.5">
                             <StatusIcon status="skip" />
-                            <span className="text-[10px] text-slate-600 font-mono">{key}</span>
+                            <span className="text-[10px] text-slate-600">{CHECK_LABELS[key] || key}</span>
                             <span className="text-[8px] text-violet-500 font-bold">PRO</span>
                         </div>
                     ))}
-                    {checkEntries.length === 0 && <div className="text-[10px] text-slate-600 italic">No check data available</div>}
+                    {checkEntries.length === 0 && <div className="text-[10px] text-slate-600 italic">No check data available — try Force Rescan</div>}
                 </div>
             </StageHeader>
 
@@ -1088,6 +1161,16 @@ const Popup = () => {
                 <div className="mb-2 px-2.5 py-1.5 bg-violet-500/10 border border-violet-500/20 rounded-lg flex items-center gap-2">
                     <Bug size={11} className="text-violet-400 shrink-0" />
                     <span className="text-[10px] font-semibold text-violet-300">Developer Mode</span>
+                </div>
+            )}
+
+            {/* ── EMAIL NOT SCANNED BANNER ─────────────────────────────────────────────────── */}
+            {!devMode && isEmail && status === 'empty' && (
+                <div className="mb-2 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2">
+                    <Mail size={11} className="text-amber-400 shrink-0" />
+                    <span className="text-[10px] text-amber-300">
+                        Email not yet scanned — open <strong>DEV mode</strong> and click <strong>Force Rescan</strong> to analyze.
+                    </span>
                 </div>
             )}
 
