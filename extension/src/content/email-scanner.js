@@ -159,6 +159,37 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         triggerScan();
     }, 1500);
 
+    // BUG-133: Watch for SPA navigation changes inside Gmail
+    let lastUrl = location.href;
+    setInterval(() => {
+        if (location.href !== lastUrl) {
+            lastUrl = location.href;
+            console.log('[Hydra Guard] SPA Navigation detected in content script');
+            extractionRetryCount = 0; // Reset on navigation
+            if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+            // Delay 500ms for Gmail to render the email DOM
+            setTimeout(() => {
+                if (isEmailReadingView()) triggerScan();
+            }, 500);
+        }
+    }, 500);
+
+    // BUG-133: Listen for explicit background triggers
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === 'RETRIGGER_SCAN' || message.type === 'GET_EMAIL_CONTEXT') {
+            if (message.type === 'RETRIGGER_SCAN') {
+                console.log('[Hydra Guard] Received RETRIGGER_SCAN from background');
+                extractionRetryCount = 0;
+                if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+                setTimeout(() => {
+                    if (isEmailReadingView()) triggerScan();
+                }, 500);
+                sendResponse({ success: true });
+                return true;
+            }
+        }
+    });
+
     // Initialize Link Interceptor
     setupLinkInterceptor((href) => {
         chrome.runtime.sendMessage({

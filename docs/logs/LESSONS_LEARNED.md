@@ -85,5 +85,13 @@
 - **Root cause 1**: `webNavigation.onCompleted` re-injects the content script on Gmail SPA hash navigations. This started the initial 1.5s timer while the user was still viewing the inbox *list*, consuming all retries before an email was ever opened.
 - **Root cause 2**: The `UNKNOWN` severity state merely set the extension badge and didn't trigger a Chrome OS notification, leaving the failure silent unless the user manually clicked the extension.
 - **Lesson**: 
-  1. When injecting scripts into SPAs that use hash-routing (like Gmail), always guard initialization timers with DOM existence checks (`isEmailReadingView`) to ensure you are operating in the correct sub-view, not just treating the navigation event as a page load.
-  2. Security products must explicitly notify users of failure states (`chrome.notifications`), not rely on passive badge updates.
+  1. Cuando inyectas scripts en SPAs que usan hash-routing (como Gmail), siempre protege los temporizadores de inicialización con comprobaciones de existencia en el DOM (`isEmailReadingView`) para asegurar que estás operando en la sub-vista correcta.
+  2. Los productos de seguridad deben notificar explícitamente a los usuarios sobre los estados de fallo (`chrome.notifications`), no depender de actualizaciones pasivas de insignias.
+
+## 2026-03-19: The Illusion of Full Page Loads in SPAs (BUG-133)
+
+- **What happened**: After BUG-131 and BUG-132, email scanning still failed. The root cause was finally identified: the extension was waiting for `chrome.webNavigation.onBeforeNavigate`, which never fires when opening an email in Gmail because Gmail is an SPA using `history.pushState`.
+- **Root cause**: Extension listeners were built under the assumption that navigating to an email was a new page load. Consequently, the content script was only injected ONCE when the inbox loaded, and its timer expired immediately against the inbox DOM.
+- **Lesson**: 
+  1. Never trust standard navigation events (`onCompleted`, `onBeforeNavigate`) when injecting content scripts into modern webapps. Always hook into `chrome.webNavigation.onHistoryStateUpdated`.
+  2. For maximum robustness in complex SPAs like Gmail where even Chrome events can be dropped or desynced, pair the background listener with a lightweight URL polling loop (`setInterval` watching `location.href`) directly inside the already-injected content script.

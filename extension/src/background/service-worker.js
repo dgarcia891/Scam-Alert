@@ -309,6 +309,26 @@ chrome.webNavigation.onBeforeNavigate.addListener(createNavigationHandler({
     resetActionUIForTab
 }));
 
+// BUG-133: Listen for SPA navigations (hash changes) in email clients
+chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+    if (details.frameId !== 0) return;
+    
+    if (isKnownEmailClient(details.url)) {
+        console.log(`[Hydra Guard] SPA Navigation detected on tab ${details.tabId}: ${details.url}`);
+        try {
+            // Immediate: Clear stale badge state to prevent flickers
+            await chrome.action.setBadgeText({ tabId: details.tabId, text: '' });
+            await chrome.action.setBadgeBackgroundColor({ tabId: details.tabId, color: [0, 0, 0, 0] });
+        } catch (e) { /* ignore */ }
+        
+        try {
+            await chrome.tabs.sendMessage(details.tabId, { type: 'RETRIGGER_SCAN' });
+        } catch (e) {
+            console.warn('[Hydra Guard] Failed to send RETRIGGER_SCAN to tab:', e);
+        }
+    }
+});
+
 // Passive injection for self-hosted or unknown-domain email clients (e.g., Roundcube)
 // because manifest.json `matches` can't statically cover arbitrary domains.
 chrome.webNavigation.onCompleted.addListener(async (details) => {
