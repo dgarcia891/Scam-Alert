@@ -78,3 +78,12 @@
 - **Root cause**: Linear retry loops (1s, 2s, 3s) were too short for heavy SPAs like Gmail, and the system had no fallback presentation for "failed to extract" other than a normal clean scan.
 - **Lesson**: Never silently swallow data extraction failures in security products. If the core heuristic context cannot be extracted, the extension must explicitly downgrade its confidence (amber '?' badge) rather than defaulting to the base URL's safety rating. Also, use exponential backoff for DOM element discovery in complex SPAs.
 - **Follow-up ideas**: Instrument telemetry for 'extractionFailed' events to globally monitor which email clients or DOM changes are breaking the parser.
+
+## 2026-03-19: SPA Injection Races & Silent Failures (BUG-132)
+
+- **What happened**: Despite adding retry logic for email extraction in BUG-131, the issue persisted because the retries were exhausting prematurely. Additionally, the user still didn't receive a proactive warning when extraction failed.
+- **Root cause 1**: `webNavigation.onCompleted` re-injects the content script on Gmail SPA hash navigations. This started the initial 1.5s timer while the user was still viewing the inbox *list*, consuming all retries before an email was ever opened.
+- **Root cause 2**: The `UNKNOWN` severity state merely set the extension badge and didn't trigger a Chrome OS notification, leaving the failure silent unless the user manually clicked the extension.
+- **Lesson**: 
+  1. When injecting scripts into SPAs that use hash-routing (like Gmail), always guard initialization timers with DOM existence checks (`isEmailReadingView`) to ensure you are operating in the correct sub-view, not just treating the navigation event as a page load.
+  2. Security products must explicitly notify users of failure states (`chrome.notifications`), not rely on passive badge updates.

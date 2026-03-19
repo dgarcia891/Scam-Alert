@@ -131,11 +131,30 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     // Initialize DOM Observer
     setupEmailObserver(triggerScan);
 
-    // BUG-127: Fire an initial scan after a short delay.
+    // BUG-132: Check if we appear to be in an email "reading" view
+    // before firing the initial scan, otherwise the premature scan exhausts
+    // all retries against the inbox list.
+    function isEmailReadingView() {
+        return !!(
+            document.querySelector('.hP') ||          // Gmail: subject line
+            document.querySelector('[data-message-id]') || // Gmail: message container
+            document.querySelector('.a3s') ||         // Gmail: Email body
+            document.querySelector('[data-testid="message-view-body"]') || // Outlook
+            document.querySelector('.msg-body') ||    // Yahoo
+            document.querySelector('.zmMailBody') ||  // Zoho
+            document.querySelector('#messagecontframe') // Roundcube
+        );
+    }
+
+    // BUG-127 & BUG-132: Fire an initial scan after a short delay.
     // The mutation observer only catches *future* DOM changes.
     // If the email is already rendered when the script loads (e.g. direct
     // navigation to a spam email), the observer never fires.
     setTimeout(() => {
+        if (!isEmailReadingView()) {
+            console.log('[Hydra Guard] Inbox list view detected — deferring scan to mutation observer');
+            return;
+        }
         console.log('[Hydra Guard] Initial scan trigger (1.5s post-load)');
         triggerScan();
     }, 1500);

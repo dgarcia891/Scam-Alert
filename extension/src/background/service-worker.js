@@ -189,6 +189,17 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                 await chrome.action.setBadgeText({ tabId, text: '?' });
                 await chrome.action.setBadgeBackgroundColor({ tabId, color: '#f59e0b' });
             } catch (error) { ignoreTabError(error); }
+
+            // BUG-132: Fire proactive OS notification when extraction fails
+            if (settings.notificationsEnabled) {
+                chrome.notifications.create({
+                    type: 'basic',
+                    iconUrl: chrome.runtime.getURL('icons/icon48.png'),
+                    title: '⚠️ Hydra Guard: Scan Incomplete',
+                    message: "Couldn't read this email's content. Click the extension icon to retry.",
+                    priority: 1
+                });
+            }
         } else {
             try {
                 // Ensure the badge is truly wiped for SAFE sites
