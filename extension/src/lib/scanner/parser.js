@@ -13,6 +13,10 @@ export function extractEmailText() {
         '.ii.gt .a3s',           // Gmail: body within thread item
         '.gs .ii.gt .a3s',       // Gmail: expanded thread body
         '[data-message-id] .a3s', // Gmail: scoped to message container
+        '.ii.gt',                // Gmail: plain text/altered layout fallback (BUG-130)
+        '[data-message-id] div[dir="auto"]', // Gmail: alternate wrapper (BUG-130)
+        '[data-message-id] div[dir="ltr"]', // Gmail: alternate wrapper (BUG-130)
+        '.nH.hx .a3s',           // Gmail: wide generic fallback (BUG-130)
         'div[dir="ltr"]',        // Gmail: LTR content block (generic fallback)
         '[data-test-id="message-view-body"]', // Outlook body
         '.Email-Message-Body',   // Generic

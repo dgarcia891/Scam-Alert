@@ -22,6 +22,7 @@ export function severityToIconState(severity) {
         case 'HIGH':
             return 'DANGER';
         case 'MEDIUM':
+        case 'UNKNOWN': // BUG-131: Unextracted email defaults to WARNING visual state
             return 'WARNING';
         case 'LOW':
         default:

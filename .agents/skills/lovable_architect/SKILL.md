@@ -59,3 +59,5 @@ triggers: ["lovable", "supabase", "mcp", "ui", "database", "github", "sync"]
     - If there are multiple viable ways to wire Lovable, Supabase, and GitHub together, STOP and ask the user which pattern they prefer instead of guessing.
 15. **Missing Context:**
     - If required Lovable, Supabase, or GitHub configuration files are absent or inconsistent, treat it as a configuration bug and propose a remediation plan rather than proceeding blindly.
+16. **Mandatory Critic Review (Fixed Gate):**
+    - For all bugfixes or structural refactors, you MUST generate a `critic_report.md` artifact before writing code. This report must objectively audit your own plan against `BUG_LOG.md` and `LESSONS_LEARNED.md` to prevent regression or repetition of failed strategies. Use `notify_user` to present the report and plan together.

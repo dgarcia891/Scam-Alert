@@ -67,3 +67,14 @@
 
 - **What was deployed**: Added DevPanel "Scanned Content" panel showing sender/subject/body snippet/link count extracted before the scan. Added human-readable check labels. Expanded `emailScams` flagged detail to show matched signal labels and impersonated brands. Added amber "Email not yet scanned" banner in the normal popup view. Stored `bodySnippet`/`linkCount`/`senderEmail` in `result.metadata` after every scan.
 - **Lesson**: When debugging a "0 checks" result, the most valuable information is what was *fed in* to the scanner — not just what was *found*. Surfacing extracted content gives instant visual confirmation of whether email context was present.
+
+## 2026-03-18: Gmail Plain-Text & Spam Body Fallbacks (BUG-130)
+
+- **What was deployed**: Added broad DOM selector fallbacks to `parser.js` and `email-clients.js` to capture Gmail email bodies that lack the standard `.a3s` wrapper (e.g., plain-text rendering or certain spam views with large banners).
+- **Lesson**: Highly specific DOM selectors (`.adn.ads .a3s`) often break on Edge cases in SPAs like Gmail. Always include at least one loose fallback (like `.ii.gt` or `div[dir="auto"]`) to ensure the pipeline doesn't abort completely when Google changes a container class.
+## 2026-03-19: Email Extraction Auto-Rescan & False Security (BUG-131)
+
+- **What happened**: When emails failed to extract (due to slow SPA loading algorithms), the extension silently gave up and defaulted to a green 'Safe' rating because it only scanned the top-level URL (`mail.google.com`). This created a false sense of security.
+- **Root cause**: Linear retry loops (1s, 2s, 3s) were too short for heavy SPAs like Gmail, and the system had no fallback presentation for "failed to extract" other than a normal clean scan.
+- **Lesson**: Never silently swallow data extraction failures in security products. If the core heuristic context cannot be extracted, the extension must explicitly downgrade its confidence (amber '?' badge) rather than defaulting to the base URL's safety rating. Also, use exponential backoff for DOM element discovery in complex SPAs.
+- **Follow-up ideas**: Instrument telemetry for 'extractionFailed' events to globally monitor which email clients or DOM changes are breaking the parser.

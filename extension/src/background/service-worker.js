@@ -125,23 +125,35 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                 metadata.sender = pageContent.senderEmail;
             }
 
-            result = await scanUrl(url, { ...settings, ...scanOptions, pageContent, isPro: isProUser, metadata }, onProgress);
-            
-            // BUG-107 Fix: Re-inject the salvaged AI verification back into the fresh scan result
-            if (existingCache?.aiVerification) {
-                result.aiVerification = existingCache.aiVerification;
-            }
-
-            // Transparency: Store extracted content metadata so DevPanel can show what was actually scanned.
-            // Without this, a "0 checks" result looks identical to "scan ran but found nothing."
-            if (pageContent) {
-                result.metadata = result.metadata || {};
-                if (pageContent.bodyText) {
-                    result.metadata.bodySnippet = pageContent.bodyText.substring(0, 200);
+            // BUG-131: Handle explicit extraction failure from email scanner
+            if (pageContent?.extractionFailed) {
+                result = {
+                    overallSeverity: 'UNKNOWN',
+                    overallThreat: false,
+                    action: 'CHECK_INCOMPLETE', // Custom action for degraded state
+                    checks: {},
+                    signals: { hard: [], soft: [] },
+                    metadata: { ...metadata, error: 'Email content extraction failed or timed out' }
+                };
+            } else {
+                result = await scanUrl(url, { ...settings, ...scanOptions, pageContent, isPro: isProUser, metadata }, onProgress);
+                
+                // BUG-107 Fix: Re-inject the salvaged AI verification back into the fresh scan result
+                if (existingCache?.aiVerification) {
+                    result.aiVerification = existingCache.aiVerification;
                 }
-                result.metadata.linkCount = (pageContent.rawUrls || pageContent.links || []).length;
-                if (pageContent.senderEmail && !result.metadata.senderEmail) {
-                    result.metadata.senderEmail = pageContent.senderEmail;
+
+                // Transparency: Store extracted content metadata so DevPanel can show what was actually scanned.
+                // Without this, a "0 checks" result looks identical to "scan ran but found nothing."
+                if (pageContent) {
+                    result.metadata = result.metadata || {};
+                    if (pageContent.bodyText) {
+                        result.metadata.bodySnippet = pageContent.bodyText.substring(0, 200);
+                    }
+                    result.metadata.linkCount = (pageContent.rawUrls || pageContent.links || []).length;
+                    if (pageContent.senderEmail && !result.metadata.senderEmail) {
+                        result.metadata.senderEmail = pageContent.senderEmail;
+                    }
                 }
             }
             
@@ -171,6 +183,12 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         const isAlert = result.overallThreat || result.overallSeverity === 'CRITICAL' || result.overallSeverity === 'HIGH' || result.overallSeverity === 'MEDIUM';
         if (isAlert) {
             await handleThreat(tabId, url, result, settings);
+        } else if (result.overallSeverity === 'UNKNOWN') {
+            // BUG-131: Amber '?' badge for incomplete scans (extraction failure)
+            try {
+                await chrome.action.setBadgeText({ tabId, text: '?' });
+                await chrome.action.setBadgeBackgroundColor({ tabId, color: '#f59e0b' });
+            } catch (error) { ignoreTabError(error); }
         } else {
             try {
                 // Ensure the badge is truly wiped for SAFE sites

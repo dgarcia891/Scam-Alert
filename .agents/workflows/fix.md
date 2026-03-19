@@ -25,15 +25,15 @@ description: "Two-Strike Bug Repair, Lessons Reuse, and Silent Learning"
 3. Reproduce:
    - Write or update a failing regression test in tests/regression/ that reliably reproduces the bug.
 4. Review (Critic Agent):
-   - SPAWN: `Review Agent` (Planning mode) with this task:
-     - "Review the bug description, related BUG_LOG / LESSONS_LEARNED entries, the regression test(s), and the proposed fix approach.
-      Check for:
-      - Repeating previously failed approaches
-      - Missing regression coverage
-      - Impact on related modules or surfaces (web, extension, shared)
-      - Any risky side effects not addressed
-      Output a short list of corrections or confirm that the fix plan is sound."
-   - The Review Agent MUST NOT directly change code or tests; it only comments on the plan.
+   - MANDATORY: Create a `critic_report.md` artifact in the brain directory.
+   - SPAWN: `Review Agent` (Planning mode) to generate this report. The report must:
+     - Reference specific BUG_LOG / LESSONS_LEARNED IDs.
+     - Confirm the regression test definitively reproduces the bug.
+     - Identify impact on related modules (web, extension, shared).
+     - Call out any risky side effects or technical debt.
+     - Output a "confirmed" or "correction required" verdict.
+   - STOP: You MUST include the `critic_report.md` path in a `notify_user` call and wait for approval before proceeding to Attempt 1.
+   - The Review Agent MUST NOT directly change code or tests; it only comments on the plan via the report.
 5. Attempt 1:
    - Implement the fix in code.
    - Run the relevant tests (regression + affected unit tests).

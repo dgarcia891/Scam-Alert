@@ -49,9 +49,9 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     /**
      * Main Trigger Logic
      */
-    // BUG-127: Retry state for lazy-loaded Gmail spam/search views
+    // BUG-127 & BUG-131: Retry state for lazy-loaded Gmail spam/search views
     let extractionRetryCount = 0;
-    const MAX_EXTRACTION_RETRIES = 3;
+    const MAX_EXTRACTION_RETRIES = 5;
     let retryTimer = null;
 
     async function triggerScan() {
@@ -68,16 +68,28 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
         const data = extractEmailText();
         if (!data) {
-            // BUG-127: Gmail spam/search views lazy-load content.
-            // Retry with increasing delay up to MAX_EXTRACTION_RETRIES times.
+            // BUG-127 & BUG-131: Gmail spam/search views lazy-load content.
+            // Retry with exponential backoff up to MAX_EXTRACTION_RETRIES times.
             if (extractionRetryCount < MAX_EXTRACTION_RETRIES) {
                 extractionRetryCount++;
-                const delay = extractionRetryCount * 1000; // 1s, 2s, 3s
+                const delay = Math.pow(2, extractionRetryCount - 1) * 500; // 500ms, 1s, 2s, 4s, 8s
                 console.log(`[Hydra Guard] Body empty — retry ${extractionRetryCount}/${MAX_EXTRACTION_RETRIES} in ${delay}ms`);
                 if (retryTimer) clearTimeout(retryTimer);
                 retryTimer = setTimeout(() => triggerScan(), delay);
             } else {
-                console.warn('[Hydra Guard] Body empty after all retries — giving up for this view.');
+                console.warn('[Hydra Guard] Body empty after all retries — signaling extraction failure.');
+                extractionRetryCount = 0; // Re-arm for future DOM mutations
+
+                chrome.runtime.sendMessage({
+                    type: MessageTypes.SCAN_CURRENT_TAB,
+                    data: {
+                        forceRefresh: true,
+                        pageContent: {
+                            extractionFailed: true,
+                            isEmailView: true
+                        }
+                    }
+                });
             }
             return;
         }

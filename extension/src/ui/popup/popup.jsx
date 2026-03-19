@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
 import { isKnownEmailClient, getMatchingClient } from '../../config/email-clients';
+import { deriveStatusFromResults } from './status-helper';
 import '../index.css';
 
 export function cn(...inputs) {
@@ -54,6 +55,13 @@ const getStatusConfig = (status, contextType = 'WEB') => {
             cardBg: "bg-slate-900/40", cardBorder: "border-slate-800",
             titleColor: "text-slate-400", subColor: "text-slate-500",
             accent: "bg-slate-600", icon: Info
+        },
+        unknown: {
+            tone: "caution", dot: "bg-amber-400", ring: "ring-amber-400/30",
+            title: "Scanning email...", subtitle: "We couldn't extract the email content yet. Retrying automatically.",
+            cardBg: "bg-slate-900/40", cardBorder: "border-amber-900/20",
+            titleColor: "text-amber-50", subColor: "text-amber-200/70",
+            accent: "bg-amber-500", icon: Loader2
         }
     };
     return configs[status] || configs.loading;
@@ -929,29 +937,6 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
 // ═══════════════════════════════════════════════════════════════
 // MAIN POPUP COMPONENT
 // ═══════════════════════════════════════════════════════════════
-// HELPER: Derive UI status from scan results
-// ═══════════════════════════════════════════════════════════════
-function deriveStatusFromResults(res, scanInProgress) {
-    if (scanInProgress) return 'loading';
-    if (!res) return 'empty';
-
-    // FEAT-119: Override status if AI escalated/confirmed a threat
-    if (res.aiVerification && ['ESCALATED', 'CONFIRMED'].includes(res.aiVerification.verdict)) {
-        return 'danger';
-    }
-
-    if (res.whitelisted) return 'secure';
-
-    // BUG-SYNC: Align with background isAlert logic
-    const severity = res.overallSeverity || res.severity;
-    const isThreat = res.overallThreat || ['CRITICAL', 'HIGH'].includes(severity);
-    
-    if (isThreat) return 'danger';
-    if (severity === 'MEDIUM') return 'caution';
-
-    return 'secure';
-}
-
 // ═══════════════════════════════════════════════════════════════
 const Popup = () => {
     const [status, setStatus] = useState('loading');
@@ -1032,13 +1017,24 @@ const Popup = () => {
 
                     if (res || scanInProgress) {
                         setScanResults(res);
-                        const newStatus = deriveStatusFromResults(res, scanInProgress);
+                        const newStatus = deriveStatusFromResults(res, scanInProgress, currentUrl);
                         setStatus(newStatus);
                         if (res?.whitelisted) setIsWhitelisted(true);
+                        
+                        // BUG-131: Auto-rescan if extraction failed but popup was opened
+                        if (newStatus === 'unknown') {
+                            setIsRescanning(true);
+                            chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: {} }, () => {
+                                setTimeout(() => setIsRescanning(false), 8000);
+                            });
+                        }
                     } else {
                         // Truly no results and not scanning -> show empty and trigger auto-scan
                         setStatus('empty');
-                        handleForceRescan();
+                        setIsRescanning(true);
+                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: {} }, () => {
+                            setTimeout(() => setIsRescanning(false), 8000);
+                        });
                     }
                 });
             });
@@ -1052,7 +1048,7 @@ const Popup = () => {
             if ((type === MessageTypes.SCAN_RESULT || type === MessageTypes.SCAN_RESULT_UPDATED) && message.data?.result) {
                 const res = message.data.result;
                 setScanResults(res);
-                const newStatus = deriveStatusFromResults(res, false);
+                const newStatus = deriveStatusFromResults(res, false, currentUrl);
                 setStatus(newStatus);
                 if (res.whitelisted) setIsWhitelisted(true);
                 setIsRescanning(false); // BUG-129: Clear spinner on live result
