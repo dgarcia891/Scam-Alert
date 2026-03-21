@@ -23,7 +23,7 @@ import {
 
 import { checkEmailScams } from './analyzer/email-heuristics.js';
 import { determineSeverity } from './analysis/scoring.js';
-import { getMergedScamPhrases, getMergedSuspiciousKeywords, getMergedEmailKeywords, getMergedUrgencyKeywords } from './database.js';
+import { getMergedScamPhrases, getMergedSuspiciousKeywords, getMergedEmailKeywords, getMergedUrgencyKeywords, getMergedHeuristicRules } from './database.js';
 import { SEVERITY } from './scan-schema.js';
 
 /**
@@ -37,12 +37,13 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
     const dynamicPhrases = customPhrases || await getMergedScamPhrases();
     const dynamicEmailKeywords = await getMergedEmailKeywords();
     const dynamicUrgencyKeywords = await getMergedUrgencyKeywords();
+    const dynamicRules = await getMergedHeuristicRules();
 
     const checks = {
         nonHttps: checkNonHttps(url),
         suspiciousTLD: { flagged: isSuspiciousTLD, ...checkSuspiciousTLD(url) },
         typosquatting: checkTyposquatting(url),
-        urlObfuscation: checkUrlObfuscation(url),
+        urlObfuscation: checkUrlObfuscation(url, dynamicRules),
         ipAddress: checkIPAddress(url),
         excessiveSubdomains: checkExcessiveSubdomains(url),
         suspiciousPort: checkSuspiciousPort(url),

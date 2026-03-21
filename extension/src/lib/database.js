@@ -61,7 +61,7 @@ export async function fetchScamPatterns(lastSync = 0) {
  * Sync patterns and update local storage cache (Delta Support)
  */
 export async function syncPatterns() {
-    const result = (await chrome.storage.local.get(['lastPatternSync', 'remoteScamPatterns', 'remoteSuspiciousKeywords'])) || {};
+    const result = (await chrome.storage.local.get(['lastPatternSync', 'remoteScamPatterns', 'remoteSuspiciousKeywords', 'remoteHeuristicRules'])) || {};
     const lastSync = result.lastPatternSync || 0;
     const existingPatterns = result.remoteScamPatterns || [];
     const existingKeywords = result.remoteSuspiciousKeywords || [];
@@ -105,12 +105,26 @@ export async function syncPatterns() {
             }
         }
 
+        // Handle Dynamic Heuristic Rules
+        if (data.rules && Array.isArray(data.rules)) {
+            updates.remoteHeuristicRules = data.rules;
+            updated = true;
+        }
+
         if (updated) {
             await chrome.storage.local.set(updates);
         }
         return true;
     }
     return false;
+}
+
+/**
+ * Get dynamic heuristic rules
+ */
+export async function getMergedHeuristicRules() {
+    const result = (await chrome.storage.local.get(['remoteHeuristicRules'])) || {};
+    return result.remoteHeuristicRules || [];
 }
 
 /**

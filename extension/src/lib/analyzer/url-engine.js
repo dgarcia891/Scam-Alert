@@ -119,22 +119,74 @@ export function checkTyposquatting(url) {
     };
 }
 
-export function checkUrlObfuscation(url) {
+export function checkUrlObfuscation(url, dynamicRules = []) {
+    const ruleOverrides = {};
+    dynamicRules.forEach(rule => {
+        if (rule.rule_key && rule.rule_key.startsWith('urlObfuscation.') && rule.active) {
+            const key = rule.rule_key.split('.')[1];
+            try {
+                let patternStr = rule.pattern_regex;
+                let flags = 'i';
+                if (patternStr.startsWith('/') && patternStr.lastIndexOf('/') > 0) {
+                    const lastSlash = patternStr.lastIndexOf('/');
+                    flags = patternStr.substring(lastSlash + 1);
+                    patternStr = patternStr.substring(1, lastSlash);
+                }
+                ruleOverrides[key] = {
+                    regex: new RegExp(patternStr, flags),
+                    score: rule.score_weight || null
+                };
+            } catch (e) {
+                console.warn('[Hydra Guard] Failed to compile dynamic heuristic rule:', rule.rule_key, e);
+            }
+        }
+    });
+
     const patterns = {
-        excessiveHyphens: /-{3,}/,
-        hexEncoding: /%[0-9A-F]{2}/gi,
-        dataUri: /^data:/i,
-        unusualProtocol: /^(?!https?:\/\/)/i,
-        atSymbol: /@/
+        excessiveHyphens: ruleOverrides.excessiveHyphens?.regex || /-{3,}/,
+        hexEncoding: ruleOverrides.hexEncoding?.regex || /%[0-9A-F]{2}/gi,
+        dataUri: ruleOverrides.dataUri?.regex || /^data:/i,
+        unusualProtocol: ruleOverrides.unusualProtocol?.regex || /^(?!https?:\/\/)/i,
+        atSymbol: ruleOverrides.atSymbol?.regex || /@/
     };
     const flagged = [];
     let totalScore = 0;
 
-    if (patterns.excessiveHyphens.test(url)) { flagged.push('Excessive hyphens'); totalScore += 15; }
-    const hexMatches = url.match(patterns.hexEncoding);
-    if (hexMatches && hexMatches.length > 3) { flagged.push('Excessive URL encoding'); totalScore += 20; }
-    if (patterns.dataUri.test(url)) { flagged.push('Data URI scheme'); totalScore += 25; }
-    if (patterns.atSymbol.test(url)) { flagged.push('@ symbol (potential domain hiding)'); totalScore += 30; }
+    let urlObj;
+    try {
+        urlObj = new URL(url);
+    } catch {
+        // Fallback for malformed URLs
+    }
+
+    if (patterns.excessiveHyphens.test(url)) { 
+        flagged.push('Excessive hyphens'); 
+        totalScore += ruleOverrides.excessiveHyphens?.score ?? 15; 
+    }
+    
+    // Baseline Fix 1: Only check for excessive hex encoding in origin and pathname, not query strings.
+    const stringForHexCheck = urlObj ? (urlObj.origin + urlObj.pathname) : url;
+    const hexMatches = stringForHexCheck.match(patterns.hexEncoding);
+    if (hexMatches && hexMatches.length > 3) { 
+        flagged.push('Excessive URL encoding'); 
+        totalScore += ruleOverrides.hexEncoding?.score ?? 20; 
+    }
+    
+    if (patterns.dataUri.test(url)) { 
+        flagged.push('Data URI scheme'); 
+        totalScore += ruleOverrides.dataUri?.score ?? 25; 
+    }
+    
+    // Baseline Fix 2: Only flag @ symbol if it's used for basic auth domain obfuscation (e.g., https://google.com-login@scam.com/)
+    if (urlObj) {
+        if (urlObj.username || urlObj.password) {
+            flagged.push('@ symbol (potential domain hiding)'); 
+            totalScore += ruleOverrides.atSymbol?.score ?? 30;
+        }
+    } else if (patterns.atSymbol.test(url)) {
+        flagged.push('@ symbol (potential domain hiding)'); 
+        totalScore += ruleOverrides.atSymbol?.score ?? 30;
+    }
 
     return {
         title: 'check_url_obfuscation',

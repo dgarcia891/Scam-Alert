@@ -95,3 +95,10 @@
 - **Lesson**: 
   1. Never trust standard navigation events (`onCompleted`, `onBeforeNavigate`) when injecting content scripts into modern webapps. Always hook into `chrome.webNavigation.onHistoryStateUpdated`.
   2. For maximum robustness in complex SPAs like Gmail where even Chrome events can be dropped or desynced, pair the background listener with a lightweight URL polling loop (`setInterval` watching `location.href`) directly inside the already-injected content script.
+
+## 2026-03-21: Dynamic Heuristics & ReDOS Prevention (BUG-134)
+
+- **What happened**: A core heuristic for URL obfuscation generated false positives on normal query parameters and path elements (like `@` handles on YouTube). Instead of just pushing a codebase fix, we added a new dynamic `sa_heuristic_rules` engine so the AI/backend can override regex behaviors autonomously in the future.
+- **Notable risks**: Giving an autonomous AI the ability to push raw regex updates to millions of clients creates a huge ReDoS (Regular Expression Denial of Service) risk or risks massive false-positive blocks if the regex matches unexpectedly.
+- **Lesson**: When bridging dynamic backend data with client-side JavaScript execution, always prefer structured AST or strict limitations rather than raw `new RegExp()` interpolation unless there is a strong Human-In-The-Loop review mechanism via an admin panel.
+- **Follow-up ideas**: Implement a regex validator and execution time limiter (or RE2 web assembly wrapper) for the `sa_heuristic_rules` sync, or mandate that all AI-generated regexes require human admin approval before the edge function distributes them.
