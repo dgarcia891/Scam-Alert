@@ -134,17 +134,29 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     // BUG-132: Check if we appear to be in an email "reading" view
     // before firing the initial scan, otherwise the premature scan exhausts
     // all retries against the inbox list.
+    // BUG-136: Expanded to cover Gmail spam/search/trash reading panes (.adn.ads)
+    // and URL hash-based detection for direct navigation to foldered emails.
     function isEmailReadingView() {
+        // URL hash signal: direct navigation to a spam/search/all/trash email
+        // e.g. mail.google.com/mail/u/0/#spam/187abc123
+        if (/\/#(?:spam|all|search|sent|trash|category\/\w+|label\/[^/]+)\/[a-zA-Z0-9]+/.test(location.hash)) {
+            return true;
+        }
+
         return !!(
-            document.querySelector('.hP') ||          // Gmail: subject line
-            document.querySelector('[data-message-id]') || // Gmail: message container
-            document.querySelector('.a3s') ||         // Gmail: Email body
+            document.querySelector('.hP') ||                    // Gmail: subject line
+            document.querySelector('[data-message-id]') ||     // Gmail: message container
+            document.querySelector('.a3s') ||                  // Gmail: Email body
+            document.querySelector('.adn.ads') ||              // BUG-136: Gmail spam/search reading pane
+            document.querySelector('.adn.nH.ads') ||           // BUG-136: alternate spam reading pane
+            document.querySelector('.aeF') ||                  // BUG-136: reading pane open indicator
             document.querySelector('[data-testid="message-view-body"]') || // Outlook
-            document.querySelector('.msg-body') ||    // Yahoo
-            document.querySelector('.zmMailBody') ||  // Zoho
-            document.querySelector('#messagecontframe') // Roundcube
+            document.querySelector('.msg-body') ||             // Yahoo
+            document.querySelector('.zmMailBody') ||           // Zoho
+            document.querySelector('#messagecontframe')        // Roundcube
         );
     }
+
 
     // BUG-127 & BUG-132: Fire an initial scan after a short delay.
     // The mutation observer only catches *future* DOM changes.
