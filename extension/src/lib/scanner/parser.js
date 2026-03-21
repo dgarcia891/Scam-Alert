@@ -53,6 +53,31 @@ export function extractEmailText() {
         }
     } catch { /* ignore */ }
 
+    // BUG-137: Gmail programmatic fallback — if all CSS selectors miss,
+    // walk the reading pane looking for the largest text block.
+    // This defends against Gmail changing internal class names.
+    if (location.hostname === 'mail.google.com') {
+        try {
+            const readingPane = document.querySelector('.nH.hx') || document.querySelector('.aeF') || document.querySelector('[role="main"]');
+            if (readingPane) {
+                // Try thread message items (.gs), then any nested div with substantial text
+                const candidates = readingPane.querySelectorAll('.gs, [data-message-id], .ii, .adn');
+                let bestText = '';
+                for (const el of candidates) {
+                    if (el.closest('[id^="hydra-guard"]')) continue;
+                    const text = (el.innerText || '').trim();
+                    if (text.length > bestText.length && text.length > 50) {
+                        bestText = text;
+                    }
+                }
+                if (bestText.length > 50) {
+                    console.log(`[Hydra Guard] extractEmailText: Gmail fallback scan (${bestText.length} chars)`);
+                    return bestText;
+                }
+            }
+        } catch { /* ignore */ }
+    }
+
     console.warn('[Hydra Guard] extractEmailText: NO body text found — all selectors missed');
     return '';
 }

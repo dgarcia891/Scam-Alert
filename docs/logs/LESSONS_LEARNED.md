@@ -114,3 +114,9 @@
 - **What happened**: Viewing an email in Gmail's spam folder showed "No content was extracted" — 0 pipeline checks ran. The scanner loaded but silently aborted.
 - **Root cause**: `isEmailReadingView()` only checked generic selectors like `.hP` and `.a3s`. Gmail's spam/search/trash reading pane renders content inside `.adn.ads` which was not in the list. The 1.5s initial scan guard returned `false`, aborting before any extraction could happen.
 - **Lesson**: Any guard that gates scanning based on DOM state must be updated in sync with the email client selector registry. When adding new selectors to `parser.js`, always audit `isEmailReadingView()` for the same selectors. The URL hash (`/#spam/`, `/#search/`) is a highly reliable secondary signal that requires no DOM queries at all and should be checked first.
+
+## 2026-03-21: Build Output Must Be Verified, Not Assumed (BUG-137)
+
+- **What happened**: The BUG-136 fix for `isEmailReadingView()` was deployed but the user's extension still showed v1.0.208. The `dist/manifest.json` was never updated because the release script's build step (`cd extension && npm run build`) was either skipped or failed silently.
+- **Root cause**: Two issues: (1) `release.cjs` builds via `execSync` with `{ stdio: 'pipe' }` which suppresses output — if the build fails, we never see why. (2) There was a redundant `extension/scripts/release.js` that only updated the extension `package.json`, not the root or manifest. Running the wrong release script caused version desync.
+- **Lesson**: Always verify `dist/manifest.json` version matches the source after deploy. The `BUG-137.test.js` regression test now checks this automatically. Also, `extractEmailText()` now has a Gmail-specific programmatic fallback that doesn't rely on CSS class names — it queries the reading pane for the largest text block, defending against Gmail changing internal classes.
