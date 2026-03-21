@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && VITE_ENTRY=src/content/content.js VITE_OUT=content vite build --config vite.content.config.js && VITE_ENTRY=src/content/email-scanner.js VITE_OUT=emailScanner vite build --config vite.content.config.js && cp src/content/content.css dist/assets/content.css",
+    "build": "vite build && VITE_ENTRY=src/content/content.js VITE_OUT=content vite build --config vite.content.config.js && VITE_ENTRY=src/content/email-scanner.js VITE_OUT=emailScanner vite build --config vite.content.config.js && cp src/content/content.css dist/assets/content.css && node ../scripts/strip-sw-polyfill.cjs",
     "deploy": "npm run build && node build/sync-nas.js",
     "release": "node scripts/release.js"
   },

@@ -11,3 +11,5 @@ Format: | ID | Title | Status | Priority | Notes |
 | HG-FEAT-03 | Visual Destination Resolver | Backlog | Low | Shows the actual destination URL when @ obfuscation is detected (resolving `user@fake.com@real-destination.com`). |
 | HG-FEAT-04 | Email Selector Debug Panel | Backlog | Low | Log which selectors match/miss to pinpoint extraction gaps without DevTools. |
 | HG-DEBT-04 | Shared JSON Robustness Utility | Backlog | Low | Centralize "fuzzy" JSON parsing for all background message handlers. |
+| HG-FEAT-05 | Heuristic Rule Validator | Backlog | High | Implement ReDoS checker and execution time limiter for dynamic heuristic rules. |
+| HG-FEAT-06 | Admin Dashboard Rule Management | Backlog | Medium | UI for humans to review and approve AI-generated heuristic overrides. |

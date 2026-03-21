@@ -102,3 +102,9 @@
 - **Notable risks**: Giving an autonomous AI the ability to push raw regex updates to millions of clients creates a huge ReDoS (Regular Expression Denial of Service) risk or risks massive false-positive blocks if the regex matches unexpectedly.
 - **Lesson**: When bridging dynamic backend data with client-side JavaScript execution, always prefer structured AST or strict limitations rather than raw `new RegExp()` interpolation unless there is a strong Human-In-The-Loop review mechanism via an admin panel.
 - **Follow-up ideas**: Implement a regex validator and execution time limiter (or RE2 web assembly wrapper) for the `sa_heuristic_rules` sync, or mandate that all AI-generated regexes require human admin approval before the edge function distributes them.
+
+## 2026-03-21: Vite Polyfills vs Service Workers (BUG-135)
+
+- **What happened**: The AI Second Opinion feature crashed with `ReferenceError: document is not defined` in the service worker. This was a *different* vector from BUG-124 (which fixed arrow function closures in `executeScript`). This time, Vite's built-in `modulepreload` polyfill — which calls `document.getElementsByTagName`, `document.createElement`, and `document.querySelector` — was being injected into every entry point bundle, including the service worker where `document` does not exist.
+- **Root cause**: Vite's `modulePreload: { polyfill: false }` config option does not fully prevent polyfill injection when dynamic `import()` is used. The polyfill still ships because Vite wraps dynamic imports in a preload helper.
+- **Lesson**: When bundling a service worker with Vite, you **must** post-process the output to remove any DOM-referencing polyfills. Vite's config options alone are insufficient. A deterministic post-build script (`strip-sw-polyfill.cjs`) is safer than fragile Rollup `renderChunk` regex plugins because the minified output structure varies.

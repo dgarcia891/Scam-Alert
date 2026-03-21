@@ -38,6 +38,7 @@ export default defineConfig({
     build: {
         outDir: '../../dist',
         emptyOutDir: true,
+        modulePreload: { polyfill: false }, // BUG-135: Reduce polyfill injection (post-build strips remainder)
         rollupOptions: {
             input: {
                 popup: resolve(__dirname, 'src/ui/popup/index.html'),
