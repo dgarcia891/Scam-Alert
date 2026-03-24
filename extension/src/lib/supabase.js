@@ -56,7 +56,7 @@ async function getApiKey() {
 /**
  * Helper: POST to an edge function
  */
-async function postEdgeFunction(functionName, body) {
+export async function postEdgeFunction(functionName, body) {
     const apiKey = await getApiKey();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);

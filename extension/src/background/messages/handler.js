@@ -175,7 +175,8 @@ async function handleGetScanResults(msgData, tabStateManager, getCachedScan) {
         results: results,
         url: state?.url || null,
         context: state?.context || null,
-        scanInProgress: !!state?.scanInProgress
+        scanInProgress: !!state?.scanInProgress,
+        domainReputation: state?.domainReputation || null
     };
 }
 

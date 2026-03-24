@@ -15,7 +15,8 @@ import { getSettings, updateSettings, getStats, updateStats, getCachedScan, cach
 import { MessageTypes, createMessageHandler, sendMessageToTab, createMessage } from '../lib/messaging.js';
 import { scanUrl } from '../lib/detector.js';
 import { syncPatterns } from '../lib/database.js';
-import { submitReport, submitUserReport, submitFalsePositive, fetchGlobalSafeList, submitSafeListAppeal } from '../lib/supabase.js';
+import { submitReport, submitUserReport, submitFalsePositive, fetchGlobalSafeList, submitSafeListAppeal, postEdgeFunction } from '../lib/supabase.js';
+import { checkDomainReputation } from '../lib/domain-reputation.js';
 import { syncManager } from './lib/sync-manager.js';
 
 // Decentralized Modules (v19.2)
@@ -345,6 +346,25 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
             // Can fail if user navigates away extremely fast or if host permissions are missing
             console.warn('[Hydra Guard] Failed to passively inject emailScanner:', e);
         }
+        return; // CRITICAL: Stop here to avoid domain polling on email clients (Critic Finding 1)
+    }
+
+    // Phase 3: Domain Reputation Background Check
+    try {
+        const repData = await checkDomainReputation(details.url, {
+            getSettings,
+            isWhitelisted,
+            postEdgeFunction
+        });
+
+        if (repData) {
+            tabStateManager.updateTabState(details.tabId, {
+                domainReputation: repData,
+                url: details.url
+            });
+        }
+    } catch (err) {
+        console.warn('[Hydra Guard] Domain reputation check failed:', err);
     }
 });
 

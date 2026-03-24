@@ -1,6 +1,6 @@
 {
   "name": "hydra-guard-root",
-  "version": "1.0.212",
+  "version": "1.0.213",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -12,10 +12,12 @@
     "handoff": "node scripts/handoff.cjs",
     "release": "node scripts/release.cjs",
     "visual:audit": "node scripts/visual_audit.cjs",
-    "test:unit": "echo \"Running tests...\" && exit 0",
+    "test:unit": "NODE_OPTIONS='--experimental-vm-modules' npx jest --no-coverage tests/unit/domain-reputation.test.js tests/regression/reputation-abuse.test.js tests/regression/worker-lifecycle-cache.test.js tests/regression/navigation-redirects.test.js",
     "test": "npm run test:unit"
   },
   "devDependencies": {
-    "eslint": "^8.0.0"
+    "@jest/globals": "^30.3.0",
+    "eslint": "^8.0.0",
+    "jest": "^30.3.0"
   }
 }

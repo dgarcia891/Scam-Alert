@@ -67,7 +67,9 @@ export async function getSettings() {
         aiEnabled: true,
         aiApiKey: '',
         aiDailyCeiling: 50,
-        aiConsentGiven: false // FEAT-108: Explicit privacy opt-in
+        aiConsentGiven: false, // FEAT-108: Explicit privacy opt-in
+        liveWebProtection: false, // Phase 3: Domain reputation scoring
+        showWebProtectionOnboarding: false
     };
 
     const merged = { ...defaults, ...(result[STORAGE_KEYS.SETTINGS] || {}) };

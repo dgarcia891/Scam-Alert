@@ -6,6 +6,7 @@ import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
 import { isKnownEmailClient, getMatchingClient } from '../../config/email-clients';
 import { deriveStatusFromResults } from './status-helper';
+import { getReputationBadge } from '../../lib/domain-reputation.js';
 import '../index.css';
 
 export function cn(...inputs) {
@@ -953,6 +954,10 @@ const Popup = () => {
     const [currentTabId, setCurrentTabId] = useState(null);
     const [aiAsking, setAiAsking] = useState(false);
     const [aiResult, setAiResult] = useState(null);
+    const [domainReputation, setDomainReputation] = useState(null);
+    const [reportOpen, setReportOpen] = useState(false);
+    const [reportSeverity, setReportSeverity] = useState('suspicious');
+    const [isReporting, setIsReporting] = useState(false);
 
     // Persist AI Second Opinion across popup remounts
     useEffect(() => {
@@ -1014,6 +1019,9 @@ const Popup = () => {
                     const data = response?.data;
                     const res = data?.results;
                     const scanInProgress = data?.scanInProgress;
+                    const domainRepData = data?.domainReputation;
+
+                    if (domainRepData) setDomainReputation(domainRepData);
 
                     if (res || scanInProgress) {
                         setScanResults(res);
@@ -1071,12 +1079,8 @@ const Popup = () => {
     };
 
     const handleReportScam = () => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'open_report_modal' }, () => {
-                if (chrome.runtime.lastError) return;
-                window.close();
-            });
-        });
+        if (!reportOpen) setReportOpen(true);
+        else setReportOpen(false);
     };
 
     const handleWhitelist = () => {
@@ -1120,11 +1124,52 @@ const Popup = () => {
     const isEmail = isKnownEmailClient(currentUrl);
     const config = getStatusConfig(status, isEmail ? 'EMAIL' : 'WEB');
 
+    const repBadge = domainReputation ? getReputationBadge(
+        domainReputation.total_score || 0,
+        domainReputation.distinct_reporters || 0,
+        domainReputation.external_flagged || false
+    ) : null;
+
     return (
         <div className={cn(
-            "w-[360px] h-fit bg-slate-900 text-white font-sans antialiased selection:bg-indigo-500 selection:text-white overflow-hidden flex flex-col p-4 pb-5",
+            "w-[360px] h-fit bg-slate-900 text-white font-sans antialiased selection:bg-indigo-500 selection:text-white overflow-hidden flex flex-col p-4 pb-5 relative",
             devMode && "w-[420px]"
         )}>
+
+            {/* ── ONBOARDING OVERLAY ─────────────────────────────────────────────────────── */}
+            {settings.showWebProtectionOnboarding && !devMode && (
+                <div className="absolute inset-0 z-50 bg-slate-950 p-6 flex flex-col justify-center animate-in fade-in duration-300">
+                    <div className="bg-indigo-600 w-12 h-12 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
+                        <Globe className="text-white relative z-10" size={24} />
+                    </div>
+                    <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Live Web Protection</h2>
+                    <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+                        Hydra Guard can now verify website domains against verified scam databases in real-time. This check is privacy-first: your browsing history never leaves your device.
+                    </p>
+                    <div className="mt-auto space-y-3">
+                        <button 
+                            onClick={async () => {
+                                const upd = { ...settings, showWebProtectionOnboarding: false, liveWebProtection: true };
+                                await chrome.storage.local.set({ settings: upd });
+                                setSettings(upd);
+                            }}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-md active:scale-[0.98]"
+                        >
+                            Enable Protection
+                        </button>
+                        <button 
+                            onClick={async () => {
+                                const upd = { ...settings, showWebProtectionOnboarding: false };
+                                await chrome.storage.local.set({ settings: upd });
+                                setSettings(upd);
+                            }}
+                            className="w-full py-2.5 text-slate-400 font-semibold hover:text-white transition-colors text-sm"
+                        >
+                            Not right now
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── HEADER ────────────────────────────────────────────────────────────────────── */}
             <div className="flex items-center justify-between mb-3 px-1">
@@ -1133,6 +1178,15 @@ const Popup = () => {
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Security Check</span>
                 </div>
                 <div className="flex items-center gap-2">
+                    {repBadge && (
+                        <div 
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest border border-current/20 cursor-help shadow-sm"
+                            style={{ color: repBadge.color, backgroundColor: `${repBadge.color}15`, borderColor: `${repBadge.color}40` }}
+                            title={`Domain Reputation: ${repBadge.level.replace('_', ' ')} (Score: ${domainReputation.total_score}, Reporters: ${domainReputation.distinct_reporters})`}
+                        >
+                            {repBadge.text} {repBadge.level.replace('_', ' ')}
+                        </div>
+                    )}
                     <button
                         onClick={toggleDevMode}
                         className={cn(
@@ -1368,6 +1422,94 @@ const Popup = () => {
                                             {isAlreadyReported ? 'Reported' : 'Report Suspicious'}
                                         </button>
                                     </div>
+
+                                    {/* Inline Report UI */}
+                                    {reportOpen && !isAlreadyReported && (
+                                        <div className="mt-2 p-3 bg-slate-800/60 rounded-xl border border-rose-500/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            <div className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <AlertTriangle size={12} />
+                                                Report Domain
+                                            </div>
+                                            <p className="text-[9px] text-slate-400 mb-3 leading-snug">
+                                                Help protect others by reporting this domain. Verified reports will decrease its community reputation score.
+                                            </p>
+                                            
+                                            <div className="space-y-1.5 mb-3">
+                                                {[
+                                                    { id: 'suspicious', label: 'Suspicious / Misleading', desc: 'Looks phishy but no clear harm yet.', theme: 'amber' },
+                                                    { id: 'scammy', label: 'Likely Scam', desc: 'Fake products, fake support, or deceptive.', theme: 'orange' },
+                                                    { id: 'dangerous', label: 'Dangerous / Phishing', desc: 'Actively stealing credentials or money.', theme: 'rose' }
+                                                ].map(level => {
+                                                    let selectedClasses = "bg-slate-900/50 border-slate-700/50 hover:bg-slate-800 text-slate-300";
+                                                    if (reportSeverity === level.id) {
+                                                        if (level.theme === 'amber') selectedClasses = "bg-amber-500/10 border-amber-500/30 text-amber-400";
+                                                        if (level.theme === 'orange') selectedClasses = "bg-orange-500/10 border-orange-500/30 text-orange-400";
+                                                        if (level.theme === 'rose') selectedClasses = "bg-rose-500/10 border-rose-500/30 text-rose-400";
+                                                    }
+                                                    
+                                                    return (
+                                                        <label key={level.id} className={cn(
+                                                            "flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors",
+                                                            selectedClasses
+                                                        )}>
+                                                            <input 
+                                                                type="radio" 
+                                                                name="severity" 
+                                                                value={level.id}
+                                                                checked={reportSeverity === level.id}
+                                                                onChange={(e) => setReportSeverity(e.target.value)}
+                                                                className={cn(
+                                                                    "mt-0.5 border-slate-600 bg-slate-900 focus:ring-0",
+                                                                    level.theme === 'amber' ? "text-amber-500" : level.theme === 'orange' ? "text-orange-500" : "text-rose-500"
+                                                                )}
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className={cn("text-[10px] font-bold", reportSeverity === level.id ? "" : "text-slate-300")}>
+                                                                    {level.label}
+                                                                </span>
+                                                                <span className="text-[8px] text-slate-500 leading-tight mt-0.5">{level.desc}</span>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => setReportOpen(false)}
+                                                    className="flex-1 py-1.5 rounded-lg text-slate-400 border border-slate-700 hover:bg-slate-700/50 transition-colors text-[10px] font-bold"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsReporting(true);
+                                                        chrome.runtime.sendMessage({
+                                                            type: MessageTypes.REPORT_SCAM,
+                                                            data: {
+                                                                url: currentUrl,
+                                                                type: 'domain_report',
+                                                                severity: reportSeverity,
+                                                                description: `User domain report: ${reportSeverity}`
+                                                            }
+                                                        }, (res) => {
+                                                            setIsReporting(false);
+                                                            if (res?.success) {
+                                                                setIsAlreadyReported(true);
+                                                                setReportOpen(false);
+                                                            } else {
+                                                                alert('Report failed: ' + (res?.error || 'Unknown error'));
+                                                            }
+                                                        });
+                                                    }}
+                                                    disabled={isReporting}
+                                                    className="flex-[2] py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
+                                                >
+                                                    {isReporting ? 'Submitting...' : 'Submit Report'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 pt-1">

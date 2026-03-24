@@ -748,6 +748,24 @@ const WhitelistSettings = () => {
                         </button>
                     </div>
 
+                    <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
+                        <div className="flex flex-col">
+                            <span className="text-slate-200 font-semibold text-sm">Live Web Protection</span>
+                            <span className="text-slate-500 text-xs">Verify domain reputation against known scam databases. Built with privacy-first checking.</span>
+                        </div>
+                        <button
+                            onClick={() => handleToggle('liveWebProtection')}
+                            className={clsx(
+                                "w-12 h-6 rounded-full transition-colors relative",
+                                settings.liveWebProtection ? "bg-indigo-600" : "bg-slate-700"
+                            )}>
+                            <div className={clsx(
+                                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                settings.liveWebProtection ? "left-7" : "left-1"
+                            )} />
+                        </button>
+                    </div>
+
                     <div className="space-y-4 p-4 bg-indigo-500/5 rounded-xl border border-indigo-500/10">
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col">

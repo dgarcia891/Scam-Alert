@@ -23,13 +23,15 @@ export async function onInstalled(details, scanActiveTabsCb) {
             } catch (e) {
                 console.warn('[Hydra Guard] Failed to clear cache on update:', e);
             }
-
             if (!settings.usePatternDetection && !settings.usePhishTank && !settings.useGoogleSafeBrowsing) {
                 await updateSettings({
                     usePatternDetection: true,
                     useGoogleSafeBrowsing: true,
-                    scanningEnabled: true
+                    scanningEnabled: true,
+                    showWebProtectionOnboarding: true // Phase 3 UI onboard trigger
                 });
+            } else {
+                await updateSettings({ showWebProtectionOnboarding: true }); // Phase 3 UI onboard trigger
             }
             await syncManager.sync(true); // Force sync
         }
