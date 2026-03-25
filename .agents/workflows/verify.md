@@ -1,12 +1,30 @@
 ---
 name: verify
-description: "Multi-Agent Verification and Human Sign-off"
+description: "Run or recommend tests and checks, and summarize results."
 ---
-1. Logic Verification:
-   - Spawn a Verification Agent to review changes against the Implementation Plan and DECISIONS.md.
-2. Automated Verification:
-   - Run all regression tests in tests/regression/.
-   - Run `npm run scan` and `npm run drift`.
-3. Human Sign-off:
-   - Call visual:audit to show changes to the user if applicable.
-   - Request final approval.
+
+# Workflow: verify
+
+1. Identify Relevant Checks
+   - Determine which tests/checks apply to this change:
+     - Unit tests.
+     - Integration or end-to-end tests.
+     - Lint and static analysis.
+     - Build or bundle checks.
+     - Any project-specific commands.
+
+2. Run or Recommend
+   - If able, run the appropriate test/check commands.
+   - If not, list the exact commands the user or CI should run.
+
+3. Record Results
+   - For each command:
+     - State whether it ran.
+     - Provide pass/fail result.
+     - Note any failures with brief context.
+
+4. Output
+   - Return a structured summary of:
+     - Commands run.
+     - Results.
+     - Commands not run and why.

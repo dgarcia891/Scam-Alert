@@ -1,8 +1,26 @@
 ---
 name: bug_report
-description: "Standardized Issue Logging to BUG_LOG.md"
+description: "Capture a structured bug report."
 ---
-1. Gather info:
-   - Error logs, reproduction steps, and severity.
-2. Log:
-   - Append to docs/logs/BUG_LOG.md with ID, Date, Description, and Status (OPEN).
+
+# Workflow: bug_report
+
+1. Summary
+   - Short description of the bug.
+
+2. Environment
+   - Relevant environment details (app version, branch, etc.).
+
+3. Steps to Reproduce
+   - Step-by-step reproduction instructions.
+
+4. Expected vs Actual
+   - Expected behavior.
+   - Actual behavior.
+
+5. Additional Data
+   - Logs, screenshots, error messages.
+
+6. Suggested Next Steps
+   - Initial hypotheses.
+   - Proposed investigations or fixes.

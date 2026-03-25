@@ -1,6 +1,23 @@
 ---
 name: handoff
-description: "Session Archival and State Continuity"
+description: "Prepare a clear handoff to another agent or human."
 ---
-1. Run `npm run handoff`.
-2. Summarize the current session state and next steps for the next agent.
+
+# Workflow: handoff
+
+1. Context
+   - State:
+     - Current branch and last commit.
+     - Scope of work.
+
+2. Status
+   - List:
+     - What is done.
+     - What is in progress.
+     - What is blocked.
+
+3. Next Steps
+   - Provide:
+     - Immediate next actions.
+     - Any open questions.
+     - Links or file paths to key artifacts.

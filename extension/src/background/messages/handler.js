@@ -57,7 +57,7 @@ export async function handleIncomingMessage(message, sender, context = {}) {
         case 'SUBMIT_CORRECTION':
             return handleSubmitCorrectionUnified(msgData);
         case MessageTypes.FORCE_RESCAN:
-            return handleForceRescan(sender, msgData, scanAndHandle);
+            return handleForceRescan(sender, msgData, scanAndHandle, tabStateManager);
         case MessageTypes.CLEAR_URL_CACHE:
             return handleClearUrlCache(msgData);
         case MessageTypes.ASK_AI_OPINION:
@@ -198,7 +198,7 @@ async function handleNavigateBack(sender) {
     }
 }
 
-async function handleForceRescan(sender, msgData, scanAndHandle) {
+async function handleForceRescan(sender, msgData, scanAndHandle, tabStateManager) {
     const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (tab) {
         const scanOptions = { forceRefresh: true };
@@ -206,30 +206,36 @@ async function handleForceRescan(sender, msgData, scanAndHandle) {
         // BUG-129: On email clients, fetch live email context before rescanning
         // so email heuristics actually run (sender, body, subject, links).
         if (isKnownEmailClient(tab.url)) {
-            try {
-                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'timeout' }), 2000));
-                const fetchPromise = sendMessageToTab(tab.id, { type: 'GET_EMAIL_CONTEXT' })
-                    .then(res => res || { success: false, error: 'no response' })
-                    .catch(e => ({ success: false, error: e.message }));
-                const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-                if (response?.success && response.context) {
-                    scanOptions.pageContent = {
-                        bodyText: response.context.snippet || '',
-                        isEmailView: true,
-                        senderName: response.context.senderName || '',
-                        senderEmail: response.context.senderEmail || '',
-                        subject: response.context.subject || '',
-                        headers: response.context.headers || {},
-                        links: (response.context.embeddedLinks || []).map(l => ({ href: l })),
-                        rawUrls: response.context.embeddedLinks || []
-                    };
-                    console.log('[Hydra Guard] FORCE_RESCAN: Fetched email context for enriched scan.');
-                } else {
-                    console.warn('[Hydra Guard] FORCE_RESCAN: Could not fetch email context:', response?.error);
+            const tabState = tabStateManager?.getTabState(tab.id);
+            if (tabState?.scanInProgress) {
+                console.log('[Hydra Guard] FORCE_RESCAN: scan already in progress — skipping context fetch');
+            } else {
+                // Emit amber badge immediately (security gap mitigation during retry window)
+                if (chrome.action?.setBadgeText) {
+                    chrome.action.setBadgeText({ tabId: tab.id, text: '?' });
+                    chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f59e0b' });
                 }
-            } catch (e) {
-                console.warn('[Hydra Guard] FORCE_RESCAN: Email context fetch failed:', e.message);
+
+                try {
+                    const response = await fetchEmailContextWithRetry(tab.id);
+                    if (response?.context) {
+                        scanOptions.pageContent = {
+                            bodyText: response.context.snippet || '',
+                            isEmailView: true,
+                            senderName: response.context.senderName || '',
+                            senderEmail: response.context.senderEmail || '',
+                            subject: response.context.subject || '',
+                            headers: response.context.headers || {},
+                            links: (response.context.embeddedLinks || []).map(l => ({ href: l })),
+                            rawUrls: response.context.embeddedLinks || []
+                        };
+                        console.log('[Hydra Guard] FORCE_RESCAN: Fetched email context for enriched scan.');
+                    } else {
+                        console.warn('[Hydra Guard] FORCE_RESCAN: context unavailable after retries — URL-only scan.');
+                    }
+                } catch (e) {
+                    console.warn('[Hydra Guard] FORCE_RESCAN: Email context fetch failed:', e.message);
+                }
             }
         }
 
@@ -287,3 +293,42 @@ async function handleTestAiKey(msgData) {
 async function handleTestPhishTankKey(msgData) {
     return { success: false, error: 'PhishTank service is currently unavailable.' };
 }
+
+/**
+ * Fetch email context from the content script with exponential backoff retries.
+ * @param {number} tabId
+ * @param {number} [maxAttempts=3]
+ * @returns {Promise<{context: object, bodyReady: boolean, success: boolean}|null>} Enriched context or null if exhausted.
+ */
+async function fetchEmailContextWithRetry(tabId, maxAttempts = 3) {
+    let lastSuccessRes = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const delay = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, 2000ms
+        const timeoutPromise = new Promise(r => setTimeout(r, 2000, { success: false, error: 'timeout' }));
+        const fetchPromise = sendMessageToTab(tabId, { type: 'GET_EMAIL_CONTEXT' })
+            .then(r => r || { success: false })
+            .catch(e => ({ success: false, error: e.message }));
+
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+
+        // Keep track of the most recent successful response, even if body is empty/short
+        if (res?.success && res.context) {
+            lastSuccessRes = res;
+        }
+
+        if (res?.success && (res.context?.snippet?.length ?? 0) > 50) {
+            return res; // Body is ready and has content
+        }
+
+        console.warn(`[Hydra Guard] FORCE_RESCAN: attempt ${attempt}/${maxAttempts} — body not ready. ${res?.error || ''}`);
+
+        if (attempt < maxAttempts) {
+            // MV3-safe delay: await keeps the message handler alive
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+    
+    // If retries exhausted, return the last successful response (handling short emails)
+    return lastSuccessRes;
+}
+

@@ -120,3 +120,11 @@
 - **What happened**: The BUG-136 fix for `isEmailReadingView()` was deployed but the user's extension still showed v1.0.208. The `dist/manifest.json` was never updated because the release script's build step (`cd extension && npm run build`) was either skipped or failed silently.
 - **Root cause**: Two issues: (1) `release.cjs` builds via `execSync` with `{ stdio: 'pipe' }` which suppresses output — if the build fails, we never see why. (2) There was a redundant `extension/scripts/release.js` that only updated the extension `package.json`, not the root or manifest. Running the wrong release script caused version desync.
 - **Lesson**: Always verify `dist/manifest.json` version matches the source after deploy. The `BUG-137.test.js` regression test now checks this automatically. Also, `extractEmailText()` now has a Gmail-specific programmatic fallback that doesn't rely on CSS class names — it queries the reading pane for the largest text block, defending against Gmail changing internal classes.
+
+## 2026-03-25: Retry Loop Coordination in Background ↔ Content Script (BUG-138)
+
+- **What happened**: Force Rescan returned empty email body because `GET_EMAIL_CONTEXT` responded before the Gmail SPA had rendered the email content. Heuristics ran with empty `bodyText` and produced 0 findings.
+- **Root cause**: The background had a single 2s timeout for `GET_EMAIL_CONTEXT`. Gmail can take 2–5s to render a heavy email thread in a spam folder.
+- **Fix**: Extracted `fetchEmailContextWithRetry()` in `handler.js` — 3 attempts with exponential backoff (500/1000/2000ms), each with its own 2s timeout race.
+- **Lesson**: Background ↔ content script message patterns for DOM data must account for SPA lazy-load timing. Always use a retry+backoff pattern for DOM-dependent queries, and always set an explicit "not ready" signal (`bodyReady: false`) so callers can distinguish "DOM not settled" from "feature not supported."
+- **Follow-up**: Long-term, the content script should proactively push an `EMAIL_DOM_READY` event to the background when the email body is available, eliminating the need for background-initiated polling entirely.

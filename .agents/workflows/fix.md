@@ -1,49 +1,70 @@
 ---
 name: fix
-description: "Two-Strike Bug Repair, Lessons Reuse, and Silent Learning"
+description: "Diagnose and resolve bugs using architect skills and regression-focused testing."
 ---
-1. Learn before fixing:
-   - Search docs/logs/BUG_LOG.md and docs/logs/LESSONS_LEARNED.md for this bug ID or similar issues.
-   - If matches are found, explicitly state:
-     - What approaches were tried before.
-     - Why those approaches failed or were insufficient.
-   - Commit to a different or improved fix strategy rather than repeating a previously failed approach.
-2. Lovable Architect for Lovable/Supabase bugs:
-   - If the bug involves:
-     - Lovable pages or flows,
-     - Supabase queries, RLS policies, or auth,
-     - GitHub ↔ Lovable sync issues,
-     THEN:
-     - Activate `lovable_architect`.
-     - Use its MCP-first recommendations (e.g., `analyze_database_schema`, project analysis) to:
-       - Understand current schema and policies.
-       - Identify potential side effects of the fix.
-   - Incorporate these findings into:
-       - The regression test design.
-       - The chosen fix approach.
-   - Do not violate forbidden zones or DB safety rules defined by the skill.
-3. Reproduce:
-   - Write or update a failing regression test in tests/regression/ that reliably reproduces the bug.
-4. Review (Critic Agent):
-   - MANDATORY: Create a `critic_report.md` artifact in the brain directory.
-   - SPAWN: `Review Agent` (Planning mode) to generate this report. The report must:
-     - Reference specific BUG_LOG / LESSONS_LEARNED IDs.
-     - Confirm the regression test definitively reproduces the bug.
-     - Identify impact on related modules (web, extension, shared).
-     - Call out any risky side effects or technical debt.
-     - Output a "confirmed" or "correction required" verdict.
-   - STOP: You MUST include the `critic_report.md` path in a `notify_user` call and wait for approval before proceeding to Attempt 1.
-   - The Review Agent MUST NOT directly change code or tests; it only comments on the plan via the report.
-5. Attempt 1:
-   - Implement the fix in code.
-   - Run the relevant tests (regression + affected unit tests).
-6. Attempt 2 (if needed):
-   - If Attempt 1 fails, try a second fix with an adjusted strategy.
-   - Re-run tests.
-   - If Attempt 2 also fails, STOP and spawn a Research Agent; do NOT keep guessing.
-7. Log & Learn (MANDATORY once tests pass):
-   - Update docs/logs/BUG_LOG.md with the bug and status: FIXED, referencing the regression test file.
-   - Update docs/logs/LESSONS_LEARNED.md with the core lesson.
-   - If the lesson is architectural or process-level, consider:
-     - Adding or updating an ADR in docs/architecture/DECISIONS.md.
-     - Adding a backlog item in docs/ENHANCEMENTS.md for follow-up improvements.
+
+# Workflow: fix
+
+1. Understand the Bug
+   - Collect:
+     - Error messages, stack traces, logs.
+     - User reports or tickets.
+     - Reproduction steps.
+   - Restate:
+     - What is happening now.
+     - What should happen instead.
+     - Suspected impact and severity.
+
+2. Learn from Past Bugs
+   - Read recent entries from:
+     - docs/logs/BUG_LOG.md
+     - docs/logs/LESSONS_LEARNED.md
+   - Look for similar incidents and note:
+     - Root causes.
+     - Fixes that worked.
+     - Anti-patterns to avoid.
+
+3. Identify Surfaces
+   - Determine if the bug touches:
+     - Lovable UI components/pages/routes.
+     - Supabase queries, schema, RLS, or auth.
+     - External APIs/integrations.
+   - Note any high-risk surfaces.
+
+4. Architect Skill Integration (if relevant)
+   - If any Lovable/Supabase/sync surface is involved:
+     - Activate and follow `lovable_architect`.
+   - Use MCP/project/schema analysis (if available) to:
+     - Map the bug to specific components/routes/queries.
+     - Understand schema and RLS implications.
+
+5. Fix Strategy & Regression Tests
+   - Propose a fix strategy that:
+     - Respects forbidden zones and DB safety rules.
+     - Uses migrations for schema changes instead of ad hoc updates.
+   - Design regression tests that:
+     - Reproduce the bug.
+     - Confirm the fix.
+     - Guard adjacent behavior.
+
+6. Implement the Fix
+   - Apply minimal, targeted changes:
+     - Limit edits to files/modules identified in the strategy.
+   - For schema changes:
+     - Add/modify migration files with comments and Business Impact labels.
+
+7. Update/Add Tests
+   - Implement regression tests.
+   - Update existing tests as needed.
+   - Ensure tests fail before the fix and pass after the fix where feasible.
+
+8. Validate
+   - Run or recommend relevant tests/checks.
+   - Note any failing tests and what is required to fix them.
+
+9. Summary & Lessons
+   - Summarize:
+     - Root cause.
+     - Code/config/migrations changed.
+     - Tests added/updated and their status.
+   - Note any lessons for BUG_LOG, LESSONS_LEARNED, and DECISIONS docs.

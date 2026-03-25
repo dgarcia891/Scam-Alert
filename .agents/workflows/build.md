@@ -1,39 +1,68 @@
 ---
 name: build
-description: "Aggressive Parallel Swarm Execution with Lessons-Aware TDD"
+description: "Implement planned changes using architect skills and thoroughness-first rules."
 ---
-1. Learn from recent work:
-   - Read the last ~200 lines from:
+
+# Workflow: build
+
+1. Load Implementation Plan
+   - Retrieve the current Implementation Plan for this task.
+   - Summarize:
+     - Scope of changes.
+     - Files/areas to touch.
+     - Planned database/config changes.
+     - Tests/checks to add or update.
+
+2. Learn from Recent Work
+   - Read recent entries from:
      - docs/logs/BUG_LOG.md
      - docs/logs/LESSONS_LEARNED.md
    - Skim docs/architecture/DECISIONS.md for decisions related to this feature.
-   - Adjust your test strategy to:
+   - Adjust test and implementation strategy to:
      - Cover previously fragile areas.
-     - Avoid patterns called out as problematic in prior lessons.
-2. Lovable Architect Integration:
-   - If the Implementation Plan or current request touches:
-     - Lovable web app components,
-     - Supabase models/migrations,
-     - GitHub ↔ Lovable sync behavior,
-     THEN:
-     - Use the `lovable_architect` skill to:
-       - Confirm which files/directories are safe to edit.
-       - Decide the correct pattern for DB changes (dead-drop migrations under `supabase/migrations/`).
-       - Ensure UI and routing changes remain Lovable-compatible.
-   - Reflect any constraints from the skill in the way tests and implementation are structured.
-3. Trigger Swarm:
-   - SPAWN: `Test Writer Agent` (Fast Mode) -> "Write or update regression and unit tests in tests/unit/ and tests/regression/ for the requested feature."
-   - SPAWN: `Developer Agent` (Fast Mode) -> "Implement logic in src/ or supabase/functions/ according to the plan and tests."
-   - Both agents must run in parallel, not strictly sequentially.
-4. Execution:
-   - Ensure tests are created/updated before finalizing implementation changes.
-   - Keep files under the 500-line limit; refactor before adding to any file that would exceed it.
-5. Verification:
-   - Run `npm test` or `npm run test:unit` (as appropriate for this repo).
-   - Run `npm run scan` and `npm run drift`.
-   - If any tests fail, iterate within this workflow until all are green.
-6. Output:
+     - Avoid patterns called out as problematic.
+
+3. Identify Surfaces
+   - Confirm which surfaces the plan touches:
+     - Lovable UI components/pages/routes.
+     - Supabase schema/data or queries.
+     - External APIs/integrations.
+   - Note any high-risk surfaces.
+
+4. Architect Skill Integration (if relevant)
+   - If any Lovable/Supabase/sync surface is involved:
+     - Activate and follow `lovable_architect`.
+   - Apply its constraints to:
+     - Which files/directories are safe to edit.
+     - How DB changes must be represented (migrations).
+     - How routing/UX changes must behave.
+
+5. Prepare Context
+   - Open and review all files to be modified.
+   - Check for discrepancies between the Implementation Plan and the actual code.
+   - If discrepancies are major, update the plan (or return to /plan) before heavy changes.
+
+6. Implement Changes
+   - Follow the Implementation Plan step-by-step:
+     - Edit/create only scoped files unless the plan is updated.
+     - Keep files within reasonable size; refactor before they become too large.
+   - For database changes:
+     - Create/update migration files (e.g., under supabase/migrations/) rather than editing schema directly.
+     - Add comments and Business Impact labels.
+   - Keep changes small, reviewable, and consistent with existing patterns.
+
+7. Update/Add Tests
+   - Implement or update tests described in the plan and informed by BUG_LOG/LESSONS_LEARNED.
+   - Ensure tests cover:
+     - Main success path.
+     - Known edge cases.
+     - Any previous regression areas.
+
+8. Handoff to Verification & Critic
    - Summarize:
+     - Updated Implementation Plan (if changed).
      - Files changed.
-     - New/updated tests.
-     - Any lessons that should later be captured in LESSONS_LEARNED.md or DECISIONS.md.
+     - Migrations created/updated.
+     - Tests added/updated.
+   - Do not declare DONE here.
+   - Return data for `/verify` and critic workflows or for the dev loop controller.

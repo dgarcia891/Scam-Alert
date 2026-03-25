@@ -226,6 +226,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         if (type === 'GET_EMAIL_CONTEXT') {
             try {
                 const data = extractEmailText() || '';
+                const bodyReady = data.length > 50;
                 const senderInfo = parseSenderInfo() || { name: '', email: '' };
                 const subject = extractSubject() || '';
                 const linkData = extractEmailLinks() || { links: [] };
@@ -233,6 +234,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
                 sendResponse({
                     success: true,
+                    bodyReady,
                     context: {
                         senderName: senderInfo.name || '',
                         senderEmail: senderInfo.email || '',
@@ -244,7 +246,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                 });
             } catch (error) {
                 console.error('[Hydra Guard] Error extracting email context:', error);
-                sendResponse({ success: false, error: error.message });
+                sendResponse({ success: false, bodyReady: false, error: error.message });
             }
             return true; // Keep channel open for async response
         }

@@ -1,46 +1,65 @@
 ---
 name: plan
-description: "Contextual Planner, Lessons Intake, and Gap Analysis"
+description: "Plan and design changes using thorough, multi-angle analysis and relevant architect skills."
 ---
-1. Context load:
-   - Run `node scripts/consult.cjs` or `node scripts/consult.js` if available.
-   - Use MCP `analyze_project` to map current state.
-2. Learn from history (recent incidents):
-   - Read the last ~200 lines from:
-     - docs/logs/BUG_LOG.md
-     - docs/logs/LESSONS_LEARNED.md
-   - Read docs/architecture/DECISIONS.md.
-   - Identify any bugs, anti-patterns, or decisions relevant to the current request.
-   - Explicitly state in the plan how you will avoid repeating known failed approaches.
-3. Lovable Architect Activation (if relevant):
-   - If the request involves Lovable UI, Supabase schema/data, MCP project/database analysis, or GitHub ↔ Lovable sync:
-     - Explicitly activate and use the `lovable_architect` skill.
-     - Use MCP tools such as `analyze_project` and `analyze_database_schema` as recommended by the skill before finalizing the Implementation Plan.
-   - Incorporate the skill’s constraints:
-     - Respect forbidden zones (e.g., `src/integrations/supabase/*`).
-     - Use dead-drop migrations instead of direct DB pushes.
-     - Align with Lovable’s directory and component conventions.
-4. Gap Analysis:
-   - Compare the user request against docs/architecture/architecture.md (or equivalent architecture doc).
-   - Identify gaps in:
-     - Features
-     - Tests
-     - Docs
-     - Data model / Supabase
-5. Output:
-   - Produce a concise Implementation Plan that:
-     - References any relevant ADRs.
-     - Notes DB impact (Destructive/Risky/Safe) if database changes are likely.
-   - STOP after outputting the plan. Do NOT modify any files or run terminal commands until explicitly instructed to implement.
-6. Review (Critic Agent):
-   - SPAWN: `Review Agent` (Planning mode) with this task:
-     - "Review the Implementation Plan, the original user request, and any referenced code paths.
-      Check for:
-      - Missing edge cases or requirements
-      - Missing or weak tests
-      - Unstated database impact (Destructive/Risky/Safe)
-      - Cross-surface gaps (e.g., extension vs web, if applicable)
-      - Security and performance concerns
-      Output a short list of potential gaps or explicitly state that the plan is sufficiently robust."
-   - The Review Agent MUST NOT modify any files or run terminal commands.
-   - STOP after Review Agent output. Wait for the user to confirm before implementation.
+
+# Workflow: plan
+
+1. Clarify Request
+   - Restate the user’s request in your own words.
+   - Classify it as trivial vs non-trivial.
+   - If non-trivial, note that this plan is intended for the full dev loop.
+
+2. Load Context
+   - Read, if present:
+     - README and project overview docs.
+     - docs/architecture/architecture.md
+     - docs/architecture/DECISIONS.md
+     - docs/logs/BUG_LOG.md (recent entries)
+     - docs/logs/LESSONS_LEARNED.md (recent entries)
+   - Summarize in 3–5 bullets:
+     - Relevant architecture decisions.
+     - Recent bugs/lessons that affect this request.
+     - Constraints to respect.
+
+3. Identify Surfaces
+   - Decide which surfaces are involved:
+     - Lovable UI components/pages/routes.
+     - Supabase schema/data or queries.
+     - External APIs or integrations.
+     - Any other core modules or high-risk areas (auth, money, security, etc.).
+   - Note any high-risk areas explicitly.
+
+4. MCP / Codebase Scan (if non-trivial)
+   - Use code navigation or MCP tools to:
+     - Locate relevant components, routes, and API handlers.
+     - Locate tables/columns or core modules touched by the feature or bug.
+   - Record key findings.
+
+5. Activate Architect Skills (if relevant)
+   - If the work touches Lovable UI, Supabase, or GitHub sync:
+     - Activate and follow `lovable_architect`.
+   - Apply any constraints from architect skills to what is allowed and how changes must be represented.
+
+6. Multi-Angle Options
+   - For non-trivial design decisions, generate at least 2–3 plausible solution approaches.
+   - For each approach, briefly record:
+     - Pros and cons.
+     - Risks (including regressions and complexity).
+     - Impact on tests, migrations, and future work.
+   - Select a preferred approach, with rationale.
+
+7. Implementation Plan
+   - Produce a structured, step-by-step Implementation Plan that:
+     - Names specific files/modules where possible.
+     - Specifies DB changes as migrations (not direct schema edits).
+     - Identifies tests/checks to add or update.
+     - Is small enough to execute in one or a few /build runs.
+
+8. Output for Dev Loop
+   - Output:
+     - The Implementation Plan.
+     - Surfaces affected.
+     - Architect skill constraints.
+     - Planned tests/checks.
+   - Do not implement changes here.
