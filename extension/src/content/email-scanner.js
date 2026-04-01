@@ -63,6 +63,12 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
     async function triggerScan() {
         if (!chrome.runtime?.id) return;
 
+        // BUG-145: Concurrency guard. If another trigger fires, cancel the pending retry.
+        if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        }
+
         const settings = await getEmailSettings();
 
         if (!settings.enabled) {
@@ -86,14 +92,15 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
             console.warn('[Hydra Guard] Extractor error in triggerScan:', extractErr);
         }
 
-        // We demand at least 20 chars of real text, or wait up to 3 seconds for the SPA to render.
-        const isLoaded = data.length > 20 || linkData.rawUrls.length > 0 || !!senderInfo.email;
+        // We demand at least 20 chars of real text, or wait up to 5 seconds for the SPA to render.
+        // BUG-145: Sender must be an actual email (contain @) to count as loaded, preventing premature fallback triggers.
+        const isLoaded = data.length > 20 || linkData.rawUrls.length > 0 || (senderInfo.email && senderInfo.email.includes('@'));
 
         if (!isLoaded) {
-            if (extractionRetryCount < 3) { // Max 3 retries (approx 3 seconds total max delay)
+            if (extractionRetryCount < MAX_EXTRACTION_RETRIES) { // Use constant 5
                 extractionRetryCount++;
                 const delay = 800; // Fixed 800ms debounce
-                console.log(`[Hydra Guard] Email SPA transitioning — retry ${extractionRetryCount}/3 in ${delay}ms`);
+                console.log(`[Hydra Guard] Email SPA transitioning — retry ${extractionRetryCount}/${MAX_EXTRACTION_RETRIES} in ${delay}ms`);
                 if (retryTimer) clearTimeout(retryTimer);
                 retryTimer = setTimeout(() => triggerScan(), delay);
                 return;

@@ -223,10 +223,25 @@ export function extractSubject() {
         if (el) {
             // BUG-145: Title tag requires .textContent because it's invisible to layout engine
             const text = (el.innerText || el.textContent || '').trim();
+            
             // Ignore default client titles (e.g. Inbox (31) - someone@gmail.com - Gmail)
-            if (text.length > 0 && text !== 'Gmail' && !/^[A-Za-z0-9]+\s+\(\d+\)\s+-/.test(text)) {
-                // Strip suffix "- myemail@gmail.com - Gmail"
-                const cleanText = sel === 'title' ? text.replace(/\s+-\s+.*?- Gmail$/, '') : text;
+            if (text.length > 0 && text !== 'Gmail') {
+                let cleanText = text;
+                if (sel === 'title') {
+                    // Strip prefix like "(3) Inbox - " or "Inbox (3) - "
+                    cleanText = cleanText.replace(/^(\(\d+\)\s*)?[a-zA-Z]+\s*(\(\d+\)\s*)?-\s*/, '');
+                    // Strip suffix "- myemail@gmail.com - Gmail"
+                    cleanText = cleanText.replace(/\s+-\s+.*?- Gmail$/, '');
+                    
+                    // If the title was literally just "Inbox", skip it
+                    if (cleanText.toLowerCase() === 'inbox') continue;
+                } else {
+                    // For non-title elements, avoid grabbing "Inbox (31) -"
+                    if (/^[A-Za-z0-9]+\s+\(\d+\)\s+-/.test(text)) continue;
+                }
+                
+                if (!cleanText.trim()) continue;
+
                 console.log(`[Hydra Guard] extractSubject: found via "${sel}" — "${cleanText}"`);
                 return cleanText;
             }
