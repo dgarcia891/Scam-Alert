@@ -5,12 +5,35 @@
  * Add new clients here — no other files need hardcoded URL checks.
  */
 
+/**
+ * @typedef {Object} EmailClient
+ * @property {string} id
+ * @property {string} label
+ * @property {string[]} urlPatterns
+ * @property {RegExp} urlRegex
+ * @property {RegExp} [readingViewHash]
+ * @property {string[]} readingViewSelectors
+ * @property {string[]} [titlePatterns]
+ * @property {Object} selectors
+ * @property {string} [selectors.container]
+ * @property {string|null} [selectors.messageBody]
+ * @property {string} [selectors.sender]
+ * @property {string} [selectors.subject]
+ * @property {string} [selectors.composeButton]
+ * @property {string[]} dom
+ * @property {string} senderExtractor
+ * @property {boolean} iframeExtraction
+ * @property {string|null} iframeSelector
+ */
+
 export const EMAIL_CLIENTS = [
     {
         id: 'gmail',
         label: 'Gmail',
         urlPatterns: ['mail.google.com'],
         urlRegex: /mail\.google\.com/,
+        readingViewHash: /^#(?:inbox|spam|all|sent|trash|category\/\w+|label\/[^\/]+)\/[-_=+%a-zA-Z0-9]+/,
+        readingViewSelectors: ['h2.hP', '[data-legacy-thread-id]', '.ade', '.bzB'], // Structural headers: subject line, reply toolbar, header row
         titlePatterns: [],
         selectors: {
             container: '.nH.hx',
@@ -29,6 +52,7 @@ export const EMAIL_CLIENTS = [
         label: 'Outlook',
         urlPatterns: ['outlook.live.com', 'outlook.office.com', 'outlook.office365.com'],
         urlRegex: /outlook\.(live|office)\S*\.com/,
+        readingViewSelectors: ['[role="heading"][aria-level="2"]', '[data-testid="reply-button"]', '[data-testid="message-subject"]'],
         titlePatterns: [],
         selectors: {
             container: '[role="main"]',
@@ -47,6 +71,7 @@ export const EMAIL_CLIENTS = [
         label: 'Yahoo Mail',
         urlPatterns: ['mail.yahoo.com'],
         urlRegex: /mail\.yahoo\.com/,
+        readingViewSelectors: ['[data-test-id="subject"]', '[data-test-id="reply-btn"]'],
         titlePatterns: [],
         selectors: {
             container: '[data-test-id="message-view"]',
@@ -65,6 +90,7 @@ export const EMAIL_CLIENTS = [
         label: 'Roundcube',
         urlPatterns: ['roundcube'],
         urlRegex: /(^|\.)(roundcube|webmail)\.[^\/]+|^[^\/]+\/(roundcube|webmail|roundcubemail)\/?$/i,
+        readingViewSelectors: ['h2.subject', '.subject'],
         titlePatterns: ['Roundcube'],
         selectors: {
             container: '#mainscreen',
@@ -83,6 +109,7 @@ export const EMAIL_CLIENTS = [
         label: 'ProtonMail',
         urlPatterns: ['mail.proton.me', 'mail.protonmail.com'],
         urlRegex: /mail\.proton(mail)?\.me|mail\.protonmail\.com/,
+        readingViewSelectors: ['[data-testid="message-header:subject"]', '[data-testid="sidebar:reply"]'],
         titlePatterns: ['Proton Mail'],
         selectors: {
             container: '[data-testid="message-view"]',
@@ -101,6 +128,7 @@ export const EMAIL_CLIENTS = [
         label: 'Zoho Mail',
         urlPatterns: ['mail.zoho.com', 'mail.zoho.eu', 'mail.zoho.in'],
         urlRegex: /mail\.zoho\.(com|eu|in)/,
+        readingViewSelectors: ['.zmSubject', '.zmReply'],
         titlePatterns: ['Zoho Mail'],
         selectors: {
             container: '.zmMailContent',

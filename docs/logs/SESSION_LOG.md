@@ -576,3 +576,32 @@ KEY FILES MODIFIED:
 NEXT STEPS:
 • [Fill in recommended next actions]
 ═══════════════════════════════════════════════════
+
+## 2026-03-30
+- **Project:** Scam Alert Extension (Hydra Guard)
+- **Active Bug:** BUG-139 / FEAT-119 AI Analysis
+- **Summary:** Fixed the "Analyzing with AI..." infinite spinner regression. Root cause was an unhandled promise rejection in the Service Worker's catch block attempting to reference `type` out of scope, causing Chrome ports to hang. Added a client-side 30s timeout to `AskAIButton` using a `useRef` increment counter to properly handle in-flight timeouts without corrupting late-arriving responses. Added unit tests for BUG-139 ensuring the message listener handles global rejections cleanly.
+- **Files Modified:** `service-worker.js`, `popup.jsx`, `BUG-139.test.js`
+- **Next Actions:** Monitor the telemetry logs to verify whether the 30-second timeout fires frequently, which would imply the underlying AI fetch context is running extremely slowly for certain users. Continue with remaining FEAT/BUG tasks as prioritized.
+
+## 2026-03-30
+- **Project:** Scam Alert Extension (Hydra Guard)
+- **Active Bug:** BUG-140 Empty-Body Scan Failure
+- **Summary:** Fixed an architectural flaw in `email-scanner.js` where emails lacking >20 chars of body text (e.g. Google DMARC reports, image-only emails) would trip the lazy-load safeguard, retry for 15s, and ultimately bypass scanner heuristic extraction completely. Extractor logic refactored to populate `{ data, senderInfo, subject, headers, links }` *before* evaluating the retry condition. 
+- **Files Modified:** `email-scanner.js`, `BUG-140.test.js`
+- **Next Actions:** Validate DMARC reports show valid `google.com` results.
+
+## 2026-03-30
+- **Project:** Scam Alert Extension (Hydra Guard)
+- **Active Bug:** BUG-141 AI Background Fetch Timeout UI Hanging
+- **Summary:** Investigated and resolved a critical timeout bug where Gemini AI validation hung indefinitely during network drops or MV3 background sleep, triggering the popup's hard 30s timeout and caching a false-positive `CONFIRMED` scam result. Replaced pure `AbortSignal` with a robust `AbortController` + `finally` cleanup sequence. Added a distinct `TIMEOUT_VERDICT` (`INCONCLUSIVE`) to prevent caching network failures as security threats.
+- **Database Safety Review:** PASS (Extension-side networking fix, no Supabase/Postgres changes). RLS/Indices/Pagination: NOT APPLICABLE. Remaining DB risks: None known.
+- **Files Modified:** `ai-verifier.js`, `ai-handler.js`, `popup.jsx`, `BUG-141.test.js`
+- **Next Actions:** Version incremented to v1.0.215. Extension build passed with zero test regressions. Test deploying to Chrome Web Store when ready.
+
+## 2026-04-01
+- **Project:** Scam Alert Extension (Hydra Guard)
+- **Active Bug:** BUG-147 Email Scanner Hang
+- **Summary:** Resolved the definitive "Analyzing Safety" UI hang where background errors silently swallowed the exit signal. Hoisted `result` with a defensive fallback and added a guaranteed broadcast in the `finally` block using a `broadcastSent` flag.
+- **Files Modified:** `service-worker.js`, `manifest.json`, `package.json`
+- **Next Actions:** User to reload extension and verify fix on problematic emails.

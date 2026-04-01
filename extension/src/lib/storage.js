@@ -28,14 +28,23 @@ const STORAGE_KEYS = {
 export function normalizeUrl(url) {
     try {
         const urlObj = new URL(url);
-        // Remove fragment
-        urlObj.hash = '';
+        
+        // BUG-145: SPA email clients (Gmail, Outlook) route discrete emails via the `#` fragment.
+        // Stripping it causes all email scans to violently collide and overwrite the base domain cache slot.
+        const hostname = urlObj.hostname.toLowerCase();
+        const isSpaEmail = hostname.includes('mail.google.com') || hostname.includes('outlook.live.com') || hostname.includes('outlook.office.com') || hostname.includes('outlook.office365.com');
+        
+        if (!isSpaEmail) {
+            // Remove fragment for normal domains to deduplicate tracking/anchor links
+            urlObj.hash = '';
+        }
+
         // Remove trailing slash from pathname if present
         if (urlObj.pathname.length > 1 && urlObj.pathname.endsWith('/')) {
             urlObj.pathname = urlObj.pathname.slice(0, -1);
         }
         // Normalize hostname
-        urlObj.hostname = urlObj.hostname.toLowerCase();
+        urlObj.hostname = hostname;
 
         return urlObj.toString();
     } catch {
@@ -316,26 +325,36 @@ export async function removeFromWhitelist(domain) {
 
 /**
  * Check if domain is whitelisted (Local + Global)
- * @param {string} url - URL to check
+ * Email addresses are checked against local whitelist ONLY.
+ * @param {string} urlOrEmail - URL or email to check
  * @returns {Promise<boolean>} True if whitelisted
  */
 export async function isWhitelisted(urlOrEmail) {
-    if (!urlOrEmail) return false;
+    if (!urlOrEmail || typeof urlOrEmail !== 'string') return false;
 
     try {
         const localWhitelist = await getWhitelist();
         const globalSafeList = await getGlobalSafeList();
         const combinedSafeList = [...localWhitelist, ...globalSafeList];
 
-        // Handle Email Addresses or raw domains directly
+        // Handle raw domains or email addresses passed directly (no protocol)
         if (!urlOrEmail.includes('://')) {
             const identity = urlOrEmail.toLowerCase().trim();
-            return combinedSafeList.some(whitelisted =>
-                identity === whitelisted || identity.endsWith(`@${whitelisted}`)
-            );
+            
+            // STRICTLY an email address — only consult the personal local whitelist
+            if (identity.includes('@')) {
+                return localWhitelist.some(whitelisted =>
+                    identity === whitelisted || identity.endsWith(`@${whitelisted}`)
+                );
+            } else {
+                // Raw domain — consult combined whitelist
+                return combinedSafeList.some(whitelisted =>
+                    identity === whitelisted || identity.endsWith(`.${whitelisted}`)
+                );
+            }
         }
 
-        // Handle URLs
+        // Handle full URLs
         const urlObj = new URL(urlOrEmail);
         const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
 

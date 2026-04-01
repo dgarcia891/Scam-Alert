@@ -2,6 +2,8 @@
  * Navigation Handler for Service Worker
  */
 
+import { isKnownEmailClient } from '../../config/email-clients.js';
+
 export function createNavigationHandler(context) {
     const { shouldScanUrl, scanAndHandle, syncIconForTabFromCache, resetActionUIForTab } = context;
 
@@ -18,6 +20,26 @@ export function createNavigationHandler(context) {
         if (!shouldScanUrl(url)) return;
 
         const tabId = details.tabId;
+
+        // BUG-144: Do NOT run scanAndHandle for email clients.
+        // The URL (mail.google.com) tells us nothing about email content.
+        // The email scanner content script will trigger the real scan via SCAN_CURRENT_TAB
+        // after extracting sender, subject, body, and links from the DOM.
+        if (isKnownEmailClient(url)) {
+            console.log(`[Hydra Guard] Email client detected — deferring scan to content script (tab ${tabId})`);
+            // BUG-144: Clear stale tab state BUT set scanInProgress: true so popup knows to wait.
+            // This prevents the 'NO SCAN' flash while the content script extracts the DOM.
+            if (context.tabStateManager) {
+                context.tabStateManager.updateTabState(tabId, { 
+                    url, 
+                    scanResults: null, 
+                    lastScanned: null,
+                    scanInProgress: true 
+                });
+            }
+            return;
+        }
+
         console.log(`[Hydra Guard] Navigation detected on tab ${tabId}:`, url);
 
         // Immediate: Clear stale badge state to prevent flickers (BUG-062)

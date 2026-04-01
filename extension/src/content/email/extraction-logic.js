@@ -115,8 +115,14 @@ export function extractEmailData() {
 
         // Extract body text
         if (client.selectors.messageBody) {
-            const body = doc.querySelector(client.selectors.messageBody);
-            if (body) bodyText = body.innerText;
+            const bodySelectors = client.selectors.messageBody.split(',').map(s => s.trim());
+            for (const sel of bodySelectors) {
+                const body = doc.querySelector(sel);
+                if (body && (body.innerText || '').trim().length > 5) {
+                    bodyText = body.innerText.trim();
+                    break;
+                }
+            }
         } else if (client.iframeExtraction && doc.body) {
             // Iframe-based clients without a specific body selector: use full iframe body
             const clone = doc.body.cloneNode(true);
@@ -148,4 +154,37 @@ export function extractEmailData() {
     }
 
     return { bodyText, senderName, senderEmail, subject, isEmailView: true };
+}
+
+/**
+ * Determines if the current page is showing an individual email (reading view),
+ * using the client config's readingViewHash and readingViewSelectors.
+ *
+ * This is INTENTIONALLY separate from extractEmailData() — it must be fast
+ * enough to call every 500ms in the SPA navigation interval.
+ *
+ * @param {object | null} client - from getMatchingClient()
+ * @returns {boolean}
+ */
+export function isEmailReadingViewForClient(client) {
+    // Fallback for null client (self-hosted webmail, Roundcube on custom domain):
+    // check well-known generic signals that appear in all supported clients.
+    if (!client) {
+        return !!(
+            document.querySelector('#messagecontframe') ||   // Roundcube
+            document.querySelector('[data-message-id]')      // Gmail fallback
+        );
+    }
+
+    // Priority 1: URL hash fast-path (zero DOM, instant)
+    if (client.readingViewHash && client.readingViewHash.test(location.hash)) {
+        return true;
+    }
+
+    // Priority 2: Structural DOM selectors (not body content — attacker-safe)
+    if (client.readingViewSelectors?.length > 0) {
+        return client.readingViewSelectors.some(sel => !!document.querySelector(sel));
+    }
+
+    return false;
 }

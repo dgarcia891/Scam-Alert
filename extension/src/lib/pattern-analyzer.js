@@ -48,11 +48,11 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
         excessiveSubdomains: checkExcessiveSubdomains(url),
         suspiciousPort: checkSuspiciousPort(url),
         suspiciousKeywords: checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent, dynamicKeywords),
+        urgencySignals: checkUrgencySignals(pageContent, dynamicUrgencyKeywords),
+        emailScams: checkEmailScams(pageContent, dynamicEmailKeywords),
 
         // Pro Features
-        advancedTyposquatting: { ...checkAdvancedTyposquatting(url), isProFeature: true },
-        urgencySignals: { ...checkUrgencySignals(pageContent, dynamicUrgencyKeywords), isProFeature: true },
-        emailScams: { ...checkEmailScams(pageContent, dynamicEmailKeywords), isProFeature: true }
+        advancedTyposquatting: { ...checkAdvancedTyposquatting(url), isProFeature: true }
     };
 
     if (pageContent) {

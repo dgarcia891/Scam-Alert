@@ -16,6 +16,16 @@ const FALLBACK_VERDICT = {
     indicators: []
 };
 
+// Architecturally, a timeout is infrastructure failure, NOT security evidence.
+// It must never flag a page as a scam.
+const TIMEOUT_VERDICT = {
+    verdict: 'INCONCLUSIVE',
+    reason: 'AI analysis timed out. Check your internet connection and try again.',
+    details: 'AI analysis timed out. Check your internet connection and try again.',
+    confidence: 0,
+    indicators: []
+};
+
 /**
  * Sanitize phrases to prevent prompt injection and keep context tight.
  * @param {string[]} phrases 
@@ -251,17 +261,21 @@ Required format:
 }
 `;
 
+    const AI_BACKGROUND_TIMEOUT_MS = 15000; // Must be < popup's AI_REQUEST_TIMEOUT_MS (30000ms)
+
+    const controller = new AbortController();
+    // Safety net: guaranteed JS-level abort even if AbortSignal.timeout is ignored by browser
+    const timeoutHandle = setTimeout(
+        () => controller.abort(new Error('AI validation timed out after 15s')),
+        AI_BACKGROUND_TIMEOUT_MS
+    );
+
     try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${options.apiKey}`;
 
-        let signal;
-        if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-            signal = AbortSignal.timeout(10000); // 10s timeout
-        }
-
         const response = await fetch(endpoint, {
             method: 'POST',
-            signal: signal,
+            signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
@@ -276,8 +290,13 @@ Required format:
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error?.message || `API error: ${response.status}`);
+            // Guard: non-JSON error bodies (e.g., Nginx 503 HTML page) must not throw
+            let errMsg = `API error: ${response.status}`;
+            try {
+                const errBody = await response.json();
+                errMsg = errBody.error?.message || errMsg;
+            } catch (_) { /* non-JSON body: use status code message */ }
+            throw new Error(errMsg);
         }
 
         const data = await response.json();
@@ -300,13 +319,22 @@ Required format:
             }
         };
     } catch (err) {
+        const isTimeout = err.message?.includes('timed out') || err.name === 'AbortError';
         console.error('[AI Verifier] API call failed:', err.message);
+
+        // Return TIMEOUT_VERDICT for aborts; FALLBACK_VERDICT for unexpected errors
+        const baseVerdict = isTimeout ? TIMEOUT_VERDICT : FALLBACK_VERDICT;
         return {
-            ...FALLBACK_VERDICT,
+            ...baseVerdict,
+            _isTimeout: isTimeout,    // Signal to ai-handler.js: do NOT cache this result
             _debug: {
                 promptSent: prompt,
                 rawResponse: `(error: ${err.message})`
             }
         };
+    } finally {
+        // Always clean up — prevents controller memory leak in MV3 SW
+        clearTimeout(timeoutHandle);
+        controller.abort(); // Safe to call multiple times (no-op if already aborted)
     }
 }

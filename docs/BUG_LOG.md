@@ -80,3 +80,156 @@
 | BUG-136 | FIXED | High | Gmail spam/search/trash folder email extraction fails — 0 pipeline checks run | `isEmailReadingView()` guard in `email-scanner.js` did not recognize Gmail's spam reading pane container (`.adn.ads`). The 1.5s initial scan fired, guard returned `false`, scan aborted. Fixed by adding `.adn.ads`, `.adn.nH.ads`, `.aeF` selectors and URL hash detection (`/#spam/, /#search/, /#trash/`) to `isEmailReadingView()`. Regression test: `BUG-136.test.js`. |
 | BUG-137 | FIXED | Critical | Gmail spam email body extraction returns empty — all CSS selectors miss + dist/manifest.json not rebuilt | Two root causes: (1) `dist/manifest.json` was v1.0.208 while source was v1.0.211 — the user's extension never loaded the BUG-136 fix. (2) `extractEmailText()` had no fallback when all CSS selectors miss. Fixed by adding a Gmail-specific programmatic fallback to `parser.js` that walks `.nH.hx` / `.aeF` reading pane for the largest text block. Also rebuilt dist/ with correct version. Regression test: `BUG-137.test.js`. |
 | BUG-138 | FIXED | High | Gmail extraction returns empty body on Force Rescan — heuristics silently skip | Extracted `fetchEmailContextWithRetry` helper in `handler.js` using a 3-attempt exponential backoff. Added `bodyReady` boolean to `GET_EMAIL_CONTEXT` so `handler.js` can distinguish missing body from actual failures. Emit amber badge during backoff retries to mitigate false security gap. Regression test: `BUG-138.test.js`. |
+| BUG-142 | CLOSED | Critical | Email Scanning Completely Dead — Global Safe List Whitelist Bypass | Added `isEmailScan` check to bypass URL whitelist for emails. |
+| BUG-145 | CLOSED | Critical | Missing Email Extractors Trigger Premature Target Timeout | Added `<area>` support, decoupled `isLoaded` from text length, and added structural fallbacks. |
+| BUG-146 | CLOSED | High | [Hydra Guard] Infinite Loading on Email Scans | Wrapped `scanAndHandle` in `finally` to ensure `scanInProgress` reset and removed manual rescan locks. |
+| BUG-147 | CLOSED | High | "Analyzing Safety" UI hang on extraction failure | Hoisted `result` to outer scope, added explicit `catch` broadcast, and implemented `broadcastSent` logic in `finally` for guaranteed signal delivery. |
+## BUG-139: "Analyzing with AI..." Spinner Stuck Permanently
+**Date:** 2026-03-30
+**Status:** Resolved
+**Description:** Clicking "Ask AI for a second opinion" caused the spinner to hang indefinitely without timeout.
+**Root Cause:**
+1. A `ReferenceError` on `type` in the global `service-worker.js` message listener `.catch()` block crashed the unhandled rejection handler, preventing `sendResponse` from being called and leaving Chrome ports open until GC.
+2. The popup `AskAIButton` implementation lacked a client-side timeout, offering no fallback when the background hung.
+**Workaround/Fix:**
+- Updated the SW `.catch()` to safely reference `message?.type` instead of the destructured (and out-of-scope) `type`.
+- Implemented a 30-second `setTimeout` in the popup with request ID correlation (`useRef`) to cleanly abort and display a timeout error without race conditions.
+**Lessons Learned:**
+Uncaught promise rejections in global message handlers are dangerous because an error *in the crash handler itself* silently swallows `sendResponse`. Always ensure `chrome.runtime.sendMessage` calls have client-side timeouts (defense-in-depth) when user UI is waiting on background operations.
+## BUG-140: Empty-Body Emails Silence Scanner Metadata
+**Date:** 2026-03-30
+**Status:** Resolved
+**Description:** Emails possessing no physical body text (e.g. Google DMARC reports or image-only spam) returned `< 20` chars during `extractEmailText()`. This mistakenly tripped the lazy-load safeguard, causing the scanner to retry 5 times and eventually drop the scan completely without extracting perfectly valid sender and subject information physically present in the DOM.
+**Root Cause:**
+`triggerScan()` failed to evaluate sender/subject properties before firing the empty-body retry loop. Thus, valid emails without body text dropped through the heuristic safety net entirely.
+**Workaround/Fix:**
+Updated `email-scanner.js` to unconditionally extract all fields `(body, sender, subject, headers, links)` at the start of the cycle. Re-defined the `isLoaded` criteria to be true if **ANY** of `{data, senderInfo.email, subject}` are populated. Added `BUG-140.test.js` to verify.
+**Lessons Learned:**
+Heuristic pipeline orchestration must be designed defensively around the limits of DOM extraction. A missing field (body) shouldn't abort the pipeline if other critical fields (sender, subject) successfully resolved.
+
+## BUG-141: AI Background Fetch Timeout UI Hanging
+
+**Date:** 2026-03-30
+**Status:** Resolved (v2 — full fix)
+
+**Description:** Clicking "Ask AI for a second opinion" on any page (especially Gmail) caused the popup to hang for 30 seconds and display "AI unavailable" with no real diagnostic information. The Gemini API call appeared to never return.
+
+**Root Cause (v1 — partial, cosmetic):**
+The initial investigation focused on `verifyWithAI()` relying on `AbortSignal.timeout(10000)` which is unreliable in MV3 Service Workers. An `AbortController` with manual `setTimeout` was added, but this only hardened ONE sub-step of a multi-step operation.
+
+**Root Cause (v2 — real problem):**
+The `handleAskAIOpinion` function is a chain of 5+ async operations: `getSettings()` → `getCachedScan()` → content script context fetch (with potential re-injection and retry) → `verifyWithAI()` → `cacheScan()`. ANY of these steps could hang independently, and there was no operation-level timeout wrapping the entire chain. If the total wall time exceeded the popup's 30s `sendResponse` timer, the Chrome message port expired silently and the popup never received a response — showing "AI unavailable" with no diagnostic ability. The `verifyWithAI` 15s timeout only protected one sub-step.
+
+Additionally, the auto-scan pipeline stage "5. AI SECOND OPINION" showing "PASS" was misleading — the auto-scan SKIPS AI entirely for SAFE/LOW severity pages (detector.js line 219-220). The "PASS" label meant the stage completed (by being skipped), not that the API was verified working. This masked the fact that the Gemini API connection had never been validated for the current session.
+
+**Fix:**
+
+1. Wrapped the entire `handleAskAIOpinion` operation in a hard 20s `Promise.race` timeout at the handler level (`OPERATION_TIMEOUT_MS = 20000`). This guarantees the popup ALWAYS receives a real `sendResponse` callback (with diagnostic debug data) before its own 30s safety timer fires — regardless of which internal sub-step hangs.
+2. Added diagnostic `console.log` at every major step (settings fetch, context fetch, Gemini call, response) so future hangs can be traced in `chrome://extensions` → Inspect views → service worker.
+3. Updated popup display to show "AI: Could not determine" for INCONCLUSIVE verdicts instead of the misleading "Something looks off".
+4. Retained the v1 fixes: AbortController in verifyWithAI, TIMEOUT_VERDICT, cache-gating for timeouts.
+
+**Lessons Learned:**
+When a user-facing operation depends on a chain of N async steps, each with its own timeout, the total wall time is the SUM of all timeouts plus overhead — not the max. A single step-level timeout (e.g., 15s on fetch) is insufficient if the operation has 5 steps that can each add latency. The operation level (the function called by `sendResponse`) MUST have its own hard ceiling timeout that is always well under the UI's deadline. Defense-in-depth means timeouts at EVERY layer: individual step, whole operation, and UI fallback.
+
+## BUG-142: Email Scanning Completely Dead — Global Safe List Whitelist Bypass
+
+**Date:** 2026-03-30
+**Status:** Resolved (v1.0.218)
+**Severity:** Critical
+
+**Description:** The popup shows "NO SCAN / 0 checks run" on ALL Gmail emails. Sender, Subject, and Body fields are all blank. The extension appears to load correctly (version visible in popup) but never processes any email content.
+
+**Initial Hypothesis (v1.0.217 — INCORRECT):**
+The `isEmailReadingView()` function in `email-scanner.js` contained a broken regex (`/\/#.../`) that never matched `location.hash` (which starts with `#` not `/#`). Fixed in v1.0.217 along with broadened DOM selectors and diagnostic logging. However, the bug persisted — this was NOT the root cause.
+
+**Root Cause (v1.0.218 — CONFIRMED):**
+`google.com` is present in the Global Safe List (fetched from Supabase). When `scanAndHandle()` runs in the service worker, the FIRST thing it does is call `isWhitelisted(url)`. For `https://mail.google.com/...`, this extracts domain `mail.google.com`, then checks `'mail.google.com'.endsWith('.google.com')` → **TRUE** → **`return;`** — the function exits immediately without doing ANY scanning.
+
+This applies to BOTH the initial `onBeforeNavigate` URL-only scan AND the email scanner's subsequent `SCAN_CURRENT_TAB` message with `forceRefresh: true` — because `handleScanCurrentTab` calls `scanAndHandle` with the same tab URL, hitting the same whitelist gate.
+
+The result: the entire email scanning pipeline was dead. No URL was ever scanned, no email content was ever processed, no checks were ever run.
+
+**Why was this hard to find:**
+1. The whitelist check is a silent `return` — no log, no error, no warning.
+2. The email scanner content script DID run correctly and DID extract content.
+3. The `SCAN_CURRENT_TAB` message WAS sent to the background.
+4. But the background's `scanAndHandle` silently exited before processing it.
+5. The popup showed "NO SCAN" which looked like an injection/timing issue, not a whitelist issue.
+
+**Fix:**
+Added an `isEmailScan` check to `scanAndHandle()` in `service-worker.js`. When `scanOptions.pageContent?.isEmailView` is true, the URL-level whitelist check is skipped. The scan targets the EMAIL CONTENT (sender reputation, body heuristics, link analysis), not the mail client's domain. Sender-level whitelisting (line 84-86) is preserved and still functions correctly.
+
+Also includes v1.0.217 fixes (regex anchoring, path-based routing, broadened DOM selectors, diagnostic logging) which were correct but insufficient.
+
+**Files Changed:**
+- `extension/src/background/service-worker.js` — bypass URL whitelist for email views
+- `extension/src/content/email-scanner.js` — regex fix + DOM selector broadening (v1.0.217)
+
+**Lessons Learned:**
+1. When debugging "nothing happens," trace the FULL call chain from message receipt to scan execution. Silent early returns (especially whitelist checks) can completely mask the real problem.
+2. Diagnostic logging that says "scan triggered" is useless if the scanner never reaches the scan code. Log at EVERY gate (whitelist check, settings check, etc).
+3. The Global Safe List is a double-edged sword: it correctly prevents false positives on safe domains, but it must NOT apply when the scan target is email CONTENT hosted on that domain.
+
+## BUG-145: Missing Email Extractors Trigger Premature Target Timeout
+**Date:** 2026-03-30
+**Status:** In Progress (v1.0.224 Planned)
+**Severity:** Critical
+
+**Description:** Spam emails with only images (or < 5 characters of text) combined with altered sender/subject headers caused the email to evaluate as "not loaded" indefinitely. The extension would retry for 15s and eventually abort with "NO SCAN".
+**Root Cause (Updated):**
+The initial assumption was that the extraction failed because text was < 20 chars. However, scammers are actively using `<area>` tags (image maps) and `<svg>` to build emails completely devoid of `<a>` tags and text. This forces all our extractors (links, text, subject, sender) to fail in Gmail SPA views. Because `isLoaded` relied on at least ONE of these extractors succeeding to prove the DOM was "loaded", the scanner assumed the page was still loading and looped into a timeout.
+**Fix (Planned):**
+1. Add `<area>` tags to `extractEmailLinks()` to defeat image-map evasion.
+2. Decouple `isLoaded` from extraction success by confirming the presence of the Gmail message container (`document.querySelector('.a3s')`) rather than relying purely on parsed string lengths.
+3. Enhance `extractSubject()` to correctly pull text from the `<title>` element (using `.textContent`) as a bulletproof structural fallback.
+**Lessons Learned:**
+Heuristics that block critical orchestration layers must use defensive, redundant proofs of life. Wait-loops that rely purely on string lengths will silently trap edge-case DOM structures. Extraction success does not equal page load completion.
+
+### Update 2026-03-30 14:15: BUG-145 Re-opened & Fixed
+The previous iteration (v1.0.224) failed for two intersecting reasons:
+1. **Build Failure:** The extension directory was never rebuilt, meaning the DevPanel in the `v1.0.223` screenshot was still running the old logic.
+2. **Race Condition Introduction:** While reviewing the v1.0.224 code, a race condition was identified. In an effort to stop the scanner from hanging on textless emails, `isLoaded` was tied to the presence of the `.a3s` container. However, Gmail SPAs inject the container *empty* prior to binding data. This caused `triggerScan` to fire immediately, resulting in completely empty payloads before any extractors had time to run.
+
+**The Fix (v1.0.225):**
+Reverted `isLoaded` to rely purely on data extraction success (restoring the retry loop). Since the extractors in `parser.js` were fundamentally upgraded to capture `<area>`, `title`, and `img[alt]`, image-only scams will now eventually satisfy the `data` requirement and trigger a scan correctly, preventing infinite loops without bypassing the lazy-load wait timer.
+
+### Update 2026-03-30 14:38: BUG-145 Root Cause of Data Collision & Empty Wrapper Discovered
+The v1.0.225 rollout did not resolve the "NO SCAN" / "Not extracted" error in the DevPanel. A thorough investigation into `scan_cache_` assignment and URL normalizations identified two compounding data-handling flaws in the pipeline:
+
+1. **SPA Fragment Collisions (`storage.js`):** The caching engine's `normalizeUrl()` utility intentionally strips `#` fragments (e.g. hash-routing) to deduplicate URL scans. However, Gmail is an SPA where the *only* difference between emails is the fragment (`#inbox/ABC123`). This means **every Gmail email overwrites the exact same `scan_cache_https://mail.google.com/mail/u/0` key.**
+2. **Payload Wrapper Unboxing (`popup.jsx`):** The popup reads the cache directly to render data instantly. However, `storage.js` wraps caches in a timestamp `{ result: {...}, timestamp: 1234 }`. Instead of unwrapping this, `popup.jsx` sets its state directly to the wrapper, causing `result.overallSeverity`, `result.metadata`, etc., to all evaluate as `undefined`. 
+3. **Ghost Retry (`handler.js`):** The `FORCE_RESCAN` action relies entirely on `bodyReady` to stop polling the content script. For image-only phishing emails, `bodyReady` evaluate to false permanently.
+
+**Upcoming Fixes (Plan approved via /rock_solid_plan_review):**
+- Lock `normalizeUrl` fragment stripping behind an SPA domain check. If it's `mail.google.com` or `outlook.live.com`, preserve the fragment so emails get their own discrete cache slots.
+- Unwrap `cached.result` safely in `popup.jsx` (with null checks).
+- Accept non-body data (`sender`, `subject`) to break the 5-retry loop for image-only emails on manual user rescans.
+# BUG-146 [Hydra Guard] Infinite Loading on Email Scans
+
+## Context
+The user reported that the 'Rescan Email Content' button triggers an endless loading state ('Analyzing Safety...') and fails to show any extracted email context even when it finally finishes on subsequent clicks.
+
+## Root Cause
+The `scanInProgress` boolean lock array in the `TabStateManager` instance was intentionally set to `true` upon first load or reload by `navigation-handler.js`. However, the main `scanAndHandle` routine in `service-worker.js` completely failed to revert this boolean to `false` upon completion (either successfully or during a throw). This indefinitely jammed the task queue for that particular tab ID. Consequently, when the manual override `FORCE_RESCAN` was triggered, it assumed there was another scan ongoing and preemptively skipped the DOM text extraction phase (to prevent collisions). The scanner ran anyway, but with an artificially blank email `pageContent`, triggering the Empty Payload Safeguard and printing the 'No email context extracted' warning.
+
+## Resolution
+Wrapped the entirety of the `scanAndHandle` routine (which contains dozens of async bail-outs and error catches) inside a `finally` block to universally trigger `scanInProgress: false` guarantees upon exit.
+Additionally stripped the residual validation logic out of the `FORCE_RESCAN` handler which is meant to be a manual brute force un-jammer and should not be bounded by brittle background flags.
+
+# BUG-147: "Analyzing Safety" UI hang on extraction failure
+
+## Context
+Persistent reports of the extension getting stuck in the "Analyzing Safety..." state, particularly on emails where extraction might be failing or taking too long. The "Rescan" button would occasionally fix it, but the root cause of the hang remained.
+
+## Root Cause
+The `scanAndHandle` function in `service-worker.js` was missing a guaranteed exit signal for the UI. While it had a `finally` block to clear `scanInProgress`, it did *not* have a guaranteed `chrome.runtime.sendMessage` broadcast in its `catch` or `finally` blocks. If an error occurred (e.g., in `fetchEmailContextWithRetry` or AI validation), the function would log the error but the popup would never receive the `SCAN_RESULT_UPDATED` message, leaving the React `scanInProgress` state set to `true` indefinitely.
+
+## Resolution
+1. **Result Hoisting**: Declared the `result` object at the top of `scanAndHandle` with a safe `UNKNOWN` fallback state.
+2. **Explicit Catch Broadcasting**: Updated the `catch` block to populate this `result` with specific error metadata (e.g., `EXTRACTION_ERROR`) to give the user feedback.
+3. **Deterministic Exit Signal**: Implemented a `broadcastSent` flag and a `finally` block that unconditionally sends the current `result` (even if it's the `UNKNOWN` fallback) if no broadcast has been sent yet. This ensures the "Analyzing Safety" spinner is always dismissed.
+
+## Lessons Learned
+In MV3 Service Workers, the messaging lifecycle must be treated as a strict contract. If the UI starts a "wait" state based on an operation, that operation MUST provide a terminal signal (success or failure) in all code paths. Using a `finally` block for the messaging signal (not just the state lock) is the most robust way to fulfill this contract.
+

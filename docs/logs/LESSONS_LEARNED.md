@@ -128,3 +128,6 @@
 - **Fix**: Extracted `fetchEmailContextWithRetry()` in `handler.js` — 3 attempts with exponential backoff (500/1000/2000ms), each with its own 2s timeout race.
 - **Lesson**: Background ↔ content script message patterns for DOM data must account for SPA lazy-load timing. Always use a retry+backoff pattern for DOM-dependent queries, and always set an explicit "not ready" signal (`bodyReady: false`) so callers can distinguish "DOM not settled" from "feature not supported."
 - **Follow-up**: Long-term, the content script should proactively push an `EMAIL_DOM_READY` event to the background when the email body is available, eliminating the need for background-initiated polling entirely.
+## 2026-04-01: UI State Lock Resilience (BUG-147)
+- **State Starvation**: In background-to-UI messaging, a success-path broadcast isn't enough. If an error occurs *before* completion, the UI "hangs" forever waiting for a message that never comes.
+- **The Protocol**: Always hoist the result variable and use a `finally` block to broadcast a "terminal state" (even if it's a failure result) to ensure the UI can always dismiss loading indicators. Use a `broadcastSent` guard if you have multiple exit points.

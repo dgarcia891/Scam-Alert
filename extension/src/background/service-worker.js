@@ -23,10 +23,10 @@ import { syncManager } from './lib/sync-manager.js';
 import { handleIncomingMessage } from './messages/handler.js';
 import { onInstalled, onStartup } from './events/lifecycle.js';
 import { checkProStatus } from './services/auth.js';
+import { isKnownEmailClient } from '../config/email-clients.js';
 import { maybeShowHttpNotification, setActionIconForTab, syncIconForTabFromCache, ignoreTabError, resetActionUIForTab } from './lib/icon-manager.js';
 import { createNavigationHandler } from './lib/navigation-handler.js';
 import { tabStateManager } from '../lib/tab-state-manager.js';
-import { isKnownEmailClient } from '../config/email-clients.js';
 
 console.log('[Hydra Guard] Service worker v1.0.59 initializing (Hydra Hub)...');
 
@@ -76,12 +76,52 @@ function shouldScanUrl(url) {
 }
 
 async function scanAndHandle(tabId, url, scanOptions = {}) {
+    let result = {
+        overallSeverity: 'UNKNOWN',
+        overallThreat: false,
+        action: 'CHECK_INCOMPLETE',
+        checks: {},
+        signals: { hard: [], soft: [] },
+        reasons: [{ code: 'SCAN_NOT_STARTED', message: 'Scan did not complete' }],
+        metadata: {}
+    };
+    let broadcastSent = false;
+
     try {
         const settings = await getSettings();
         if (!settings.scanningEnabled) return;
-        if (await isWhitelisted(url)) return;
+
+        // BUG-142/144: For email clients, we must NEVER silent-abort at the URL gate.
+        // Even if we don't have pageContent yet (e.g. initial navigation), we still want
+        // to produce a result for the domain itself so the popup isn't stuck on 'empty'.
+        const isEmailScan = !!scanOptions.pageContent?.isEmailView;
+        const isEmailClient = isKnownEmailClient(url);
+        
+        console.log(`[Hydra Guard] scanAndHandle [Tab ${tabId}]: emailScan=${isEmailScan}, emailClient=${isEmailClient}`);
+
+        if (!isEmailScan && !isEmailClient && await isWhitelisted(url)) {
+            console.log(`[Hydra Guard] scanAndHandle [Tab ${tabId}]: Whitelist match (non-email) — skipping`);
+            return;
+        }
 
         if (scanOptions.pageContent?.senderEmail && await isWhitelisted(scanOptions.pageContent.senderEmail)) {
+            console.log(`[Hydra Guard] scanAndHandle [Tab ${tabId}]: Sender whitelisted: ${scanOptions.pageContent.senderEmail}`);
+            // BUG-143 Fix: Don't hang the UI on NO SCAN. Synthesize a SAFE result.
+            const result = {
+                overallSeverity: 'SAFE',
+                overallThreat: false,
+                confidence: 'CERTAIN',
+                action: 'ALLOW',
+                signals: { hard: [], soft: [] },
+                reasons: [{ code: 'SENDER_WHITELIST', message: 'Sender is in your personal safe list' }],
+                checks: {},
+                metadata: { senderEmail: scanOptions.pageContent.senderEmail }
+            };
+            
+            tabStateManager.updateTabState(tabId, { url, scanResults: result, lastScanned: Date.now(), scanInProgress: false });
+            await cacheScan(url, result);
+            await setActionIconForTab(tabId, 'SAFE');
+            await chrome.action.setBadgeText({ tabId, text: '' });
             return;
         }
 
@@ -91,7 +131,7 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         let existingCache = null;
         try { existingCache = await getCachedScan(url); } catch { /* ignore */ }
 
-        let result = forceRefresh ? null : existingCache;
+        result = forceRefresh ? null : existingCache;
 
         if (!result) {
             const onProgress = (progress) => {
@@ -142,6 +182,30 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                 // BUG-107 Fix: Re-inject the salvaged AI verification back into the fresh scan result
                 if (existingCache?.aiVerification) {
                     result.aiVerification = existingCache.aiVerification;
+                }
+
+                // BUG-145: Empty Payload Safeguard
+                // If the DOM was loaded but the extractors failed to find text, links, or a sender,
+                // the engine will default to SAFE (True Negative logic). We must escalate to UNKNOWN
+                // so the user receives a warning badge rather than a false sense of security.
+                if (
+                    pageContent &&
+                    pageContent.isEmailView &&
+                    result.overallThreat === false &&
+                    result.overallSeverity === 'SAFE'
+                ) {
+                    const hasExtractedData = (pageContent.bodyText || '').length > 5 || 
+                                             (pageContent.rawUrls || []).length > 0 ||
+                                             (pageContent.senderEmail) ||
+                                             (pageContent.senderName && pageContent.senderName !== 'Unknown');
+                    
+                    if (!hasExtractedData) {
+                        console.warn('[Hydra Guard] scanAndHandle: Empty Payload Safeguard triggered. Escalating to UNKNOWN.');
+                        result.overallSeverity = 'UNKNOWN';
+                        result.action = 'CHECK_INCOMPLETE';
+                        result.metadata = result.metadata || {};
+                        result.metadata.error = 'Email content obscured (potential image/SVG evasion) — manual caution advised';
+                    }
                 }
 
                 // Transparency: Store extracted content metadata so DevPanel can show what was actually scanned.
@@ -218,7 +282,8 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
         tabStateManager.updateTabState(tabId, {
             url,
             scanResults: result,
-            lastScanned: Date.now()
+            lastScanned: Date.now(),
+            scanInProgress: false
         });
 
         // Layer 2: Broadcast scan result to tab for Moment of Action interception
@@ -233,12 +298,21 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             chrome.runtime.sendMessage(createMessage(MessageTypes.SCAN_RESULT_UPDATED, { result }), () => {
                 void chrome.runtime.lastError; // Suppress "no listener" error when popup is closed
             });
+            broadcastSent = true;
         } catch (error) {
             // Popup might not be open, not critical
         }
 
     } catch (error) {
         console.error('[Hydra Guard] Critical Scan Error:', error);
+        
+        if (scanOptions.pageContent?.isEmailView || isKnownEmailClient(url)) {
+            result.metadata.error = 'Email scan encountered an internal error — retry recommended';
+            result.metadata.reason = 'EXTRACTION_ERROR';
+        } else {
+            result.metadata.error = 'Scan error: ' + (error.message || 'Unknown');
+        }
+
         try {
             const domain = (url && typeof url === 'string') ? new URL(url).hostname : 'unknown';
             await updateStats({
@@ -246,6 +320,16 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                 activity: { domain, action: 'error', time: Date.now(), severity: 'UNKNOWN', metadata: { error: error.message } }
             });
         } catch (statsError) { /* Ignore */ }
+    } finally {
+        tabStateManager.updateTabState(tabId, { scanResults: result, scanInProgress: false, lastScanned: Date.now() });
+
+        if (!broadcastSent) {
+            try {
+                chrome.runtime.sendMessage(createMessage(MessageTypes.SCAN_RESULT_UPDATED, { result }), () => {
+                    void chrome.runtime.lastError; // suppresses "no listener" when popup is closed
+                });
+            } catch { /* popup closed or detached */ }
+        }
     }
 }
 
@@ -390,11 +474,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         handleIncomingMessage(message, sender, context)
             .then(sendResponse)
             .catch(err => {
-                console.error(`[Hydra Guard] Fatal message error (${type}):`, err);
+                console.error(`[Hydra Guard] Fatal message error (${message?.type || 'unknown'}):`, err);
                 sendResponse({ success: false, error: err.message || 'Internal extension error' });
             });
     } catch (syncErr) {
-        console.error('[Hydra Guard] Sync message listener error:', syncErr);
+        console.error(`[Hydra Guard] Sync message listener error (${message?.type || 'unknown'}):`, syncErr);
         sendResponse({ success: false, error: syncErr.message || 'Extension initialization error' });
     }
     return true; // Keep channel open for async

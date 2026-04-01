@@ -1,14 +1,51 @@
 /**
  * Hydra Guard: AI Opinion Handler
  * Extracts AI interaction logic out of the main handler.js
+ * 
+ * BUG-141: The entire operation is wrapped in a hard 20s timeout (OPERATION_TIMEOUT_MS).
+ * This guarantees the popup ALWAYS receives a sendResponse callback before its
+ * own 30s safety timer fires — regardless of which internal step hangs
+ * (content script fetch, Gemini API, chrome.storage, script injection, etc.)
  */
 
 import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
 import { isKnownEmailClient } from '../../config/email-clients.js';
 import { sendMessageToTab } from '../../lib/messaging.js';
 
+// Must be well under popup's AI_REQUEST_TIMEOUT_MS (30000ms)
+// Leaves a 10s buffer for message transit + sendResponse delivery
+const OPERATION_TIMEOUT_MS = 20000;
+
 export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, cacheScan, tabStateManager) {
+    // BUG-141 FIX: Wrap the entire operation in a hard timeout.
+    // If ANY sub-step hangs (getSettings, content fetch, Gemini API, cacheScan),
+    // we force-return a real response so the popup never hits its dead-end 30s timer.
+    const operationResult = await Promise.race([
+        _doAskAI(msgData, getSettings, getCachedScan, cacheScan, tabStateManager),
+        new Promise(resolve => setTimeout(() => {
+            console.error('[Hydra Guard] ASK_AI_OPINION: HARD OPERATION TIMEOUT (20s) — forcing response.');
+            resolve({
+                success: true,
+                verdict: 'INCONCLUSIVE',
+                reason: 'AI analysis timed out. The Gemini API or content extraction may be slow. Please try again.',
+                details: 'AI analysis timed out. The Gemini API or content extraction may be slow. Please try again.',
+                confidence: 0,
+                _debug: {
+                    promptSent: '--- Operation Timeout ---\nThe entire Ask AI operation exceeded 20 seconds.\nThis typically means the Google Gemini API is unreachable, rate-limited, or the network is very slow.\nCheck your API key in Settings and try again.',
+                    rawResponse: '(operation timeout: no API response received within 20s)'
+                }
+            });
+        }, OPERATION_TIMEOUT_MS))
+    ]);
+    return operationResult;
+}
+
+/**
+ * The actual AI opinion logic, separated so it can be raced against the hard timeout.
+ */
+async function _doAskAI(msgData, getSettings, getCachedScan, cacheScan, tabStateManager) {
     try {
+        console.log('[Hydra Guard] ASK_AI: Starting AI opinion request...');
         const settings = await getSettings();
 
         if (!settings.aiEnabled || !settings.aiApiKey) {
@@ -41,7 +78,7 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
             const tabState = tabStateManager.getTabState(msgData.tabId);
             if (tabState && tabState.scanResults) {
                 cached = tabState.scanResults;
-                console.log('[Hydra Guard] AI Using live tab scan results instead of URL cache');
+                console.log('[Hydra Guard] ASK_AI: Using live tab scan results instead of URL cache');
             }
         }
 
@@ -83,13 +120,14 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                         return Promise.race([fetchPromise, timeoutResponse]);
                     };
 
+                    console.log('[Hydra Guard] ASK_AI: Fetching email context from content script...');
                     let response = await attemptFetch();
 
                     // BUG-118: If the content script is not reachable (common in Gmail SPA
                     // navigation or after a service worker restart), programmatically re-inject
                     // the email scanner and retry once.
                     if (!response?.success && response?.error?.includes('Receiving end does not exist')) {
-                        console.log('[Hydra Guard] Content script unreachable — re-injecting email scanner...');
+                        console.log('[Hydra Guard] ASK_AI: Content script unreachable — re-injecting email scanner...');
                         try {
                             await chrome.scripting.executeScript({
                                 target: { tabId: targetTabId },
@@ -99,10 +137,10 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                             await new Promise(resolve => setTimeout(resolve, 500));
                             response = await attemptFetch();
                             if (response?.success) {
-                                console.log('[Hydra Guard] Re-injection succeeded — email context fetched.');
+                                console.log('[Hydra Guard] ASK_AI: Re-injection succeeded — email context fetched.');
                             }
                         } catch (injectErr) {
-                            console.warn('[Hydra Guard] Programmatic injection failed:', injectErr.message);
+                            console.warn('[Hydra Guard] ASK_AI: Programmatic injection failed:', injectErr.message);
                         }
                     }
 
@@ -116,14 +154,15 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                             bodyLinks: ec.embeddedLinks || [],
                             isReply: false
                         };
-                        console.log('[Hydra Guard] Fetched live email context for popup AI:', emailContext);
+                        console.log('[Hydra Guard] ASK_AI: Got email context — sender:', emailContext.senderEmail, 'subject:', emailContext.subject?.slice(0, 40));
                     } else if (response?.error) {
                         fetchError = response.error;
-                        console.warn('[Hydra Guard] Live email context fetch failed:', fetchError);
+                        console.warn('[Hydra Guard] ASK_AI: Live email context fetch failed:', fetchError);
                     }
                 } else if (targetTabId) {
                     try {
                         // BUG-125: use known email body selectors before falling back to raw body text
+                        console.log('[Hydra Guard] ASK_AI: Extracting page text via script injection...');
                         const injection = await chrome.scripting.executeScript({
                             target: { tabId: targetTabId },
                             func: function extractSmartPageText() {
@@ -150,15 +189,15 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
                         });
                         if (injection && injection[0]?.result) {
                             emailContext = { pageText: injection[0].result };
-                            console.log('[Hydra Guard] Extracted live page text for generic AI scan.');
+                            console.log('[Hydra Guard] ASK_AI: Extracted page text (' + injection[0].result.length + ' chars).');
                         }
                     } catch (e) {
-                        console.warn('[Hydra Guard] Failed to exact live page text:', e.message);
+                        console.warn('[Hydra Guard] ASK_AI: Failed to extract live page text:', e.message);
                     }
                 }
             } catch (e) {
                 fetchError = e.message;
-                console.warn('[Hydra Guard] Failed to fetch live email context for AI:', e);
+                console.warn('[Hydra Guard] ASK_AI: Failed to fetch live email context for AI:', e);
             }
 
             // Fallback for automated background scans or if fetch failed
@@ -172,7 +211,7 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         // EMPTY CONTEXT GUARD: Prevent false positives on safe pages with no readable textual or email context
         const hasUsefulContext = emailContext && (emailContext.bodySnippet || emailContext.subject || emailContext.senderName || emailContext.senderEmail || (emailContext.pageText && emailContext.pageText.trim().length > 50));
         if (signals.length === 0 && phrases.length === 0 && intentKeywords.length === 0 && !hasUsefulContext) {
-            console.log('[Hydra Guard] AI Context Guard triggered: Insufficient data for AI analysis.');
+            console.log('[Hydra Guard] ASK_AI: Context Guard triggered — no data to analyze.');
             const errorReport = fetchError ? `\n\n[FETCH ERROR]: The extension tried to pull live data but failed: ${fetchError}` : '';
             const aiVerification = {
                 verdict: 'INCONCLUSIVE',
@@ -194,7 +233,9 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         const isEmailContext = isKnownEmailClient(url) || (cached && cached.checks?.emailScams?.flagged);
         const contextType = isEmailContext ? 'EMAIL' : 'WEB';
 
+        console.log('[Hydra Guard] ASK_AI: Calling Gemini API (contextType: ' + contextType + ', signals: ' + signals.length + ')...');
         const result = await verifyWithAI(url, { signals, phrases, intentKeywords, emailContext, contextType }, { apiKey: settings.aiApiKey });
+        console.log('[Hydra Guard] ASK_AI: Gemini API returned verdict:', result.verdict, '(timeout:', !!result._isTimeout, ')');
 
         const aiVerification = {
             verdict: result.verdict,
@@ -229,7 +270,8 @@ export async function handleAskAIOpinion(msgData, getSettings, getCachedScan, ca
         }
 
         // FEAT-088 Fix: Persist AI verdict in persistent scan cache so it survives popup re-opens
-        if (cached && cacheScan) {
+        // BUG-141 Fix: NEVER cache a timeout result to avoid false-positive caching
+        if (cached && cacheScan && !result._isTimeout) {
             cached.aiVerification = aiVerification;
             await cacheScan(url, cached);
         }

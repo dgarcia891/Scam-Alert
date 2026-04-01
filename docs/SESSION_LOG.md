@@ -1,0 +1,67 @@
+# Session Log: Hydra Guard (Scam Alert)
+
+This file is the single source of truth for "what we last worked on" and "what to do next" for the Hydra Guard extension.
+
+---
+
+## [2026-03-30] Stability & Extraction Hardening
+
+**Project:** Hydra Guard (Scam Alert)  
+**Active Bugs:** BUG-140, BUG-141, BUG-142, BUG-145  
+**Version:** 1.0.223
+
+### Summary of Work
+- **BUG-145 (Resolved):** Fixed the "NO SCAN" issue in Gmail where image-only emails or obscured metadata caused the scanner to time out. Lowered text extraction threshold to 5 chars and added proof-of-life logic via link detection.
+- **BUG-142 (Resolved):** Bypassed the global URL whitelist for email scans to prevent the extension from ignoring emails on `google.com`.
+- **BUG-141 (Resolved):** Implemented a 20s operation-level timeout for AI analysis to prevent UI hangs in the popup.
+- **BUG-140 (Resolved):** Refactored extraction order to ensure metadata (sender/subject) is captured even for emails with empty bodies.
+- **Infrastructure:** Verified build pipeline and bumped extension version to 1.0.223.
+
+### Files Affected
+- `extension/src/content/email-scanner.js`
+- `extension/src/lib/scanner/parser.js`
+- `extension/src/background/service-worker.js`
+- `extension/src/background/messages/ai-handler.js`
+- `extension/manifest.json`
+- `docs/BUG_LOG.md`
+
+### Next Actions
+1. **Deploy v1.0.223:** When ready for Chrome Web Store posting, ZIP the `dist/` directory. (Skipped for now per user request).
+2. **Telemetry Monitoring:** Watch for `TIMEOUT_VERDICT` signals in the console to identify if the 20s AI timeout is triggering frequently for specific users.
+3. **Advanced Heuristics:** Consider implementing OCR for image-only scams (like the "Storage Full" example) if the current link-based detection has low recall.
+4. **Email Reputation:** Finalize the `sa-check-email-rep` Supabase Edge Function integration for real-time sender history lookups.
+
+### [2026-03-30] Stability & Extraction Hardening (Part 2)
+
+**Project:** Hydra Guard (Scam Alert)  
+**Active Bugs:** BUG-145 (Re-opened)  
+**Version:** 1.0.223
+
+### Summary of Work
+- **BUG-145 (Re-opened):** The previous fix for BUG-145 failed to resolve the "NO SCAN" issue for a specific class of image-only scams. Analysis revealed scams using `<area>` tags (image maps) and textless SVGs evade our `isLoaded` gate entirely because it relies on extraction success. 
+- Created an Implementation Plan to add `<area>` tags to link extraction, decouple `isLoaded` from extraction success by checking for `.a3s` container presence, and use `.textContent` for `<title>` subject extraction fallback.
+
+### Next Actions
+1. **User Review:** Waiting for user approval on the proposed Implementation Plan before writing code.
+2. **Implementation:** Update `email-scanner.js` and `parser.js`.
+3. **Verification:** Test the fix against the failing image-only scam pattern.
+
+---
+
+### [2026-04-01] Email Scanner Pipeline Hardening
+
+**Project:** Hydra Guard (Scam Alert)  
+**Active Bug:** BUG-147  
+**Version:** 1.1.3
+
+### Summary of Work
+- **BUG-147 (Resolved):** Eliminated the indefinite "Analyzing Safety..." UI hang where background service worker failures silently swallowed the terminal exit signal.
+- **Protocol Fix:** Hoisted the `result` object and implemented a guaranteed `SCAN_RESULT_UPDATED` broadcast in the `finally` block of `scanAndHandle`.
+- **State Resilience:** Ensured the `scanInProgress` state is always cleared, preventing UI deadlocks and ensuring the "Analyzing Safety" spinner is dismissed for both success and failure cases.
+- **Build & Versioning:** Bumped version to v1.1.3 and verified Vite build integrity.
+
+### Next Actions
+1. **Manual Verification:** Reload the extension in `chrome://extensions` and test a problematic email. The UI should now instantly clear the spinner or show an error badge if the scan fails.
+2. **Monitor Logs:** Watch for `[Hydra Guard] Critical Scan Error` in the background worker inspector to confirm error broadcasting.
+
+---

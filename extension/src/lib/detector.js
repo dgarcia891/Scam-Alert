@@ -12,15 +12,17 @@
 import { checkUrl } from './google-safe-browsing.js';
 import { checkUrlWithPhishTank, checkUrlOffline } from './phishtank.js';
 import { analyzeUrl } from './pattern-analyzer.js';
+import { checkEmailReputation } from './email-reputation.js';
 import { getMergedScamPhrases } from './database.js';
 import { isKnownEmailClient } from '../config/email-clients.js';
 import { createScanResult, SEVERITY, ACTION } from './scan-schema.js';
 import { determineSeverity } from './analysis/scoring.js';
-import { normalizeUrl, isBlocked } from './storage.js';
+import { normalizeUrl, isBlocked, getSettings, isWhitelisted } from './storage.js';
 import { extractHostname } from './analyzer/url-engine.js';
 import { verifyWithAI, extractEmailContext } from './ai-verifier.js';
 import { checkAICanRun, incrementRateCounters } from './ai-rate-limiter.js';
 import { recordAICall } from './ai-telemetry.js';
+import { postEdgeFunction } from './supabase.js';
 
 /**
  * Main scan function that combines all detection methods
@@ -84,15 +86,46 @@ export async function scanUrl(url, options = {}, onProgress = null) {
 
     let finalChecks = {};
 
-    // 2. Local Pattern Analysis
+    // 2. Local Pattern Analysis & Email Reputation (Parallel)
     const patternsStart = Date.now();
     if (usePatternDetection) {
-        reportProgress(20, 'Analyzing URL patterns...');
+        reportProgress(20, 'Analyzing patterns and reputation...');
         const customPhrases = await getMergedScamPhrases();
-        const patterns = await analyzeUrl(url, pageContent, options.isPro, customPhrases);
+        
+        let patternsPromise = analyzeUrl(url, pageContent, options.isPro, customPhrases);
+        let emailRepPromise = Promise.resolve(null);
+        
+        if (pageContent?.senderEmail) {
+            emailRepPromise = checkEmailReputation(pageContent.senderEmail, {
+                getSettings,
+                isWhitelisted,
+                postEdgeFunction
+            });
+        }
+        
+        const [patterns, emailRep] = await Promise.all([patternsPromise, emailRepPromise]);
+        
+        if (emailRep) {
+            if (emailRep.is_disposable) {
+                softSignals.push({ code: 'SUSPICIOUS_SENDER', message: 'Sender uses a disposable email provider' });
+                reasons.push({ flagged: true, severity: 'LOW', details: 'Disposable email detected', code: 'EMAIL_DISPOSABLE' });
+            }
+            if (emailRep.reputation_score === 'low') {
+                hardSignals.push({ code: 'MALICIOUS_SENDER', message: 'Sender email has a known bad reputation' });
+                reasons.push({ flagged: true, severity: 'CRITICAL', details: 'Bad sender reputation flagged', code: 'EMAIL_BAD_REP' });
+            }
+            finalChecks.emailReputation = {
+                 title: 'email_reputation',
+                 description: 'Checks sender email against reputation databases.',
+                 flagged: emailRep.reputation_score === 'low' || emailRep.is_disposable,
+                 severity: emailRep.reputation_score === 'low' ? 'CRITICAL' : (emailRep.is_disposable ? 'LOW' : 'NONE'),
+                 details: `Reputation: ${emailRep.reputation_score}`,
+                 dataChecked: pageContent.senderEmail
+            };
+        }
 
         // Preserve all checks for the UI Activity Log
-        finalChecks = { ...patterns.checks };
+        finalChecks = { ...patterns.checks, ...finalChecks };
 
         // Map Pattern Checks to Signals
         if (patterns.checks.typosquatting?.flagged) {

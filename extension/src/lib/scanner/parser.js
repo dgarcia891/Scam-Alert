@@ -18,6 +18,9 @@ export function extractEmailText() {
         '[data-message-id] div[dir="ltr"]', // Gmail: alternate wrapper (BUG-130)
         '.nH.hx .a3s',           // Gmail: wide generic fallback (BUG-130)
         'div[dir="ltr"]',        // Gmail: LTR content block (generic fallback)
+        'div[role="main"] .a3s', // Gmail: scoped to main reading area
+        '.nH[role="main"] .a3s', // Gmail: alternate main container
+        '.aDP .a3s',             // Gmail: alternate reading pane
         '[data-test-id="message-view-body"]', // Outlook body
         '.Email-Message-Body',   // Generic
         '.gs .ii.gt',            // Gmail: last resort thread body
@@ -30,7 +33,7 @@ export function extractEmailText() {
         const el = document.querySelector(sel);
         if (el) {
             const text = (el.innerText || el.textContent || '').trim();
-            if (text.length > 20) { // Min 20 chars to avoid empty containers
+            if (text.length > 5) { // Min 5 chars to catch short emails
                 console.log(`[Hydra Guard] extractEmailText: found via "${sel}" (${text.length} chars)`);
                 return text;
             }
@@ -44,7 +47,7 @@ export function extractEmailText() {
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
                 if (iframeDoc?.body) {
                     const text = (iframeDoc.body.innerText || '').trim();
-                    if (text.length > 50) {
+                    if (text.length > 5) {
                         console.log(`[Hydra Guard] extractEmailText: found in iframe body (${text.length} chars)`);
                         return text;
                     }
@@ -66,11 +69,11 @@ export function extractEmailText() {
                 for (const el of candidates) {
                     if (el.closest('[id^="hydra-guard"]')) continue;
                     const text = (el.innerText || '').trim();
-                    if (text.length > bestText.length && text.length > 50) {
+                    if (text.length > bestText.length && text.length > 5) {
                         bestText = text;
                     }
                 }
-                if (bestText.length > 50) {
+                if (bestText.length > 5) {
                     console.log(`[Hydra Guard] extractEmailText: Gmail fallback scan (${bestText.length} chars)`);
                     return bestText;
                 }
@@ -78,7 +81,41 @@ export function extractEmailText() {
         } catch { /* ignore */ }
     }
 
-    console.warn('[Hydra Guard] extractEmailText: NO body text found — all selectors missed');
+    // BUG-145: Defend against image-only (textless) scams
+    // Extract alt text from images / SVGs as a last resort
+    const imgText = Array.from(document.querySelectorAll('img[alt], [aria-label]'))
+        .map(el => el.getAttribute('alt') || el.getAttribute('aria-label') || '')
+        .filter(t => t.length > 5 && !['Profile', 'Avatar', 'Toolbar', 'Search', 'Menu'].some(skip => t.includes(skip)))
+        .join(' ');
+        
+    if (imgText.length > 5) {
+        console.log(`[Hydra Guard] extractEmailText: Extracted from img/aria tags (${imgText.length} chars)`);
+        return imgText;
+    }
+
+    // Tier 2: Universal Main Text Fallback (e.g. Reading Panes or <main>)
+    const mainEls = document.querySelectorAll('[role="main"], main, #main');
+    for (const main of mainEls) {
+        let text = (main.innerText || '').trim();
+        text = text.replace(/^(Loading\.\.\.|Loading|Working\.\.\.)/ig, '').trim();
+        if (text.length > 20) {
+            console.log(`[Hydra Guard] extractEmailText: Universal Tier 2 Fallback ([role=main]) (${text.length} chars)`);
+            return text;
+        }
+    }
+
+    // Tier 3: Absolute Universal Document Body Fallback
+    if (document.body) {
+        let text = (document.body.innerText || '').trim();
+        text = text.replace(/^(Loading\.\.\.|Loading|Working\.\.\.)/ig, '').trim();
+        
+        if (text.length > 20) {
+           console.log(`[Hydra Guard] extractEmailText: Universal Tier 3 Fallback (document.body) (${text.length} chars)`);
+           return text;
+        }
+    }
+
+    console.warn('[Hydra Guard] extractEmailText: NO body text found — document is completely empty or just noise.');
     return '';
 }
 
@@ -110,9 +147,20 @@ export function parseSenderInfo() {
     if (ariaEl) {
         const emailFromHover = ariaEl.getAttribute('data-hovercard-id') || ariaEl.getAttribute('email') || '';
         const nameFromHover = ariaEl.getAttribute('name') || ariaEl.innerText || '';
-        if (emailFromHover.includes('@')) {
-            console.log(`[Hydra Guard] parseSenderInfo: found via data-hovercard-id — email="${emailFromHover}"`);
+        if (emailFromHover.includes('@') || nameFromHover) {
+            console.log(`[Hydra Guard] parseSenderInfo: found via data-hovercard-id — email="${emailFromHover}", name="${nameFromHover}"`);
             return { name: nameFromHover || emailFromHover, email: emailFromHover };
+        }
+    }
+
+    // Strategy 4: Generic Span fallback
+    const spanEmail = document.querySelector('span[email]');
+    if (spanEmail) {
+        const spanEmailAttr = spanEmail.getAttribute('email') || '';
+        const spanNameAttr = spanEmail.getAttribute('name') || spanEmail.innerText || '';
+        if (spanEmailAttr || spanNameAttr) {
+            console.log(`[Hydra Guard] parseSenderInfo: found via span[email] — name="${spanNameAttr}", email="${spanEmailAttr}"`);
+            return { name: spanNameAttr || spanEmailAttr, email: spanEmailAttr };
         }
     }
 
@@ -140,8 +188,17 @@ export function parseSenderInfo() {
         }
     }
 
-    console.warn('[Hydra Guard] parseSenderInfo: NO sender info found — all strategies missed');
-    return { name: 'Unknown', email: '' };
+    // Strategy 6: Aggressive Regex over the entire document for an email address (Last ditch effort, but effective if DOM obfuscated)
+    const allText = document.body ? document.body.innerText : '';
+    // Look for `<email@domain.com>` format usually used in headers, e.g. "John Doe <john@doe.com>"
+    const aggressiveMatch = allText.match(/([A-Z0-9\.\_\%\+\-]+@[A-Z0-9\.\-]+\.[A-Z]{2,})/i);
+    if (aggressiveMatch) {
+         console.log(`[Hydra Guard] parseSenderInfo: aggressive regex fallback caught: ${aggressiveMatch[1]}`);
+         return { name: aggressiveMatch[1], email: aggressiveMatch[1] };
+    }
+
+    console.warn('[Hydra Guard] parseSenderInfo: NO sender info found — all strategies missed, returning location.host');
+    return { name: `Fallback (${location.hostname})`, email: `${location.hostname}` };
 }
 
 export function extractSubject() {
@@ -149,41 +206,48 @@ export function extractSubject() {
         '.hP',                              // Gmail: subject line
         'h2.hP',                            // Gmail: subject as h2
         '[data-thread-id] .hP',            // Gmail: scoped subject
+        'h2[data-legacy-thread-id]',       // Gmail: alternate subject
+        '[data-message-id] div[role="heading"]', // Gmail: deeply obscured SPA heading
         '[data-testid="message-subject"]', // Outlook
         '.ha h2',                           // Gmail: header subject fallback
         'h2.subject, .subject',             // Roundcube subject
         '[data-testid="message-header:subject"]', // ProtonMail
         '[data-test-id="subject"]',         // Yahoo
         '.zmSubject',                        // Zoho
+        'div[role="heading"][aria-level="2"]', // Universal accessible heading
         'title'                             // Last resort: page title
     ];
 
     for (const sel of selectors) {
         const el = document.querySelector(sel);
         if (el) {
+            // BUG-145: Title tag requires .textContent because it's invisible to layout engine
             const text = (el.innerText || el.textContent || '').trim();
-            if (text.length > 0 && text !== 'Gmail') {
-                console.log(`[Hydra Guard] extractSubject: found via "${sel}" — "${text}"`);
-                return text;
+            // Ignore default client titles (e.g. Inbox (31) - someone@gmail.com - Gmail)
+            if (text.length > 0 && text !== 'Gmail' && !/^[A-Za-z0-9]+\s+\(\d+\)\s+-/.test(text)) {
+                // Strip suffix "- myemail@gmail.com - Gmail"
+                const cleanText = sel === 'title' ? text.replace(/\s+-\s+.*?- Gmail$/, '') : text;
+                console.log(`[Hydra Guard] extractSubject: found via "${sel}" — "${cleanText}"`);
+                return cleanText;
             }
         }
     }
 
-    console.warn('[Hydra Guard] extractSubject: NO subject found');
-    return '';
+    console.warn('[Hydra Guard] extractSubject: NO subject found — falling back to document.title');
+    return document.title || 'Unknown Subject';
 }
 
 export function extractEmailLinks() {
     const selectors = [
-        '.a3s.aiL a',
-        '.adn.ads .a3s a',                    // Gmail spam/search pane (BUG-125)
-        '.adn .a3s a',                        // Gmail alternate reading pane (BUG-125)
-        '.a3s a',
-        '[data-test-id="message-view-body"] a',
-        '.Email-Message-Body a',
-        '[data-testid="message-content"] a', // ProtonMail
-        '.msg-body a',                        // Yahoo
-        '.zmMailBody a'                       // Zoho
+        '.a3s.aiL a, .a3s.aiL area',          // BUG-145: Add area tags for image-maps
+        '.adn.ads .a3s a, .adn.ads .a3s area',// BUG-125 & BUG-145
+        '.adn .a3s a, .adn .a3s area',
+        '.a3s a, .a3s area',
+        '[data-test-id="message-view-body"] a, [data-test-id="message-view-body"] area',
+        '.Email-Message-Body a, .Email-Message-Body area',
+        '[data-testid="message-content"] a, [data-testid="message-content"] area', // ProtonMail
+        '.msg-body a, .msg-body area',                        // Yahoo
+        '.zmMailBody a, .zmMailBody area'                       // Zoho
     ];
 
     const links = [];

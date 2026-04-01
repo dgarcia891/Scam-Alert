@@ -50,6 +50,8 @@ description: "Implement planned changes using architect skills and thoroughness-
      - Create/update migration files (e.g., under supabase/migrations/) rather than editing schema directly.
      - Add comments and Business Impact labels.
    - Keep changes small, reviewable, and consistent with existing patterns.
+   - **Version Management (CRITICAL)**:
+     - ALWAYS increment the version number in `package.json`, `extension/package.json`, and `extension/manifest.json` whenever you make any code changes.
 
 7. Update/Add Tests
    - Implement or update tests described in the plan and informed by BUG_LOG/LESSONS_LEARNED.

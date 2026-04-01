@@ -83,7 +83,11 @@ async function handleGetTabStatus(getCachedScan) {
 }
 
 async function handleScanCurrentTab(sender, data, scanAndHandle) {
-    const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    let explicitTab;
+    if (data && data.tabId) {
+        explicitTab = await chrome.tabs.get(data.tabId).catch(() => null);
+    }
+    const tab = explicitTab || sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (tab) {
         await scanAndHandle(tab.id, tab.url, {
             forceRefresh: Boolean(data?.forceRefresh),
@@ -199,43 +203,42 @@ async function handleNavigateBack(sender) {
 }
 
 async function handleForceRescan(sender, msgData, scanAndHandle, tabStateManager) {
-    const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    let explicitTab;
+    if (msgData && msgData.tabId) {
+        explicitTab = await chrome.tabs.get(msgData.tabId).catch(() => null);
+    }
+    const tab = explicitTab || sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (tab) {
         const scanOptions = { forceRefresh: true };
 
         // BUG-129: On email clients, fetch live email context before rescanning
         // so email heuristics actually run (sender, body, subject, links).
         if (isKnownEmailClient(tab.url)) {
-            const tabState = tabStateManager?.getTabState(tab.id);
-            if (tabState?.scanInProgress) {
-                console.log('[Hydra Guard] FORCE_RESCAN: scan already in progress — skipping context fetch');
-            } else {
-                // Emit amber badge immediately (security gap mitigation during retry window)
-                if (chrome.action?.setBadgeText) {
-                    chrome.action.setBadgeText({ tabId: tab.id, text: '?' });
-                    chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f59e0b' });
-                }
+            // Emit amber badge immediately (security gap mitigation during retry window)
+            if (chrome.action?.setBadgeText) {
+                chrome.action.setBadgeText({ tabId: tab.id, text: '?' });
+                chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f59e0b' });
+            }
 
-                try {
-                    const response = await fetchEmailContextWithRetry(tab.id);
-                    if (response?.context) {
-                        scanOptions.pageContent = {
-                            bodyText: response.context.snippet || '',
-                            isEmailView: true,
-                            senderName: response.context.senderName || '',
-                            senderEmail: response.context.senderEmail || '',
-                            subject: response.context.subject || '',
-                            headers: response.context.headers || {},
-                            links: (response.context.embeddedLinks || []).map(l => ({ href: l })),
-                            rawUrls: response.context.embeddedLinks || []
-                        };
-                        console.log('[Hydra Guard] FORCE_RESCAN: Fetched email context for enriched scan.');
-                    } else {
-                        console.warn('[Hydra Guard] FORCE_RESCAN: context unavailable after retries — URL-only scan.');
-                    }
-                } catch (e) {
-                    console.warn('[Hydra Guard] FORCE_RESCAN: Email context fetch failed:', e.message);
+            try {
+                const response = await fetchEmailContextWithRetry(tab.id);
+                if (response?.context) {
+                    scanOptions.pageContent = {
+                        bodyText: response.context.snippet || '',
+                        isEmailView: true,
+                        senderName: response.context.senderName || '',
+                        senderEmail: response.context.senderEmail || '',
+                        subject: response.context.subject || '',
+                        headers: response.context.headers || {},
+                        links: (response.context.embeddedLinks || []).map(l => ({ href: l })),
+                        rawUrls: response.context.embeddedLinks || []
+                    };
+                    console.log('[Hydra Guard] FORCE_RESCAN: Fetched email context for enriched scan.');
+                } else {
+                    console.warn('[Hydra Guard] FORCE_RESCAN: context unavailable after retries — URL-only scan.');
                 }
+            } catch (e) {
+                console.warn('[Hydra Guard] FORCE_RESCAN: Email context fetch failed:', e.message);
             }
         }
 
@@ -311,16 +314,17 @@ async function fetchEmailContextWithRetry(tabId, maxAttempts = 3) {
 
         const res = await Promise.race([fetchPromise, timeoutPromise]);
 
-        // Keep track of the most recent successful response, even if body is empty/short
+        // Keep track of the most recent successful response
         if (res?.success && res.context) {
             lastSuccessRes = res;
+            
+            // Universal Extractor payload acceptance check
+            if ((res.context.snippet?.length ?? 0) > 20 || res.context.subject || res.context.senderEmail) {
+                return res; 
+            }
         }
 
-        if (res?.success && (res.context?.snippet?.length ?? 0) > 50) {
-            return res; // Body is ready and has content
-        }
-
-        console.warn(`[Hydra Guard] FORCE_RESCAN: attempt ${attempt}/${maxAttempts} — body not ready. ${res?.error || ''}`);
+        console.warn(`[Hydra Guard] FORCE_RESCAN: attempt ${attempt}/${maxAttempts} — universal payload empty. ${res?.error || ''}`);
 
         if (attempt < maxAttempts) {
             // MV3-safe delay: await keeps the message handler alive

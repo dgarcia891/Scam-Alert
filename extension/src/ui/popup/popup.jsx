@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTriangle, ChevronRight, Share2, ArrowRight, Bug, Copy, Check, ChevronDown, RefreshCw, Trash2, Terminal, Globe, Mail, Lock, Unlock, Clock, Zap, Database, Key, Cpu, Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -79,6 +79,7 @@ const SeverityPill = ({ severity }) => {
         MEDIUM: "bg-amber-500/20 text-amber-400 border-amber-500/30",
         LOW: "bg-sky-500/20 text-sky-400 border-sky-500/30",
         SAFE: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+        UNKNOWN: "bg-orange-500/10 text-orange-400/80 border-orange-500/20",
     };
     return (
         <span 
@@ -318,8 +319,24 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                             </div>
                         ))}
                         {!hasContentData && (
-                            <div className="text-[10px] text-rose-400 font-semibold mt-1 py-1 px-2 bg-rose-900/20 rounded">
-                                ⚠️ No content was extracted. The scan only checked the URL (mail.google.com) — email heuristics did not run. Try clicking Force Rescan.
+                            <div className="mt-2 space-y-2">
+                                <div className="text-[10px] text-rose-400 font-semibold py-1.5 px-2 bg-rose-900/20 rounded border border-rose-500/20 flex items-start gap-2">
+                                    <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                                    <span>No content was extracted. The scan only checked the URL — email heuristics did not run.</span>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setIsRescanning(true);
+                                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { forceRefresh: true, tabId: currentTabId } }, () => {
+                                            setTimeout(() => setIsRescanning(false), 3000);
+                                        });
+                                    }}
+                                    disabled={isRescanning}
+                                    className="w-full py-1.5 px-2 rounded bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600/50 text-[10px] text-slate-300 font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                >
+                                    <RefreshCw size={10} className={cn(isRescanning && "animate-spin")} />
+                                    {isRescanning ? 'Scanning...' : 'Rescan Email Content'}
+                                </button>
                             </div>
                         )}
                     </div>
@@ -618,6 +635,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
         </div>
     );
 };
+const AI_REQUEST_TIMEOUT_MS = 30000;
 
 const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking, aiResult, setAiResult, scanResults }) => {
     const [debugOpen, setDebugOpen] = useState(false);
@@ -628,17 +646,33 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [submitOptions, setSubmitOptions] = useState({ sender: true, subject: true, body: true });
+    
+    const requestIdRef = useRef(0);
 
     const executeAskAI = useCallback(() => {
         if (!currentUrl || aiAsking) return;
+        
+        const thisRequestId = ++requestIdRef.current;
         setAiAsking(true);
         setAiResult(null);
         setDebugOpen(false);
         setShowConsent(false);
         
+        const timeoutId = setTimeout(() => {
+            if (requestIdRef.current !== thisRequestId) return;
+            setAiAsking(false);
+            setAiResult({
+                verdict: 'ERROR',
+                reason: 'AI analysis is taking too long — your connection may be slow. Please try again.'
+            });
+        }, AI_REQUEST_TIMEOUT_MS);
+        
         chrome.runtime.sendMessage(
             { type: MessageTypes.ASK_AI_OPINION, data: { url: currentUrl, tabId: currentTabId } },
             (response) => {
+                clearTimeout(timeoutId);
+                if (requestIdRef.current !== thisRequestId) return;
+                
                 const lastError = chrome.runtime.lastError;
                 setAiAsking(false);
                 if (lastError) {
@@ -654,6 +688,7 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
             }
         );
     }, [currentUrl, aiAsking, currentTabId]);
+
 
     const handleAskAI = useCallback(() => {
         if (settings?.aiConsentGiven) {
@@ -792,7 +827,8 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                                 {aiResult.verdict === 'DOWNGRADED' ? 'AI says: Looks safe'
                                     : (aiResult.verdict === 'ESCALATED' || aiResult.verdict === 'CONFIRMED') ? 'AI says: This looks dangerous'
                                         : aiResult.verdict === 'ERROR' ? 'AI unavailable'
-                                            : 'AI says: Something looks off'}
+                                            : aiResult.verdict === 'INCONCLUSIVE' ? 'AI: Could not determine'
+                                                : 'AI says: Something looks off'}
                             </span>
                             <ChevronDown size={12} className={cn("transition-transform shrink-0 opacity-50", !debugOpen && "-rotate-90")} />
                         </div>
@@ -994,8 +1030,16 @@ const Popup = () => {
 
     // Main data load
     useEffect(() => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const tab = tabs[0];
+        const queryTabs = (callback) => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs && tabs[0]) return callback(tabs[0]);
+                chrome.tabs.query({ active: true, windowType: 'normal' }, (fallbacks) => {
+                    callback(fallbacks ? fallbacks[0] : null);
+                });
+            });
+        };
+
+        queryTabs((tab) => {
             if (!tab?.url) return;
             const url = tab.url;
             setCurrentUrl(url);
@@ -1016,23 +1060,26 @@ const Popup = () => {
                 }
 
                 chrome.runtime.sendMessage({ type: MessageTypes.GET_SCAN_RESULTS, data: { tabId: tab.id } }, (response) => {
-                    const data = response?.data;
-                    const res = data?.results;
-                    const scanInProgress = data?.scanInProgress;
-                    const domainRepData = data?.domainReputation;
+                    // BUG-FIX: GET_SCAN_RESULTS returns {results, scanInProgress, ...} straight from handler.js, NOT nested in 'data'
+                    const res = response?.results;
+                    const scanInProgress = response?.scanInProgress;
+                    const domainRepData = response?.domainReputation;
 
                     if (domainRepData) setDomainReputation(domainRepData);
 
                     if (res || scanInProgress) {
-                        setScanResults(res);
-                        const newStatus = deriveStatusFromResults(res, scanInProgress, currentUrl);
+                        // BUG-145: Ensure unwrapping if data was directly pulled via chrome.storage.local.get and has a {result, timestamp} shape
+                        const unwrappedRes = (res && res.result && typeof res.result === 'object') ? res.result : res;
+                        
+                        setScanResults(unwrappedRes);
+                        const newStatus = deriveStatusFromResults(unwrappedRes, scanInProgress, currentUrl);
                         setStatus(newStatus);
-                        if (res?.whitelisted) setIsWhitelisted(true);
+                        if (unwrappedRes?.whitelisted) setIsWhitelisted(true);
                         
                         // BUG-131: Auto-rescan if extraction failed but popup was opened
                         if (newStatus === 'unknown') {
                             setIsRescanning(true);
-                            chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: {} }, () => {
+                            chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: currentTabId, forceRefresh: true } }, () => {
                                 setTimeout(() => setIsRescanning(false), 8000);
                             });
                         }
@@ -1040,7 +1087,7 @@ const Popup = () => {
                         // Truly no results and not scanning -> show empty and trigger auto-scan
                         setStatus('empty');
                         setIsRescanning(true);
-                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: {} }, () => {
+                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: currentTabId, forceRefresh: true } }, () => {
                             setTimeout(() => setIsRescanning(false), 8000);
                         });
                     }
@@ -1102,7 +1149,7 @@ const Popup = () => {
     // Dev mode actions
     const handleForceRescan = useCallback(() => {
         setIsRescanning(true);
-        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: {} }, () => {
+        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: currentTabId, forceRefresh: true } }, () => {
             // BUG-129: Results arrive via the SCAN_RESULT_UPDATED listener.
             // The old setTimeout re-fetch was racing with the broadcast and
             // overwriting email-enriched results with stale URL-only data.
