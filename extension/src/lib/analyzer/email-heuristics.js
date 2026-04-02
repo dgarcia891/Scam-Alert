@@ -131,10 +131,15 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'banking': ['bank', 'chase', 'wellsfargo', 'bofa', 'capital one', 'visa', 'mastercard', 'payment']
     };
 
-    const externalLinks = [
+    // BUG-149: Deduplicate at source. rawUrls is the .href projection of links,
+    // so both arrays contain the same URLs. Without Set(), the same URL is checked
+    // twice — once in the intent-mismatch loop (section 4) and once in the embedded
+    // link URL checks (section 4.5). This also prevents the linkTriggers guard from
+    // being invalidated by a second appearance of the same URL with a different object shape.
+    const externalLinks = [...new Set([
         ...(pageContent?.links || []).map(l => typeof l === 'string' ? l : l.href || l.url || ''),
         ...(pageContent?.rawUrls || [])
-    ].filter(Boolean).slice(0, 5);
+    ].filter(Boolean))].slice(0, 5);
 
     let mismatchFound = false;
     const detectedBrands = [];

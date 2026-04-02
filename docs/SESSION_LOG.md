@@ -65,3 +65,24 @@ This file is the single source of truth for "what we last worked on" and "what t
 2. **Monitor Logs:** Watch for `[Hydra Guard] Critical Scan Error` in the background worker inspector to confirm error broadcasting.
 
 ---
+
+### [2026-04-01] Extraction Hardening (Part 2)
+
+**Project:** Hydra Guard (Scam Alert)
+**Active Bug:** BUG-145 (Resolved)
+**Version:** 1.1.4
+
+### Summary of Work
+- **BUG-145 (Resolved):** Eliminated "NO SCAN" failures for image-only scams and lazy-loaded Gmail views.
+- **Proof-of-Life:** Refactored `triggerScan` to use a multi-signal loading gate (Body > 20 chars OR verified sender email OR meaningful subject OR links found).
+- **Adversarial Catch:** Added `<area>` (image map) support to link extraction.
+- **Title Sanitization:** Hardened `extractSubject` to sanitize document titles (removing "Inbox" counts) when used as a fallback.
+- **Concurrency:** Added a `retryTimer` clearing guard to prevent overlapping scans during rapid navigation.
+- **Versioning:** Bumped to v1.1.4 and committed to `main`.
+
+### Next Actions
+1. **Manual ZIP & Upload:** ZIP the `dist/` directory and upload to the Chrome Web Store dashboard.
+2. **Monitor Telemetry:** Watch for any increase in extraction retries on slow connections.
+
+
+---

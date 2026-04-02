@@ -161,9 +161,13 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                                 target: { tabId },
                                 files: ['dist/assets/emailScanner.js']
                             });
-                            // brief delay for the script to initialize
-                            await new Promise(r => setTimeout(r, 200));
-                            ctxResponse = await chrome.tabs.sendMessage(tabId, { type: 'GET_EMAIL_CONTEXT' }).catch(() => null);
+                            // Poll up to 3× (450ms max) — the injected script is async,
+                            // so we exit as soon as the listener is registered rather than
+                            // relying on a fixed sleep that can race on slow tabs.
+                            for (let attempt = 0; attempt < 3 && !ctxResponse; attempt++) {
+                                await new Promise(r => setTimeout(r, 150));
+                                ctxResponse = await chrome.tabs.sendMessage(tabId, { type: 'GET_EMAIL_CONTEXT' }).catch(() => null);
+                            }
                         } catch (injErr) {
                             console.warn('[Hydra Guard] On-demand injection failed:', injErr);
                         }

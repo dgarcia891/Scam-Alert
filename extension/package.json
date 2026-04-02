@@ -1,6 +1,6 @@
 {
   "name": "hydra-guard-extension",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "description": "Browser extension for Scam Alert real-time protection",
   "private": true,
   "type": "module",

@@ -163,6 +163,34 @@ export function checkUrlObfuscation(url, dynamicRules = []) {
         flagged.push('Excessive hyphens'); 
         totalScore += ruleOverrides.excessiveHyphens?.score ?? 15; 
     }
+
+    // BUG-149: ESP tracking wrapper exemption.
+    // Marketing platforms (Vialoops, Klaviyo, HubSpot, Mailchimp, SendGrid, etc.) embed
+    // a URL-encoded destination URL in their click-tracking path, e.g.:
+    //   https://c.vialoops.com/CL0/https:%2F%2Fwww.perplexity.ai/...
+    // The %3A%2F%2F encoding of "://" alone produces 3 hex sequences, immediately
+    // tripping the hexMatches.length > 3 threshold. This is industry-standard behavior,
+    // not malicious obfuscation. We exempt known ESP redirect domains from the hex check.
+    const KNOWN_ESP_REDIRECT_HOSTS = [
+        'vialoops.com', 'mailchimp.com', 'list-manage.com', 'hubspot.com',
+        'hs-email.com', 'salesforce.com', 'exacttarget.com', 'brevo.com',
+        'sendinblue.com', 'klaviyo.com', 'constantcontact.com', 'campaign-archive.com',
+        'mailgun.org', 'sendgrid.net', 'postmarkapp.com', 'drip.com',
+        'convertkit.com', 'activehosted.com',
+        // Well-known URL shorteners also embed encoded URLs in their paths
+        'bit.ly', 'ow.ly', 't.co', 'buff.ly', 'goo.gl',
+    ];
+    if (urlObj && KNOWN_ESP_REDIRECT_HOSTS.some(h => urlObj.hostname === h || urlObj.hostname.endsWith('.' + h))) {
+        return {
+            title: 'check_url_obfuscation',
+            flagged: false,
+            severity: 'NONE',
+            details: 'ESP/shortener tracking wrapper — path encoding is expected, not obfuscation',
+            patterns: [],
+            dataChecked: url,
+            score: 0
+        };
+    }
     
     // Baseline Fix 1: Only check for excessive hex encoding in origin and pathname, not query strings.
     const stringForHexCheck = urlObj ? (urlObj.origin + urlObj.pathname) : url;

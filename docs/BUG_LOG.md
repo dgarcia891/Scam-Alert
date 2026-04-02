@@ -82,8 +82,10 @@
 | BUG-138 | FIXED | High | Gmail extraction returns empty body on Force Rescan — heuristics silently skip | Extracted `fetchEmailContextWithRetry` helper in `handler.js` using a 3-attempt exponential backoff. Added `bodyReady` boolean to `GET_EMAIL_CONTEXT` so `handler.js` can distinguish missing body from actual failures. Emit amber badge during backoff retries to mitigate false security gap. Regression test: `BUG-138.test.js`. |
 | BUG-142 | CLOSED | Critical | Email Scanning Completely Dead — Global Safe List Whitelist Bypass | Added `isEmailScan` check to bypass URL whitelist for emails. |
 | BUG-145 | CLOSED | Critical | Missing Email Extractors Trigger Premature Target Timeout | Added `<area>` support, decoupled `isLoaded` from text length, and added structural fallbacks. |
-| BUG-146 | CLOSED | High | [Hydra Guard] Infinite Loading on Email Scans | Wrapped `scanAndHandle` in `finally` to ensure `scanInProgress` reset and removed manual rescan locks. |
-| BUG-147 | CLOSED | High | "Analyzing Safety" UI hang on extraction failure | Hoisted `result` to outer scope, added explicit `catch` broadcast, and implemented `broadcastSent` logic in `finally` for guaranteed signal delivery. |
+| BUG-146 | CLOSED | High | [Hydra Guard] Infinite Loading on Email Scans | Fixed `ReferenceError` in `popup.jsx` and added `finally` block in `service-worker.js` to guarantee `scanInProgress` reset. |
+| BUG-147 | CLOSED | High | "Analyzing Safety" UI hang on extraction failure | Implemented visibility-aware `querySelectorAll` reverse-iteration and deterministic `finally` broadcast in `service-worker.js`. |
+| BUG-148 | CLOSED | Critical | "Service worker registration failed. Status code: 15" with "Unexpected token 'export'" | Replaced dynamic `import()` calls with static imports in `ai-handler.js` and `threat-telemetry.js` to prevent Vite/Rollup from chunking the service worker entry point and injecting `export` statements. |
+
 ## BUG-139: "Analyzing with AI..." Spinner Stuck Permanently
 **Date:** 2026-03-30
 **Status:** Resolved
