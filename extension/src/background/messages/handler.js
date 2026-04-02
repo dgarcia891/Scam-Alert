@@ -209,6 +209,17 @@ async function handleForceRescan(sender, msgData, scanAndHandle, tabStateManager
     }
     const tab = explicitTab || sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (tab) {
+        // BUG-148: Clear stale tab state BEFORE the rescan so a previously cached
+        // empty-payload SAFE result cannot be served by getCachedScan in scanAndHandle.
+        if (tabStateManager) {
+            tabStateManager.updateTabState(tab.id, {
+                url: tab.url,
+                scanResults: null,
+                lastScanned: null,
+                scanInProgress: true
+            });
+        }
+
         const scanOptions = { forceRefresh: true };
 
         // BUG-129: On email clients, fetch live email context before rescanning
@@ -218,6 +229,23 @@ async function handleForceRescan(sender, msgData, scanAndHandle, tabStateManager
             if (chrome.action?.setBadgeText) {
                 chrome.action.setBadgeText({ tabId: tab.id, text: '?' });
                 chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#f59e0b' });
+            }
+
+            // BUG-148: Re-inject the email scanner content script BEFORE trying to
+            // fetch context. After an extension reload, manifest-injected content
+            // scripts become orphaned (chrome.runtime.id is undefined) and silently
+            // drop all messages. The emailScanner.js double-execution guard
+            // (window.__hydraGuardEmailScannerLoaded) makes re-injection safe.
+            try {
+                await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    files: ['dist/assets/emailScanner.js']
+                });
+                console.log('[Hydra Guard] FORCE_RESCAN: Re-injected emailScanner.js');
+                // Give the freshly injected script time to initialize
+                await new Promise(r => setTimeout(r, 1500));
+            } catch (injectErr) {
+                console.warn('[Hydra Guard] FORCE_RESCAN: Content script injection failed:', injectErr.message);
             }
 
             try {

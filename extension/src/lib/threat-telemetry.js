@@ -7,6 +7,8 @@
  * ONLY runs if the user has explicitly opted-in via settings.telemetryOptIn.
  */
 
+import { submitUserReport } from './supabase.js';
+
 export async function reportThreatIndicators(indicators, contextType = 'WEB') {
     if (!indicators || indicators.length === 0) return { success: false, reason: 'No indicators' };
 
@@ -30,8 +32,8 @@ export async function reportThreatIndicators(indicators, contextType = 'WEB') {
             console.warn('[Telemetry] Could not fetch current tab URL:', e);
         }
 
-        import('./supabase.js').then(supabase => {
-            supabase.submitUserReport(
+        try {
+            submitUserReport(
                 currentUrl,
                 'telemetry',
                 `AI Extracted Indicators (${contextType})`,
@@ -39,9 +41,9 @@ export async function reportThreatIndicators(indicators, contextType = 'WEB') {
             ).catch(err => {
                 console.warn('[Telemetry] Telemetry submission failed:', err);
             });
-        }).catch(err => {
+        } catch (err) {
             console.warn('[Telemetry] Failed to load supabase module:', err);
-        });
+        }
 
         return { success: true };
     } catch (err) {

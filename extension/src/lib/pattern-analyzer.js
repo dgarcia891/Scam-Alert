@@ -47,7 +47,18 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
         ipAddress: checkIPAddress(url),
         excessiveSubdomains: checkExcessiveSubdomains(url),
         suspiciousPort: checkSuspiciousPort(url),
-        suspiciousKeywords: checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent, dynamicKeywords),
+        // BUG-148: Skip the generic URL keyword scanner on email views.
+        // email-heuristics.js (checkEmailScams) handles email-specific detection
+        // with contextual bigrams, intent-link mismatch, and sender analysis.
+        // Running checkSuspiciousKeywords on email body text produces false
+        // positives on benign words like "verify", "secure", "account".
+        suspiciousKeywords: checkSuspiciousKeywords(
+            url,
+            isSuspiciousTLD,
+            pageContent?.isEmailView ? null : pageContent,
+            dynamicKeywords
+        ),
+        // Re-enabled for email views: uses multi-word phrases (e.g., "action required", "account locked")
         urgencySignals: checkUrgencySignals(pageContent, dynamicUrgencyKeywords),
         emailScams: checkEmailScams(pageContent, dynamicEmailKeywords),
 
@@ -55,6 +66,7 @@ export async function analyzeUrl(url, pageContent = null, isPro = false, customP
         advancedTyposquatting: { ...checkAdvancedTyposquatting(url), isProFeature: true }
     };
 
+    // Re-enabled for email views: uses exact phrase matches (e.g., "verify your identity")
     if (pageContent) {
         checks.contentAnalysis = analyzePageContent(pageContent, dynamicPhrases);
     }

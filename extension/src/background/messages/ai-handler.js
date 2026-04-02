@@ -11,6 +11,8 @@
 import { verifyWithAI, extractEmailContext } from '../../lib/ai-verifier.js';
 import { isKnownEmailClient } from '../../config/email-clients.js';
 import { sendMessageToTab } from '../../lib/messaging.js';
+import { setActionIconForTab } from '../lib/icon-manager.js';
+import { reportThreatIndicators } from '../../lib/threat-telemetry.js';
 
 // Must be well under popup's AI_REQUEST_TIMEOUT_MS (30000ms)
 // Leaves a 10s buffer for message transit + sendResponse delivery
@@ -254,18 +256,20 @@ async function _doAskAI(msgData, getSettings, getCachedScan, cacheScan, tabState
             if (msgData?.tabId) {
                 chrome.action.setBadgeText({ text: '!', tabId: msgData.tabId }).catch(() => {});
                 chrome.action.setBadgeBackgroundColor({ color: '#f43f5e', tabId: msgData.tabId }).catch(() => {});
-                import('../lib/icon-manager.js').then(module => {
-                    module.setActionIconForTab(msgData.tabId, 'CRITICAL');
-                }).catch(err => console.warn('[Hydra Guard] Failed to update action icon:', err));
+                try {
+                    setActionIconForTab(msgData.tabId, 'CRITICAL');
+                } catch (err) {
+                    console.warn('[Hydra Guard] Failed to update action icon:', err);
+                }
             }
 
             // 2. Dispatch telemetry (reportThreatIndicators checks user opt-in internally)
             if (aiVerification.indicators && aiVerification.indicators.length > 0) {
-                import('../../lib/threat-telemetry.js').then(module => {
-                    module.reportThreatIndicators(aiVerification.indicators, contextType);
-                }).catch(err => {
+                try {
+                    reportThreatIndicators(aiVerification.indicators, contextType);
+                } catch (err) {
                     console.warn('[Hydra Guard] Failed to load telemetry module:', err);
-                });
+                }
             }
         }
 

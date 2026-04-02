@@ -36,7 +36,7 @@ export const EMAIL_CLIENTS = [
         readingViewSelectors: ['h2.hP', '[data-legacy-thread-id]', '.ade', '.bzB'], // Structural headers: subject line, reply toolbar, header row
         titlePatterns: [],
         selectors: {
-            container: '.nH.hx',
+            container: 'div[role="main"], .nH',
             messageBody: '.a3s.aiL, .adn.ads .a3s, .adn .a3s, .a3s, .ii.gt .a3s, [data-message-id] .a3s, .ii.gt, div[dir="auto"]',  // BUG-125 & BUG-130: added spam/search pane and fallback selectors
             sender: '.gD, .go',
             subject: 'h2.hP, .hP',

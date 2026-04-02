@@ -11,11 +11,7 @@
  */
 
 const HIGHLIGHT_CLASS = 'hydra-guard-highlight';
-const TOOLTIP_ID = 'hydra-guard-tooltip';
 const ANIMATION_STYLE_ID = 'sa-highlight-animation';
-
-let activeTooltip = null;
-let _hideTimer = null;  // Debounce timer for mouseleave
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
@@ -62,7 +58,6 @@ export function removeHighlights() {
             parent.normalize(); // Merge adjacent text nodes
         }
     });
-    _hideTooltip();
 
     // Remove the animation style when there are no more highlights
     const style = document.getElementById(ANIMATION_STYLE_ID);
@@ -92,7 +87,7 @@ function _applyHighlight(indicator) {
     const { phrase, category, reason } = indicator;
     // Strip fuzzy-match annotation (handles both 'Fuzzy Match' and 'fuzzy match')
     const cleanPhrase = phrase.replace(/\s*\(fuzzy\s+match\)/i, '').trim();
-    if (!cleanPhrase) return;
+    if (!cleanPhrase || cleanPhrase.length <= 3) return;
 
     const regex = new RegExp(`(${_escapeRegExp(cleanPhrase)})`, 'gi');
 
@@ -158,13 +153,8 @@ function _applyHighlight(indicator) {
                 transition: 'background-color 0.2s'
             });
 
-            mark.addEventListener('mouseenter', (e) => {
-                clearTimeout(_hideTimer);
-                _showTooltip(e, { phrase: match, category, reason });
-            });
-            mark.addEventListener('mouseleave', () => {
-                _hideTimer = setTimeout(_hideTooltip, 120);
-            });
+            // Tooltip interaction is handled by tooltip.js event delegation
+            // on `.hydra-guard-highlight` elements — no per-mark listeners needed.
 
             fragment.appendChild(mark);
             lastIdx = offset + match.length;
@@ -177,111 +167,6 @@ function _applyHighlight(indicator) {
 
         parent.replaceChild(fragment, node);
     });
-}
-
-function _showTooltip(event, { phrase, category, reason }) {
-    // If we're already showing a tooltip for this exact phrase+target, keep it — don't flicker
-    if (activeTooltip && activeTooltip.dataset.phrase === phrase && activeTooltip.dataset.target === event.target.textContent) {
-        return;
-    }
-
-    // Different target or no tooltip — destroy old one first
-    _hideTooltip();
-
-    const tooltip = document.createElement('div');
-    tooltip.id = TOOLTIP_ID;
-    tooltip.dataset.phrase = phrase;
-    tooltip.dataset.target = event.target.textContent;
-
-    // Base styles — position will be set after layout measurement
-    Object.assign(tooltip.style, {
-        position: 'fixed',
-        zIndex: '2147483647',
-        background: 'linear-gradient(145deg, #7f1d1d, #450a0a)', // Deep red (red-900)
-        color: 'white',
-        padding: '12px 16px',
-        borderRadius: '10px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        fontSize: '13px',
-        lineHeight: '1.5',
-        maxWidth: '270px',
-        boxShadow: '0 12px 20px -4px rgba(0,0,0,0.7), 0 0 0 1px rgba(185,28,28,0.5)',
-        border: '1px solid rgba(239,68,68,0.4)',
-        pointerEvents: 'none',
-        opacity: '0',           // Start invisible for measurement
-        animation: 'sa-tooltip-in 0.2s ease-out forwards'
-    });
-
-    // Build tooltip contents with textContent (XSS-safe)
-    const categoryEl = document.createElement('div');
-    Object.assign(categoryEl.style, {
-        fontWeight: '800',
-        color: '#fca5a5',
-        fontSize: '10px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.07em',
-        marginBottom: '4px'
-    });
-    categoryEl.textContent = category || 'Scam Indicator';
-
-    const phraseEl = document.createElement('div');
-    Object.assign(phraseEl.style, {
-        fontWeight: '600',
-        fontSize: '14px',
-        marginBottom: '7px',
-        color: '#fff'
-    });
-    phraseEl.textContent = `"${phrase}"`;
-
-    const reasonEl = document.createElement('p');
-    Object.assign(reasonEl.style, {
-        color: '#fecaca',
-        fontSize: '12px',
-        margin: '0',
-        lineHeight: '1.5'
-    });
-    reasonEl.textContent = reason;
-
-    tooltip.appendChild(categoryEl);
-    tooltip.appendChild(phraseEl);
-    tooltip.appendChild(reasonEl);
-
-    // Append to DOM first so getBoundingClientRect() gives real dimensions
-    document.body.appendChild(tooltip);
-
-    // Now measure and position
-    const targetRect = event.target.getBoundingClientRect();
-    const ttRect = tooltip.getBoundingClientRect();
-
-    // Increase gap to 14px to move it further from the cursor hotspot
-    let top = targetRect.top - ttRect.height - 14;
-    let left = targetRect.left + (targetRect.width / 2) - (ttRect.width / 2);
-
-    // Flip below if not enough room above
-    if (top < 10) top = targetRect.bottom + 14;
-    // Clamp to viewport edges
-    if (left < 10) left = 10;
-    if (left + ttRect.width > window.innerWidth - 10) {
-        left = window.innerWidth - ttRect.width - 10;
-    }
-    // Make sure it doesn't go below the viewport either
-    if (top + ttRect.height > window.innerHeight - 10) {
-        top = targetRect.top - ttRect.height - 10;
-    }
-
-    tooltip.style.top = `${top}px`;
-    tooltip.style.left = `${left}px`;
-    tooltip.style.opacity = ''; // Let the animation handle fade-in
-
-    activeTooltip = tooltip;
-}
-
-function _hideTooltip() {
-    clearTimeout(_hideTimer);
-    if (activeTooltip) {
-        activeTooltip.remove();
-        activeTooltip = null;
-    }
 }
 
 function _escapeRegExp(string) {

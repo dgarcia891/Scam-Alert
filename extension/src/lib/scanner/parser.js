@@ -5,37 +5,48 @@
 
 export function extractEmailText() {
     const selectors = [
-        '.a3s.aiL',              // Gmail: Primary email body (most reliable, standard inbox)
-        '.adn.ads .a3s',         // Gmail: Spam/search preview pane body (BUG-125)
-        '.aqs.aqq .a3s',         // Gmail: another search/filter pane variant
-        '.adn .a3s',             // Gmail: Generic reading pane body (BUG-125)
-        '.a3s',                  // Gmail: Email body fallback
-        '.ii.gt .a3s',           // Gmail: body within thread item
-        '.gs .ii.gt .a3s',       // Gmail: expanded thread body
-        '[data-message-id] .a3s', // Gmail: scoped to message container
-        '.ii.gt',                // Gmail: plain text/altered layout fallback (BUG-130)
-        '[data-message-id] div[dir="auto"]', // Gmail: alternate wrapper (BUG-130)
-        '[data-message-id] div[dir="ltr"]', // Gmail: alternate wrapper (BUG-130)
-        '.nH.hx .a3s',           // Gmail: wide generic fallback (BUG-130)
-        'div[dir="ltr"]',        // Gmail: LTR content block (generic fallback)
-        'div[role="main"] .a3s', // Gmail: scoped to main reading area
-        '.nH[role="main"] .a3s', // Gmail: alternate main container
-        '.aDP .a3s',             // Gmail: alternate reading pane
-        '[data-test-id="message-view-body"]', // Outlook body
-        '.Email-Message-Body',   // Generic
-        '.gs .ii.gt',            // Gmail: last resort thread body
-        '[data-testid="message-content"]',    // ProtonMail body
-        '.msg-body',             // Yahoo body
-        '.zmMailBody, .zmail-content'          // Zoho body
+        { sel: '.a3s.aiL',                  multi: true },  // Gmail: Primary email body
+        { sel: '.adn.ads .a3s',             multi: true },  // Gmail: Spam/search preview pane
+        { sel: '.aqs.aqq .a3s',             multi: true },  // Gmail: another search/filter pane variant
+        { sel: '.adn .a3s',                 multi: true },  // Gmail: Generic reading pane body
+        { sel: '.a3s',                      multi: true },  // Gmail: Email body fallback
+        { sel: '.ii.gt .a3s',               multi: true },  // Gmail: body within thread item
+        { sel: '.gs .ii.gt .a3s',           multi: true },  // Gmail: expanded thread body
+        { sel: '[data-message-id] .a3s',    multi: true },  // Gmail: scoped to message container
+        { sel: '.ii.gt',                    multi: true },  // Gmail: plain text/altered layout fallback
+        { sel: '[data-message-id] div[dir="auto"]', multi: true }, // Gmail: alternate wrapper
+        { sel: '[data-message-id] div[dir="ltr"]',  multi: true }, // Gmail: alternate wrapper
+        { sel: '.nH.hx .a3s',               multi: true },  // Gmail: wide generic fallback
+        { sel: 'div[dir="ltr"]',            multi: false }, // Gmail: LTR content block (too broad for multi)
+        { sel: 'div[role="main"] .a3s',     multi: false }, // Gmail: scoped to main reading area
+        { sel: '.nH[role="main"] .a3s',     multi: false }, // Gmail: alternate main container
+        { sel: '.aDP .a3s',                 multi: false }, // Gmail: alternate reading pane
+        { sel: '[data-test-id="message-view-body"]', multi: false }, // Outlook body
+        { sel: '.Email-Message-Body',       multi: false }, // Generic
+        { sel: '.gs .ii.gt',                multi: true },  // Gmail: last resort thread body
+        { sel: '[data-testid="message-content"]', multi: false }, // ProtonMail body
+        { sel: '.msg-body',                 multi: false }, // Yahoo body
+        { sel: '.zmMailBody, .zmail-content', multi: false } // Zoho body
     ];
 
-    for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el) {
-            const text = (el.innerText || el.textContent || '').trim();
-            if (text.length > 5) { // Min 5 chars to catch short emails
-                console.log(`[Hydra Guard] extractEmailText: found via "${sel}" (${text.length} chars)`);
-                return text;
+    for (const { sel, multi } of selectors) {
+        if (multi) {
+            const els = document.querySelectorAll(sel);
+            for (let i = els.length - 1; i >= 0; i--) {
+                const text = (els[i].innerText || '').trim();
+                if (text.length > 5) {
+                    console.log(`[Hydra Guard] extractEmailText: found via "${sel}" [multi] (${text.length} chars)`);
+                    return text;
+                }
+            }
+        } else {
+            const el = document.querySelector(sel);
+            if (el) {
+                const text = (el.innerText || el.textContent || '').trim();
+                if (text.length > 5) { // Min 5 chars to catch short emails
+                    console.log(`[Hydra Guard] extractEmailText: found via "${sel}" [single] (${text.length} chars)`);
+                    return text;
+                }
             }
         }
     }

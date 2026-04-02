@@ -4,6 +4,7 @@ import { Shield, ShieldAlert, Settings, ExternalLink, Activity, Info, AlertTrian
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageTypes } from '../../lib/messaging';
+import { CHECK_LABELS } from '../../lib/constants';
 import { isKnownEmailClient, getMatchingClient } from '../../config/email-clients';
 import { deriveStatusFromResults } from './status-helper';
 import { getReputationBadge } from '../../lib/domain-reputation.js';
@@ -170,22 +171,7 @@ function deriveSeverityRule(signals) {
 // DEV PANEL (the main developer mode view)
 // ═══════════════════════════════════════════════════════════════
 
-// Human-readable labels for check keys
-const CHECK_LABELS = {
-    emailScams: '✉️ Email Scam Patterns',
-    urgencySignals: '⏰ Urgency / Pressure Signals',
-    typosquatting: '🎭 Typosquatting (Fake Domain)',
-    advancedTyposquatting: '🎭 Advanced Typosquatting',
-    suspiciousKeywords: '🔍 Suspicious Keywords in URL',
-    nonHttps: '🔓 Unencrypted Connection (HTTP)',
-    suspiciousTLD: '🌐 Suspicious Domain Extension',
-    ipAddress: '📍 IP Address as URL',
-    urlObfuscation: '🕵️ URL Obfuscation',
-    excessiveSubdomains: '🌿 Excessive Subdomains',
-    suspiciousPort: '🔌 Non-standard Port',
-    contentAnalysis: '📄 Page Content Analysis',
-    googleSafeBrowsing: '🛡️ Google Safe Browsing',
-};
+// Using centralized CHECK_LABELS from constants.js
 
 const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCache, isRescanning, userIsPro }) => {
     const version = (() => { try { return chrome.runtime.getManifest().version; } catch { return '?.?.?'; } })();
@@ -325,12 +311,7 @@ const DevPanel = ({ scanResults, currentUrl, settings, onForceRescan, onClearCac
                                     <span>No content was extracted. The scan only checked the URL — email heuristics did not run.</span>
                                 </div>
                                 <button 
-                                    onClick={() => {
-                                        setIsRescanning(true);
-                                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { forceRefresh: true, tabId: currentTabId } }, () => {
-                                            setTimeout(() => setIsRescanning(false), 3000);
-                                        });
-                                    }}
+                                    onClick={onForceRescan}
                                     disabled={isRescanning}
                                     className="w-full py-1.5 px-2 rounded bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600/50 text-[10px] text-slate-300 font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                                 >

@@ -3,7 +3,13 @@
  * Uses central email-clients.js config for selector-based parsing.
  */
 
+import { extractEmailText, parseSenderInfo, extractSubject } from '../../lib/scanner/parser.js';
 import { getMatchingClient } from '../../config/email-clients.js';
+
+// Gmail UI chrome prefixes that indicate parser.js Tier 2/3 scraped the sidebar/nav
+// rather than the email body. These are used to reject false-positive fallback results
+// on image-only emails. (BUG-146 M-1)
+const UI_NOISE_PREFIXES = ['Compose', 'Primary', 'Social', 'Promotions', 'Inbox', 'Starred'];
 
 export async function getEmailSettings() {
     return new Promise((resolve) => {
@@ -87,6 +93,7 @@ function extractSender(senderEl, client) {
 
 /**
  * Unified email data extraction using the central config.
+ * Falls back to parser.js for robust adversarial extraction.
  */
 export function extractEmailData() {
     const url = window.location.href;
@@ -103,6 +110,7 @@ export function extractEmailData() {
         return { bodyText, senderName, senderEmail, subject, isEmailView: false };
     }
 
+    // Phase 1: Config-driven extraction
     try {
         // Determine the document to query (iframe vs main document)
         let doc = document;
@@ -117,11 +125,15 @@ export function extractEmailData() {
         if (client.selectors.messageBody) {
             const bodySelectors = client.selectors.messageBody.split(',').map(s => s.trim());
             for (const sel of bodySelectors) {
-                const body = doc.querySelector(sel);
-                if (body && (body.innerText || '').trim().length > 5) {
-                    bodyText = body.innerText.trim();
-                    break;
+                const bodies = doc.querySelectorAll(sel);
+                for (let i = bodies.length - 1; i >= 0; i--) {
+                    const bodyContent = (bodies[i].innerText || '').trim();
+                    if (bodyContent.length > 5) {
+                        bodyText = bodyContent;
+                        break;
+                    }
                 }
+                if (bodyText) break;
             }
         } else if (client.iframeExtraction && doc.body) {
             // Iframe-based clients without a specific body selector: use full iframe body
@@ -132,7 +144,20 @@ export function extractEmailData() {
 
         // Extract sender
         if (client.selectors.sender) {
-            const senderEl = document.querySelector(client.selectors.sender) || doc.querySelector(client.selectors.sender);
+            const senderSelectors = client.selectors.sender.split(',').map(s => s.trim());
+            let senderEl = null;
+            
+            for (const sel of senderSelectors) {
+                const all = document.querySelectorAll(sel);
+                if (all.length > 0) { senderEl = all[all.length - 1]; break; }
+            }
+            if (!senderEl && doc !== document) {
+                for (const sel of senderSelectors) {
+                    const all = doc.querySelectorAll(sel);
+                    if (all.length > 0) { senderEl = all[all.length - 1]; break; }
+                }
+            }
+
             if (senderEl) {
                 const senderInfo = extractSender(senderEl, client);
                 senderName = senderInfo.name;
@@ -147,10 +172,64 @@ export function extractEmailData() {
         // Extract subject
         if (client.selectors.subject) {
             const subj = document.querySelector(client.selectors.subject) || doc.querySelector(client.selectors.subject);
-            if (subj) subject = subj.innerText;
+            if (subj) subject = (subj.innerText || subj.textContent || '').trim();
         }
     } catch (e) {
         console.warn(`[Hydra Guard] ${client.label} extraction failed:`, e);
+    }
+
+    // Phase 2: Robust Parser Fallbacks (BUG-146)
+    // Each fallback is in its own try/catch so a failure in one does not
+    // prevent the others from running. (M-3)
+
+    // Body fallback: only fires when Phase 1 found NOTHING. (M-2)
+    // This prevents Phase 1's short-but-valid content from being replaced
+    // by potentially noisier parser.js output.
+    try {
+        if (bodyText.length === 0) {
+            const fallbackBody = extractEmailText();
+            // M-1: Reject results that look like Gmail UI chrome (sidebar, nav labels).
+            // These appear when the email is image-only and parser.js falls through
+            // to the Tier 2/3 document.body scrape.
+            const looksLikeUIChrome = fallbackBody && UI_NOISE_PREFIXES.some(w =>
+                fallbackBody.trimStart().startsWith(w)
+            );
+            if (fallbackBody && fallbackBody.length > 0 && !looksLikeUIChrome) {
+                console.log('[Hydra Guard] extractEmailData: parser.js body fallback triggered');
+                bodyText = fallbackBody;
+            } else if (looksLikeUIChrome) {
+                console.warn('[Hydra Guard] extractEmailData: parser.js body fallback rejected (UI chrome detected)');
+            }
+        }
+    } catch (bodyFallbackErr) {
+        console.warn('[Hydra Guard] Parser.js body fallback error:', bodyFallbackErr);
+    }
+
+    // Sender fallback: only fires when Phase 1 found no valid email address.
+    try {
+        if (!senderEmail || !senderEmail.includes('@')) {
+            const fallbackSender = parseSenderInfo();
+            if (fallbackSender.email && fallbackSender.email.includes('@')) {
+                console.log('[Hydra Guard] extractEmailData: parser.js sender fallback triggered');
+                senderName = fallbackSender.name || senderName;
+                senderEmail = fallbackSender.email;
+            }
+        }
+    } catch (senderFallbackErr) {
+        console.warn('[Hydra Guard] Parser.js sender fallback error:', senderFallbackErr);
+    }
+
+    // Subject fallback: only fires when Phase 1 found no subject text.
+    try {
+        if (!subject) {
+            const fallbackSubject = extractSubject();
+            if (fallbackSubject && fallbackSubject !== 'Unknown Subject') {
+                console.log('[Hydra Guard] extractEmailData: parser.js subject fallback triggered');
+                subject = fallbackSubject;
+            }
+        }
+    } catch (subjectFallbackErr) {
+        console.warn('[Hydra Guard] Parser.js subject fallback error:', subjectFallbackErr);
     }
 
     return { bodyText, senderName, senderEmail, subject, isEmailView: true };

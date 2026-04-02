@@ -31,9 +31,9 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         ...(dyn.giftCardKeywords || [])
     ])];
     const commandWords = [...new Set([
-        'buy', 'purchase', 'scratch', 'photo', 'picture', 'code', 'front and back',
-        'pick up', 'amount', 'how many', 'each card', 'i have them',
-        'get reimbursed', 'reimbursed', 'amount of each', 'pick them up',
+        'buy a', 'buy some', 'purchase a', 'scratch the back', 'photo of the back', 'picture of the back', 'the code', 'reveal the code', 'read the code', 'front and back',
+        'pick up', 'amount of each', 'amount owed', 'how many', 'each card', 'i have them',
+        'get reimbursed', 'reimbursed', 'pick them up',
         'get this done', 'done today', 'get it done',
         'do with them', 'let me know',
         ...(dyn.commandWords || [])
@@ -47,6 +47,8 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
     const securityKeywords = [...new Set([
         'failed', 'expired', 'renew', 'subscription', 'storage', 'update payment',
         'card declined', 'transaction failed', 'action required', 'unauthorized',
+        'verify your identity', 'verify your account', 'confirm your identity',
+        'verification code', 'security code', 'account locked', 'account suspended',
         ...(dyn.securityKeywords || [])
     ])];
     const hasSecurityLure = securityKeywords.filter(k => emailBody.includes(k));
@@ -93,16 +95,23 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
     }
 
     // 3.5 Display Name / Email Mismatch Check (NEW)
-    // Extract the email prefix (e.g., marek.bartis022 from marek.bartis022@skolavdf.cz)
-    const emailPrefix = sender.split('@')[0];
+    // Extract the email prefix and apex brand (e.g. "github" from "github.com")
+    const emailPrefix = sender.split('@')[0] || '';
+    const emailDomain = sender.split('@')[1] || '';
+    const emailApexBrand = getBaseBrand(emailDomain);
     let mismatchScoreAdded = false;
 
     if (displayName && emailPrefix && displayName !== emailPrefix) {
         const nameParts = displayName.split(/\s+/).filter(p => p.length > 2);
         if (nameParts.length > 0) {
-            // Check if ANY part of the display name is in the email prefix
-            const hasOverlap = nameParts.some(part => emailPrefix.includes(part));
-            if (!hasOverlap) {
+            const matchesApexDomain = nameParts.some(part => emailApexBrand.includes(part));
+            const matchesPrefixOnly = !matchesApexDomain && nameParts.some(part => emailPrefix.includes(part));
+
+            if (matchesPrefixOnly) {
+                mismatchScoreAdded = true;
+                indicators.push('Brand spoofing detected in email prefix');
+                score += 55;
+            } else if (!matchesApexDomain) {
                 mismatchScoreAdded = true;
                 indicators.push('Sender display name does not match email address');
                 score += 35; 
@@ -217,27 +226,57 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         score += 35;
     }
 
-    const keywordMatches = [
-        ...(giftCardKeywords.filter(k => emailBody.includes(k))),
-        ...(commandWords.filter(k => emailBody.includes(k))),
-        ...(financeKeywords.filter(k => emailBody.includes(k))),
-        ...(vagueLureKeywords.filter(k => emailBody.includes(k))),
-        ...(securityKeywords.filter(k => emailBody.includes(k)))
-    ];
+    const keywordMatches = [];
+    if (hasGiftCard && hasCommand) {
+        keywordMatches.push(...giftCardKeywords.filter(k => emailBody.includes(k)));
+        keywordMatches.push(...commandWords.filter(k => emailBody.includes(k)));
+    }
+    if (hasFinance.length >= 2) {
+        keywordMatches.push(...financeKeywords.filter(k => emailBody.includes(k)));
+    }
+    if (hasVagueLure && hasExternalLinks) {
+        keywordMatches.push(...vagueLureKeywords.filter(k => emailBody.includes(k)));
+    }
+    // Unconditionally add security and critical phrases to keywordMatches 
+    // so they are highlighted IF the email gets flagged for ANY reason (e.g. sender spoofing).
+    if (hasSecurityLure.length >= 1) {
+        keywordMatches.push(...hasSecurityLure);
+        
+        // Extract individual highlightable words from matched security phrases
+        // Gmail fragments text across DOM nodes, so multi-word phrases won't match
+        // in the TreeWalker. Individual words will.
+        const individualWords = new Set();
+        hasSecurityLure.forEach(phrase => {
+            phrase.split(/\s+/).forEach(word => {
+                if (word.length > 3) individualWords.add(word);
+            });
+        });
+        individualWords.forEach(word => {
+            if (emailBody.includes(word) && !keywordMatches.includes(word)) {
+                keywordMatches.push(word);
+            }
+        });
+    }
 
     // Build visualIndicators ONLY when the check is actually flagged.
-    const visualIndicators = indicators.length > 0 ? [
-        ...indicators.map(label => ({
-            phrase: label,
-            ...(INDICATOR_EXPLANATIONS[label] || getExplanation(label))
-        })),
+    const unfilteredIndicators = indicators.length > 0 ? [
+        ...indicators.map(label => {
+            // For brand spoofing, try to highlight the full sender address if it appears in text
+            if (label === 'Brand spoofing detected in email prefix') {
+                return { phrase: sender, ...(INDICATOR_EXPLANATIONS[label] || getExplanation(label)) };
+            }
+            return { phrase: label, ...(INDICATOR_EXPLANATIONS[label] || getExplanation(label)), isMeta: true };
+        }),
         ...keywordMatches
             .filter(k => !indicators.some(label =>
                 (INDICATOR_EXPLANATIONS[label]?.category || '') ===
                 (getExplanation(k)?.category || 'x')
             ))
-            .map(phrase => ({ phrase, ...getExplanation(phrase) }))
+            .map(phrase => ({ phrase, ...getExplanation(phrase), isMeta: false }))
     ] : [];
+
+    // Filter out literal strings of logical indicator names to prevent wasted TreeWalker cycles in the UI
+    const visualIndicators = unfilteredIndicators.filter(i => !i.isMeta);
 
     return {
         title: 'check_email_scams',
@@ -264,6 +303,28 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         },
         score
     };
+}
+
+/**
+ * Extracts the apex brand string from a complex domain.
+ * Supports bypassing common 2-segment TLDs (like .co.uk, .com.au)
+ * to prevent subdomain spoofing validation. e.g. github.notreal.com -> "notreal"
+ */
+function getBaseBrand(emailDomain) {
+    if (!emailDomain) return '';
+    const parts = emailDomain.toLowerCase().split('.');
+    if (parts.length <= 1) return emailDomain;
+    
+    const tld = parts[parts.length - 1];
+    const sld = parts[parts.length - 2];
+    
+    // Naively handle well-known two-part TLD suffixes
+    const ccTlds = ['co', 'org', 'com', 'net', 'edu', 'gov', 'ac'];
+    if (ccTlds.includes(sld) && tld.length === 2 && parts.length > 2) {
+        return parts[parts.length - 3] || sld; 
+    }
+    
+    return sld;
 }
 
 /**

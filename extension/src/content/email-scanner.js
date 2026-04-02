@@ -17,9 +17,13 @@ import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
 
 (function () {
-    // BUG-144: Prevent double-execution from manifest injection + passive executeScript injection
-    if (window.__hydraGuardEmailScannerLoaded) return;
-    window.__hydraGuardEmailScannerLoaded = true;
+    // BUG-144 + BUG-148: Prevent double-execution but allow re-initialization
+    // after extension reload/update. The old guard used a simple boolean which
+    // persisted on the page's window object, blocking NEW content scripts from
+    // running after the old script became orphaned (chrome.runtime.id = undefined).
+    const currentVersion = chrome.runtime?.getManifest?.()?.version || 'unknown';
+    if (window.__hydraGuardEmailScannerLoaded === currentVersion) return;
+    window.__hydraGuardEmailScannerLoaded = currentVersion;
 
     let currentEmailId = null;
 
@@ -57,7 +61,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
      */
     // BUG-127 & BUG-131: Retry state for lazy-loaded Gmail spam/search views
     let extractionRetryCount = 0;
-    const MAX_EXTRACTION_RETRIES = 5;
+    const MAX_EXTRACTION_RETRIES = 8;
     let retryTimer = null;
 
     async function triggerScan() {
@@ -97,16 +101,24 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
         const isLoaded = data.length > 20 || linkData.rawUrls.length > 0 || (senderInfo.email && senderInfo.email.includes('@'));
 
         if (!isLoaded) {
-            if (extractionRetryCount < MAX_EXTRACTION_RETRIES) { // Use constant 5
+            if (extractionRetryCount < MAX_EXTRACTION_RETRIES) {
                 extractionRetryCount++;
-                const delay = 800; // Fixed 800ms debounce
+                const delay = 1000; // 1s debounce — gives complex emails more render time
                 console.log(`[Hydra Guard] Email SPA transitioning — retry ${extractionRetryCount}/${MAX_EXTRACTION_RETRIES} in ${delay}ms`);
                 if (retryTimer) clearTimeout(retryTimer);
                 retryTimer = setTimeout(() => triggerScan(), delay);
                 return;
             } else {
-                console.warn('[Hydra Guard] SPA delay exhausted — pushing universal payload immediately.');
-                // We do NOT send extractionFailed. We just send whatever we have.
+                // BUG-148: After exhaustion, if we have ZERO useful data, abort rather than
+                // sending an empty payload that would cache a false SAFE result and block
+                // future legitimate email heuristic scans.
+                const hasAnyData = data.length > 0 || senderInfo.email || linkData.rawUrls.length > 0;
+                if (!hasAnyData) {
+                    console.warn('[Hydra Guard] Extraction exhausted with zero useful data — aborting scan to prevent false SAFE caching.');
+                    extractionRetryCount = 0;
+                    return;
+                }
+                console.warn('[Hydra Guard] SPA delay exhausted — pushing partial payload.');
             }
         }
 
@@ -213,11 +225,15 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                         success: true,
                         bodyReady,
                         context: {
+                            isEmailView: true,
+                            bodyText: data,
                             senderName: senderInfo.name || '',
                             senderEmail: senderInfo.email || '',
                             subject: subject,
                             headers: headers,
                             snippet: data.substring(0, 500),
+                            links: linkData.links,
+                            rawUrls: linkData.rawUrls,
                             embeddedLinks: linkData.links.map(l => l.href)
                         }
                     });

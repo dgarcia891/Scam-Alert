@@ -143,7 +143,44 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
             };
 
             let pageContent = scanOptions.pageContent || null;
-            if (!pageContent && settings.collectPageSignals) {
+            const isEmailUrl = isKnownEmailClient(url);
+            const providedPageContent = scanOptions.pageContent;
+
+            if (providedPageContent) {
+                pageContent = providedPageContent;
+            } else if (isEmailUrl) {
+                try {
+                    // Try to get context
+                    let ctxResponse = await chrome.tabs.sendMessage(tabId, { type: 'GET_EMAIL_CONTEXT' }).catch(() => null);
+                    
+                    // BUG-148: If the extension was reloaded and the content script was orphaned, inject it on demand.
+                    if (!ctxResponse) {
+                        console.warn('[Hydra Guard] Content script unresponsive. Attempting on-demand injection...');
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId },
+                                files: ['dist/assets/emailScanner.js']
+                            });
+                            // brief delay for the script to initialize
+                            await new Promise(r => setTimeout(r, 200));
+                            ctxResponse = await chrome.tabs.sendMessage(tabId, { type: 'GET_EMAIL_CONTEXT' }).catch(() => null);
+                        } catch (injErr) {
+                            console.warn('[Hydra Guard] On-demand injection failed:', injErr);
+                        }
+                    }
+
+                    if (ctxResponse && ctxResponse.success) {
+                        pageContent = ctxResponse.context;
+                        
+                        // Pass along explicit extraction failure state (BUG-131)
+                        if (ctxResponse.extractionFailed) {
+                            pageContent.extractionFailed = true;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[Hydra Guard] Page signal collection failed:', err.message);
+                }
+            } else if (!pageContent && settings.collectPageSignals) {
                 try {
                     const response = await sendMessageToTab(tabId, createMessage(MessageTypes.ANALYZE_PAGE, {}));
                     if (response?.data) pageContent = response.data;

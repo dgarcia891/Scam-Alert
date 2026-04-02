@@ -2,7 +2,7 @@ import { MessageTypes } from '../lib/messaging.js';
 import { detectContext, detectEmailMetadata } from '../lib/context-detector.js';
 import { scanUrl } from '../lib/detector.js';
 import { highlightDetections, removeHighlights } from './highlighter.js';
-import { OVERLAY_ID } from '../lib/constants.js';
+import { OVERLAY_ID, CHECK_LABELS } from '../lib/constants.js';
 export { OVERLAY_ID };
 
 
@@ -249,79 +249,135 @@ export function createOverlay(result) {
         .card {
             background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 3rem; border-radius: 1.5rem; max-width: 600px; text-align: center;
-            animation: fadeIn 0.3s ease-out;
+            animation: fadeIn 0.3s ease-out; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         }
-        h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: #fca5a5; }
-        .details { display: none; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 0.5rem; text-align: left; }
-        .details.visible { display: block; }
-        button.primary { background: #ef4444; color: white; border: none; padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; }
+        h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; color: #fca5a5; }
+        .subtitle { margin-bottom: 2rem; color: #fecaca; opacity: 0.9; }
+        .finding-item { display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.75rem; text-align: left; }
+        .finding-icon { color: #f87171; font-weight: bold; margin-top: 2px; }
+        .details-panel { 
+            display: none; background: rgba(0,0,0,0.4); border-radius: 0.75rem; 
+            margin-top: 1rem; border: 1px solid rgba(255,255,255,0.05);
+            text-align: left; overflow: hidden;
+        }
+        .details-panel.visible { display: block; }
+        .details-scroll { max-height: 250px; overflow-y: auto; padding: 1.25rem; }
+        .details-scroll::-webkit-scrollbar { width: 6px; }
+        .details-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        
+        .technical-row { margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.75rem; }
+        .technical-key { font-family: monospace; font-size: 0.75rem; color: #94a3b8; margin-bottom: 2px; }
+        .technical-val { font-size: 0.85rem; color: #e2e8f0; line-height: 1.4; }
+
+        .btn-toggle {
+            background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; margin-top: 1.5rem;
+        }
+        .btn-toggle:hover { background: rgba(255,255,255,0.1); color: #cbd5e1; }
+        
+        button.primary { 
+            background: #ef4444; color: white; border: none; padding: 1.15rem 2.5rem; 
+            border-radius: 0.75rem; font-size: 1.1rem; font-weight: 700; cursor: pointer;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4); transition: transform 0.1s;
+        }
+        button.primary:active { transform: translateY(1px); }
+        
+        .footer-links { display: flex; justify-content: center; gap: 2rem; margin-top: 2rem; }
+        .footer-link { background: none; border: none; color: #94a3b8; text-decoration: underline; cursor: pointer; font-size: 0.85rem; }
+        .footer-link:hover { color: #cbd5e1; }
+
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     `;
     shadow.appendChild(style);
 
     const wrapper = document.createElement('div');
     wrapper.className = 'card';
-    const findings = Object.values(result?.checks || {}).filter(c => c.flagged)
-        .map(c => `<li><strong>${c.title}:</strong> ${c.details || c.description}</li>`).join('');
+    
+    // Helper to get friendly labels
+    const getFriendlyLabel = (key) => {
+        if (CHECK_LABELS[key]) return CHECK_LABELS[key];
+        // Title Case Fallback: check_suspicious_keywords -> Suspicious Keywords
+        return key.replace(/^(check_|analyze_)/, '').split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    const flaggedChecks = Object.entries(result?.checks || {}).filter(([, c]) => c.flagged);
+    
+    const summaryList = flaggedChecks.map(([key]) => `
+        <div class="finding-item">
+            <span class="finding-icon">✕</span>
+            <div style="font-weight: 600; font-size: 1rem;">${getFriendlyLabel(key)}</div>
+        </div>
+    `).join('');
+
+    const technicalLog = flaggedChecks.map(([key, c]) => `
+        <div class="technical-row">
+            <div class="technical-key">${key}</div>
+            <div class="technical-val">${c.details || c.description || 'No detail provided.'}</div>
+        </div>
+    `).join('');
 
     wrapper.innerHTML = `
-        <h1 style="margin:0">High Risk Detected</h1>
-        <p>We recommend leaving this page immediately.</p>
-        <div id="btn-reason" style="background:rgba(220,38,38,0.2); border:1px solid #dc2626; padding:1rem; border-radius:0.5rem; margin-bottom:1rem; cursor:pointer;">
-            Reason: <strong>${result?.recommendations?.[0] || result?.reasons?.[0]?.message || 'Suspicious Activity'}</strong>
+        <h1>High Risk Detected</h1>
+        <p class="subtitle">We recommend leaving this page immediately.</p>
+        
+        <div style="margin-bottom: 2rem;">
+            ${summaryList}
         </div>
-        <div id="pnl-details" class="details"><ul>${findings}</ul></div>
-        <div style="display:flex; flex-direction:column; gap:1rem; margin-top:2rem;">
-            <button class="primary" id="btn-back">Go back to safety</button>
-            <div style="display:flex; justify-content:center; gap:1.5rem;">
-                <button style="background:none; border:none; color:#9ca3af; text-decoration:underline; cursor:pointer;" id="btn-proceed">I understand the risks, proceed anyway</button>
-                <button style="background:none; border:none; color:#9ca3af; text-decoration:underline; cursor:pointer;" id="btn-whitelist">Trust this site (Mark as safe)</button>
+
+        <button class="primary" id="btn-back">Go back to safety</button>
+
+        <button class="btn-toggle" id="btn-toggle-log">Show Diagnostic Log</button>
+        
+        <div id="pnl-details" class="details-panel">
+            <div class="details-scroll">
+                <div style="font-size: 0.75rem; font-weight: 800; color: #fca5a5; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">
+                    Diagnostic Log (Advanced)
+                </div>
+                ${technicalLog}
             </div>
+        </div>
+
+        <div class="footer-links">
+            <button class="footer-link" id="btn-proceed">I understand the risks, proceed anyway</button>
+            <button class="footer-link" id="btn-whitelist">Trust this site</button>
         </div>
     `;
     shadow.appendChild(wrapper);
 
-    shadow.getElementById('btn-reason').onclick = () => shadow.getElementById('pnl-details').classList.toggle('visible');
+    shadow.getElementById('btn-toggle-log').onclick = (e) => {
+        const pnl = shadow.getElementById('pnl-details');
+        const btn = e.target;
+        const isVisible = pnl.classList.toggle('visible');
+        btn.textContent = isVisible ? 'Hide Diagnostic Log' : 'Show Diagnostic Log';
+        if (isVisible) pnl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
     const originalUrl = window.location.href;
     shadow.getElementById('btn-back').onclick = async () => {
         container.remove();
         chrome.runtime.sendMessage({ type: MessageTypes.NAVIGATE_BACK });
         window.history.back();
-        // Fallback: if we're still on the same suspicious page after 500ms, go to about:blank
         setTimeout(() => {
             try {
                 if (window.location.href === originalUrl && window.location.href !== 'about:blank') {
                     window.location.href = 'about:blank';
                 }
-            } catch (e) {
-                // Ignore cross-origin errors
-            }
+            } catch (e) { }
         }, 500);
     };
-    shadow.getElementById('btn-proceed').onclick = () => {
+
+    const cleanupAndDismiss = () => {
         container.remove();
         warningAcknowledged = true;
-        try {
-            window.sessionStorage.setItem('hydra_guard_suppressed', 'true');
-        } catch (e) {
-            // Ignore Storage access errors
-        }
+        try { window.sessionStorage.setItem('hydra_guard_suppressed', 'true'); } catch (e) { }
         _applyHighlightsIfEnabled(result);
     };
+
+    shadow.getElementById('btn-proceed').onclick = cleanupAndDismiss;
     shadow.getElementById('btn-whitelist').onclick = () => {
-        const domain = window.location.hostname;
-        chrome.runtime.sendMessage({ 
-            type: MessageTypes.ADD_TO_WHITELIST, 
-            data: { domain } 
-        });
-        container.remove();
-        warningAcknowledged = true;
-        try {
-            window.sessionStorage.setItem('hydra_guard_suppressed', 'true');
-        } catch (e) {
-            // Ignore Storage access errors
-        }
-        _applyHighlightsIfEnabled(result);
+        chrome.runtime.sendMessage({ type: MessageTypes.ADD_TO_WHITELIST, data: { domain: window.location.hostname } });
+        cleanupAndDismiss();
     };
 
     container.onclick = (e) => e.stopPropagation();

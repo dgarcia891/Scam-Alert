@@ -214,6 +214,58 @@ export const PHRASE_EXPLANATIONS = {
     'review this document': {
         category: 'Social Lure',
         reason: 'Fake document review requests are widely used to steal login credentials.'
+    },
+
+    // ── Account Security / Authenticator Lure ─────────────────────────────────
+    'verify your identity': {
+        category: 'Account Security Lure',
+        reason: 'Legitimate services rarely ask you to "verify your identity" via email. This phrasing is commonly used in phishing to steal login credentials.'
+    },
+    'verify your account': {
+        category: 'Account Security Lure',
+        reason: 'Requests to "verify your account" via email are a hallmark of credential phishing. Real companies use in-app verification flows.'
+    },
+    'confirm your identity': {
+        category: 'Account Security Lure', 
+        reason: 'Identity confirmation requests via email are typically phishing attempts designed to harvest personal information.'
+    },
+    'verification code': {
+        category: 'Account Security Lure',
+        reason: 'While real services send verification codes, scammers impersonate them to intercept or phish for these codes.'
+    },
+    'account locked': {
+        category: 'Account Security Lure',
+        reason: '"Account locked" notifications are a common phishing pressure tactic designed to make you click urgently.'
+    },
+    'account suspended': {
+        category: 'Account Security Lure',
+        reason: '"Account suspended" alerts create panic — scammers use this fear to drive you to fake login pages.'
+    },
+
+    // Extracted individual words for Highlighting (Context-aware tooltips)
+    'verify': {
+        category: 'Account Security Detail',
+        reason: 'Flagged because it appears alongside other security-related language in this email — a pattern consistent with credential phishing.'
+    },
+    'identity': {
+        category: 'Account Security Detail',
+        reason: 'Flagged because it appears alongside other security-related language in this email — a pattern consistent with credential phishing.'
+    },
+    'account': {
+        category: 'Account Security Detail',
+        reason: 'Flagged because it appears alongside other security-related language in this email — a pattern consistent with credential phishing.'
+    },
+    'verification': {
+        category: 'Account Security Detail',
+        reason: 'Flagged because it appears alongside other security-related language in this email — a pattern consistent with credential phishing.'
+    },
+    'locked': {
+        category: 'Account Security Detail',
+        reason: 'Flagged because it appears alongside other security-related language in this email — a pattern consistent with credential phishing.'
+    },
+    'suspended': {
+        category: 'Account Security Detail',
+        reason: 'Flagged because it appears alongside other security-related language in this email — a pattern consistent with credential phishing.'
     }
 };
 
@@ -230,6 +282,14 @@ export const INDICATOR_EXPLANATIONS = {
         category: 'Impersonation',
         reason: 'This email claims to be from an official or authority figure but was sent from a free personal account — a classic impersonation tactic.'
     },
+    'Brand spoofing detected in email prefix': {
+        category: 'Sender Spoofing',
+        reason: 'The sender\'s email address hides a well-known brand name in the prefix (before the @) while using a completely different domain. This is a deliberate spoofing tactic — the real sender is NOT affiliated with the brand they are impersonating.'
+    },
+    'Sender display name does not match email address': {
+        category: 'Impersonation',
+        reason: 'The sender\'s actual email address does not match the company or person they claim to be in their display name.'
+    },
     'Suspicious financial request': {
         category: 'Financial Fraud',
         reason: 'Multiple financial keywords detected. This pattern is consistent with invoice fraud and business email compromise (BEC).'
@@ -245,6 +305,10 @@ export const INDICATOR_EXPLANATIONS = {
     'Multi-domain redirect chain link': {
         category: 'Link Obfuscation',
         reason: 'This link contains multiple @ symbols and chained domain segments designed to hide the real destination — a strong phishing signal.'
+    },
+    'Account security or payment lure': {
+        category: 'Account Security Lure',
+        reason: 'This email contains multiple account-security phrases typically used in phishing attacks to pressure you into revealing credentials or payment information.'
     }
 };
 

@@ -64,17 +64,36 @@ export function checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent = null
         dataChecked += ` | Page: ...${foundInPage.join(', ')}...`;
     }
 
+    // BUG-148: Build pattern-aware details and matches instead of word lists.
+    // Before: details = "Suspicious keywords: verify, secure, account"
+    //         matches = ["verify", "secure", "account"] (each gets its own tooltip)
+    // After:  details = "Found 3 phishing-related keywords together: verify, secure, account"
+    //         matches = ["verify + secure + account"] (one combined tooltip)
+    let details;
+    if (flagged) {
+        details = `Found ${found.length} phishing-related keywords together in this page: ${found.join(', ')}. This combination is commonly used in credential-theft and phishing attacks.`;
+    } else if (found.length > 0) {
+        details = `Found ${found.length} keyword${found.length > 1 ? 's' : ''} (${found.join(', ')}), but not enough to indicate a threat.`;
+    } else {
+        details = 'No suspicious keywords detected.';
+    }
+
+    // Combine matches into a single entry so only one highlight/tooltip appears
+    const combinedMatches = flagged && found.length > 0
+        ? [found.join(' + ')]
+        : [];
+
     return {
         title: 'check_suspicious_keywords',
         description: 'Scans the URL and page for high-risk words used in phishing attacks.',
         flagged,
         severity: flagged ? 'MEDIUM' : 'NONE',
-        details: flagged ? `Suspicious keywords: ${found.join(', ')}` : (found.length > 0 ? `Found keywords: ${found.join(', ')}` : 'No suspicious keywords'),
+        details,
         keywords: found,
         keywordReasons,
         reasonSummary,
         dataChecked,
-        matches: found,
+        matches: combinedMatches,
         score: flagged ? found.length * 5 : 0
     };
 }
