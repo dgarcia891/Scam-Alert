@@ -162,27 +162,42 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
     }
 
     // 4.5 Embedded Link URL Checks (NEW)
+    const linkTriggers = {
+        port: false,
+        obfuscated: false,
+        tld: false,
+        ip: false,
+        redirect: false
+    };
+
     for (const link of externalLinks) {
-        if (checkSuspiciousPort(link).flagged) {
+        if (!linkTriggers.port && checkSuspiciousPort(link).flagged) {
             indicators.push('Suspicious port in embedded link');
             score += 25;
+            linkTriggers.port = true;
         }
-        if (checkUrlObfuscation(link).flagged) {
+        if (!linkTriggers.obfuscated && checkUrlObfuscation(link).flagged) {
             indicators.push('Obfuscated embedded link');
             score += 20;
+            linkTriggers.obfuscated = true;
         }
-        if (checkSuspiciousTLD(link).flagged) {
+        if (!linkTriggers.tld && checkSuspiciousTLD(link).flagged) {
             indicators.push('Suspicious TLD in embedded link');
             score += 20;
+            linkTriggers.tld = true;
         }
-        if (checkIPAddress(link).flagged) {
+        if (!linkTriggers.ip && checkIPAddress(link).flagged) {
             indicators.push('IP address used instead of domain in link');
             score += 25;
+            linkTriggers.ip = true;
         }
-        const redirectCheck = checkRedirectChain(link);
-        if (redirectCheck.flagged) {
-            indicators.push('Multi-domain redirect chain link');
-            score += redirectCheck.score;
+        if (!linkTriggers.redirect) {
+            const redirectCheck = checkRedirectChain(link);
+            if (redirectCheck.flagged) {
+                indicators.push('Multi-domain redirect chain link');
+                score += redirectCheck.score;
+                linkTriggers.redirect = true;
+            }
         }
     }
 
