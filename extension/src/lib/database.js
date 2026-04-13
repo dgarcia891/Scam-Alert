@@ -190,6 +190,11 @@ export async function getMergedEmailKeywords() {
         authorityPressureSignals: remotePatterns
             .filter(p => p.category === 'authority_pressure')
             .map(p => p.phrase),
+        // Security alert keywords (DB patterns in 'securityKeywords' category)
+        // These map to the email-heuristics.js "Account security or payment lure" check
+        securityKeywords: remotePatterns
+            .filter(p => p.category === 'securityKeywords')
+            .map(p => p.phrase),
     };
 }
 

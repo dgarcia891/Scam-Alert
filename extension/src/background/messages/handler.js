@@ -109,7 +109,8 @@ async function handleAddToWhitelist(data, addToWhitelist, submitSafeListAppeal) 
     // 1. Add to local whitelist for immediate effect
     await addToWhitelist(identity);
     
-    // 2. Dispatch appeal to global safe list queue
+    // 2. BUG-152: Dispatch appeal to global safe list queue (awaited for sync status)
+    let backendSynced = false;
     if (submitSafeListAppeal) {
         try {
             const encoder = new TextEncoder();
@@ -118,16 +119,17 @@ async function handleAddToWhitelist(data, addToWhitelist, submitSafeListAppeal) 
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             const urlHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             
-            // Fire and forget (don't block the UI)
-            submitSafeListAppeal(urlHash, data.domain).catch(e => console.warn('[Hydra Guard] Silent appeal failure:', e));
+            const appealResult = await submitSafeListAppeal(urlHash, data.domain);
+            backendSynced = !!(appealResult?.success);
         } catch (e) {
-            console.warn('[Hydra Guard] Failed to hash domain for appeal:', e);
+            console.warn('[Hydra Guard] Safe appeal backend sync failed:', e.message || e);
+            backendSynced = false;
         }
     }
 
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (activeTab) chrome.action.setBadgeText({ tabId: activeTab.id, text: '' });
-    return { success: true };
+    return { success: true, backendSynced };
 }
 
 async function handleResetStats(repairStatistics) {
@@ -242,8 +244,9 @@ async function handleForceRescan(sender, msgData, scanAndHandle, tabStateManager
                     files: ['dist/assets/emailScanner.js']
                 });
                 console.log('[Hydra Guard] FORCE_RESCAN: Re-injected emailScanner.js');
-                // Give the freshly injected script time to initialize
-                await new Promise(r => setTimeout(r, 1500));
+                // BUG-160: Give the freshly injected script more time to initialize AND
+                // for Gmail to finish rendering the email DOM. 1500ms was insufficient.
+                await new Promise(r => setTimeout(r, 2500));
             } catch (injectErr) {
                 console.warn('[Hydra Guard] FORCE_RESCAN: Content script injection failed:', injectErr.message);
             }
@@ -252,7 +255,7 @@ async function handleForceRescan(sender, msgData, scanAndHandle, tabStateManager
                 const response = await fetchEmailContextWithRetry(tab.id);
                 if (response?.context) {
                     scanOptions.pageContent = {
-                        bodyText: response.context.snippet || '',
+                        bodyText: response.context.bodyText || response.context.snippet || '',
                         isEmailView: true,
                         senderName: response.context.senderName || '',
                         senderEmail: response.context.senderEmail || '',
@@ -331,11 +334,11 @@ async function handleTestPhishTankKey(msgData) {
  * @param {number} [maxAttempts=3]
  * @returns {Promise<{context: object, bodyReady: boolean, success: boolean}|null>} Enriched context or null if exhausted.
  */
-async function fetchEmailContextWithRetry(tabId, maxAttempts = 3) {
+async function fetchEmailContextWithRetry(tabId, maxAttempts = 5) {
     let lastSuccessRes = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const delay = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, 2000ms
-        const timeoutPromise = new Promise(r => setTimeout(r, 2000, { success: false, error: 'timeout' }));
+        const delay = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, 2000ms, 4000ms, 8000ms
+        const timeoutPromise = new Promise(r => setTimeout(r, 3000, { success: false, error: 'timeout' }));
         const fetchPromise = sendMessageToTab(tabId, { type: 'GET_EMAIL_CONTEXT' })
             .then(r => r || { success: false })
             .catch(e => ({ success: false, error: e.message }));
@@ -346,8 +349,9 @@ async function fetchEmailContextWithRetry(tabId, maxAttempts = 3) {
         if (res?.success && res.context) {
             lastSuccessRes = res;
             
-            // Universal Extractor payload acceptance check
-            if ((res.context.snippet?.length ?? 0) > 20 || res.context.subject || res.context.senderEmail) {
+            // BUG-160: Check bodyText (full body) in addition to snippet (500-char truncation)
+            const hasBody = (res.context.bodyText?.length ?? 0) > 20 || (res.context.snippet?.length ?? 0) > 20;
+            if (hasBody || res.context.subject || res.context.senderEmail) {
                 return res; 
             }
         }

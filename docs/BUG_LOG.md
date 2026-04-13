@@ -84,7 +84,12 @@
 | BUG-145 | CLOSED | Critical | Missing Email Extractors Trigger Premature Target Timeout | Added `<area>` support, decoupled `isLoaded` from text length, and added structural fallbacks. |
 | BUG-146 | CLOSED | High | [Hydra Guard] Infinite Loading on Email Scans | Fixed `ReferenceError` in `popup.jsx` and added `finally` block in `service-worker.js` to guarantee `scanInProgress` reset. |
 | BUG-147 | CLOSED | High | "Analyzing Safety" UI hang on extraction failure | Implemented visibility-aware `querySelectorAll` reverse-iteration and deterministic `finally` broadcast in `service-worker.js`. |
-| BUG-148 | CLOSED | Critical | "Service worker registration failed. Status code: 15" with "Unexpected token 'export'" | Replaced dynamic `import()` calls with static imports in `ai-handler.js` and `threat-telemetry.js` to prevent Vite/Rollup from chunking the service worker entry point and injecting `export` statements. |
+| BUG-148 | CLOSED | High | "Service worker registration failed. Status code: 15" with "Unexpected token 'export'" | Replaced dynamic `import()` calls with static imports in `ai-handler.js` and `threat-telemetry.js` to prevent Vite/Rollup from chunking the service worker entry point and injecting `export` statements. |
+| BUG-150 | CLOSED | High | False positive "High Risk" on enterprise emails (Workday) | Reduced "display name mismatch" heuristic weight from +35 to +15. |
+| BUG-151 | CLOSED | High | Missing interstitial warning during email navigation | Routed `SHOW_WARNING` signals to native email dashboard and muted web-page overlay on email clients. |
+| BUG-152 | CLOSED | High | "Mark as Safe" feedback fails silently | Awaited backend appeal sync in `handler.js` and updated UI to show local/sync status. |
+| BUG-160 | CLOSED | High | Direct Supabase DB writes from client (Security Risk) | Refactored reporting logic to use `sa-report-user` Edge Function. Removes direct DB dependency. |
+| BUG-161 | CLOSED | High | Gmail Mutation Observer double-injection & instability | Hardened observer in SPA views and added logic to prevent badge duplication. |
 
 ## BUG-139: "Analyzing with AI..." Spinner Stuck Permanently
 **Date:** 2026-03-30

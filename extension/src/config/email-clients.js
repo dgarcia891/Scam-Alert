@@ -33,7 +33,7 @@ export const EMAIL_CLIENTS = [
         urlPatterns: ['mail.google.com'],
         urlRegex: /mail\.google\.com/,
         readingViewHash: /^#(?:inbox|spam|all|sent|trash|category\/\w+|label\/[^\/]+)\/[-_=+%a-zA-Z0-9]+/,
-        readingViewSelectors: ['h2.hP', '[data-legacy-thread-id]', '.ade', '.bzB'], // Structural headers: subject line, reply toolbar, header row
+        readingViewSelectors: ['h2.hP', '.ade', '.bzB'], // Structural headers: subject line, reply toolbar, header row
         titlePatterns: [],
         selectors: {
             container: 'div[role="main"], .nH',

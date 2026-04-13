@@ -429,6 +429,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ success: true });
             break;
         case MessageTypes.SHOW_WARNING:
+            // BUG-151: On email clients, email-scanner.js handles its own native
+            // dashboard UI. The web-page overlay (createOverlay) doesn't render
+            // correctly in Gmail/Outlook, so we recuse and let email-scanner handle it.
+            if (detectContext().type === 'email') {
+                sendResponse({ success: true, deferred: 'email-scanner' });
+                break;
+            }
             currentScanResult = result;
             if (!warningAcknowledged) {
                 createOverlay(result);
@@ -437,6 +444,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse({ success: true });
             break;
         case MessageTypes.SHOW_BANNER:
+            // BUG-151: Same recusal for banners on email clients
+            if (detectContext().type === 'email') {
+                sendResponse({ success: true, deferred: 'email-scanner' });
+                break;
+            }
             showTopBanner(result);
             sendResponse({ success: true });
             break;

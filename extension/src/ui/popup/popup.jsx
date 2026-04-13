@@ -914,7 +914,13 @@ const AskAIButton = ({ settings, currentUrl, currentTabId, aiAsking, setAiAsking
                                         metadata.senderEmail = scanResults?.metadata?.senderEmail;
                                     }
                                     if (submitOptions.subject) metadata.subject = scanResults?.metadata?.subject;
-                                    if (submitOptions.body) metadata.bodyText = scanResults?.metadata?.bodySnippet || scanResults?.metadata?.body_text;
+                                    // FIX: submitUserReport expects body_text (snake_case), not bodyText
+                                    if (submitOptions.body) metadata.body_text = scanResults?.metadata?.bodySnippet || scanResults?.metadata?.body_text;
+                                    // Pass indicators so AI knows which heuristics fired
+                                    metadata.indicators = scanResults?.report?.indicators
+                                        || scanResults?.checks?.emailScam?.indicators
+                                        || [];
+                                    metadata.severity = scanResults?.overallSeverity || 'UNKNOWN';
                                     
                                     chrome.runtime.sendMessage({
                                         type: MessageTypes.REPORT_SCAM,
@@ -1053,14 +1059,15 @@ const Popup = () => {
                         const unwrappedRes = (res && res.result && typeof res.result === 'object') ? res.result : res;
                         
                         setScanResults(unwrappedRes);
-                        const newStatus = deriveStatusFromResults(unwrappedRes, scanInProgress, currentUrl);
+                        const newStatus = deriveStatusFromResults(unwrappedRes, scanInProgress, url);
                         setStatus(newStatus);
                         if (unwrappedRes?.whitelisted) setIsWhitelisted(true);
                         
-                        // BUG-131: Auto-rescan if extraction failed but popup was opened
+                        // BUG-131: Auto-rescan if extraction failed but popup was opened.
+                        // Uses tab.id (local) not currentTabId (stale React state) — fix for stale closure.
                         if (newStatus === 'unknown') {
                             setIsRescanning(true);
-                            chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: currentTabId, forceRefresh: true } }, () => {
+                            chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: tab.id, forceRefresh: true } }, () => {
                                 setTimeout(() => setIsRescanning(false), 8000);
                             });
                         }
@@ -1068,7 +1075,8 @@ const Popup = () => {
                         // Truly no results and not scanning -> show empty and trigger auto-scan
                         setStatus('empty');
                         setIsRescanning(true);
-                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: currentTabId, forceRefresh: true } }, () => {
+                        // Uses tab.id (local) not currentTabId (stale React state) — fix for stale closure.
+                        chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: tab.id, forceRefresh: true } }, () => {
                             setTimeout(() => setIsRescanning(false), 8000);
                         });
                     }
@@ -1092,7 +1100,8 @@ const Popup = () => {
         };
         chrome.runtime.onMessage.addListener(handleScanUpdate);
         return () => chrome.runtime.onMessage.removeListener(handleScanUpdate);
-    }, []);
+    // currentUrl dep: re-bind listener after URL is set so deriveStatusFromResults gets the real URL
+    }, [currentUrl]);
 
     const handleGoBack = async () => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

@@ -13,7 +13,10 @@ const DASHBOARD_ID = 'hydra-guard-threat-dashboard';
 // 5 seconds is long enough for the cascade to settle.
 let dismissCooldownUntil = 0;
 
-export function setupEmailObserver(triggerScan) {
+// BUG-NEW: Accept an optional isReadingView guard callback.
+// When provided, the observer will only call triggerScan() if the user
+// actually has an email open (not just browsing the inbox list).
+export function setupEmailObserver(triggerScan, isReadingView) {
     let scanThrottleTimeout = null;
     let dashboardWasPresent = false;
 
@@ -43,6 +46,20 @@ export function setupEmailObserver(triggerScan) {
 
         if (scanThrottleTimeout) clearTimeout(scanThrottleTimeout);
         scanThrottleTimeout = setTimeout(() => {
+            // BUG-NEW: Only fire triggerScan when an individual email is open.
+            // Without this guard, any DOM mutation in the Gmail inbox (new emails
+            // loading, scrolling, search results) triggers a full scan on the list
+            // view, causing false-positive "Sender mismatch" alerts to appear.
+            // try/catch is mandatory: an uncaught error inside a MutationObserver
+            // callback permanently kills the observer for the tab's lifetime.
+            try {
+                if (isReadingView && !isReadingView()) {
+                    console.log('[Hydra Guard] Observer fired but not in email reading view — scan skipped');
+                    return;
+                }
+            } catch (guardErr) {
+                console.warn('[Hydra Guard] isReadingView check threw — allowing scan (fail-open):', guardErr);
+            }
             triggerScan();
         }, 1000);
     });

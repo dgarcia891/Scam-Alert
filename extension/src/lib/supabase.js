@@ -228,16 +228,21 @@ export async function submitReport(url, type, description = '', metadata = {}) {
 }
 
 /**
- * @deprecated Use submitCorrection() instead.
+ * Report a False Positive to the global community reputation block.
+ * @param {Object} payload 
  */
 export async function submitFalsePositive(payload) {
-    console.warn('[Hydra Guard] submitFalsePositive() is deprecated. Use submitCorrection() instead.');
     try {
         const { url, phrase, explanation } = payload;
-        const urlHash = await hashUrl(url || '');
-        return await submitCorrection(urlHash, 'false_positive', {
-            userComment: explanation || phrase || '',
+        const result = await postEdgeFunction('sa-report-user', {
+            url: url || 'unknown://',
+            report_type: 'false_positive',
+            report_direction: 'false_positive',
+            description: explanation || '',
+            user_notes: phrase || '',
+            extension_version: chrome.runtime.getManifest().version,
         });
+        return { success: true, id: result?.id };
     } catch (error) {
         console.error('[Hydra Guard] Failed to submit false positive:', error);
         return { success: false, error: error.message };

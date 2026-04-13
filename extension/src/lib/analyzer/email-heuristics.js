@@ -114,12 +114,17 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
             } else if (!matchesApexDomain) {
                 mismatchScoreAdded = true;
                 indicators.push('Sender display name does not match email address');
-                score += 35; 
+                score += 15; // BUG-150: Reduced from 35. Mismatch alone is common in enterprise
+                             // systems (Workday, Jira, Notion). Requires a second indicator to reach HIGH.
             }
         }
     }
 
-    // 4. Intent-Link Mismatch Detection (FEAT-094)
+    // BUG-161: Intent-Link Mismatch Detection (FEAT-094)
+    // The sender's own domain ALWAYS constitutes a legitimate link destination.
+    // Extract it once so all checks below can reference it.
+    const senderApexDomain = emailDomain ? emailDomain.split('.').slice(-2).join('.') : '';
+
     const emailSubject = (pageContent.subject || '').toLowerCase();
     const fullText = (emailSubject + ' ' + emailBody);
     const intentKeywords = {
@@ -128,7 +133,9 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'apple': ['apple', 'icloud', 'itunes', 'app store', 'mac', 'iphone'],
         'amazon': ['amazon', 'prime', 'aws', 'kindle'],
         'netflix': ['netflix', 'subscription', 'streaming'],
-        'banking': ['bank', 'chase', 'wellsfargo', 'bofa', 'capital one', 'visa', 'mastercard', 'payment']
+        // BUG-161: 'payment' alone is far too generic — it matches every fintech/bank
+        // transactional email. Require more specific banking impersonation keywords.
+        'banking': ['bank account', 'wire transfer', 'routing number', 'account number', 'ach transfer']
     };
 
     // BUG-149: Deduplicate at source. rawUrls is the .href projection of links,
@@ -150,9 +157,11 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
             for (const link of externalLinks) {
                 try {
                     const hostname = new URL(link).hostname.toLowerCase();
+                    // BUG-161: The sender's own apex domain is always legitimate
+                    const isSenderDomain = senderApexDomain && hostname.endsWith(senderApexDomain);
                     // If intent is brand but link is NOT brand
                     const isLegit = isBrandLink(hostname, brand);
-                    if (!isLegit && !isWhitelistedBrand(hostname)) {
+                    if (!isLegit && !isSenderDomain && !isWhitelistedBrand(hostname)) {
                         mismatchFound = true;
                         break;
                     }
@@ -364,10 +373,26 @@ function isBrandLink(hostname, brand) {
 }
 
 /**
- * Helper: Sites that are common redirectors or high-trust but not brand specific
+ * Helper: Sites that are common redirectors or high-trust but not brand specific.
+ * BUG-161: Expanded to include major social platforms and financial services
+ * commonly linked in legitimate marketing and transactional emails.
  */
 function isWhitelistedBrand(hostname) {
-    const whitelist = ['google.com', 'microsoft.com', 'apple.com', 'amazon.com', 'dropbox.com', 'box.com'];
+    const whitelist = [
+        // Big tech
+        'google.com', 'microsoft.com', 'apple.com', 'amazon.com',
+        // Storage/collab
+        'dropbox.com', 'box.com',
+        // Social platforms — commonly present in email footers (share buttons, social links)
+        'facebook.com', 'twitter.com', 'x.com', 'instagram.com', 'linkedin.com',
+        'youtube.com', 'tiktok.com', 'pinterest.com', 'snapchat.com',
+        // Financial / commerce — legitimate transactional email senders
+        'paypal.com', 'stripe.com', 'squareup.com', 'shopify.com',
+        // Email infrastructure / legal
+        'unsubscribe.com', 'list-unsubscribe.com',
+        // CDN / email delivery (common in HTML emails)
+        'sendgrid.net', 'mailchimp.com', 'klaviyo.com', 'constantcontact.com'
+    ];
     return whitelist.some(d => hostname === d || hostname.endsWith('.' + d));
 }
 

@@ -17,12 +17,26 @@ import { runHeuristics } from '../lib/scanner/heuristics.js';
 import { setupLinkInterceptor } from './email/link-interceptor.js';
 
 (function () {
-    // BUG-144 + BUG-148: Prevent double-execution but allow re-initialization
-    // after extension reload/update. The old guard used a simple boolean which
-    // persisted on the page's window object, blocking NEW content scripts from
-    // running after the old script became orphaned (chrome.runtime.id = undefined).
+    // BUG-144 + BUG-148 + BUG-160: Prevent double-execution but allow re-initialization
+    // after extension reload/update. Version-only guard is not enough: after a reload,
+    // an orphaned script (chrome.runtime.id = undefined) keeps the guard flag set but
+    // can no longer handle messages. The new injection would see the same version and
+    // exit early, leaving the tab with zero functional listeners.
+    // Fix: If a guard is set but the runtime is no longer live, clear it first.
     const currentVersion = chrome.runtime?.getManifest?.()?.version || 'unknown';
-    if (window.__hydraGuardEmailScannerLoaded === currentVersion) return;
+    const isAlreadyLoaded = window.__hydraGuardEmailScannerLoaded === currentVersion;
+    if (isAlreadyLoaded) {
+        // The guard is set for this version. Check if the existing instance is still
+        // connected to the extension runtime. chrome.runtime.id is undefined in orphaned scripts.
+        const existingInstanceAlive = !!(chrome.runtime?.id);
+        if (existingInstanceAlive) {
+            // A live, same-version instance is running — do not double-initialize.
+            console.log('[Hydra Guard] emailScanner already live at v' + currentVersion + '. Skipping re-init.');
+            return;
+        }
+        // Orphaned instance detected — clear the guard so this fresh injection can take over.
+        console.log('[Hydra Guard] Orphaned emailScanner detected (runtime.id missing). Clearing guard and re-initializing.');
+    }
     window.__hydraGuardEmailScannerLoaded = currentVersion;
 
     let currentEmailId = null;
@@ -109,16 +123,16 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                 retryTimer = setTimeout(() => triggerScan(), delay);
                 return;
             } else {
-                // BUG-148: After exhaustion, if we have ZERO useful data, abort rather than
-                // sending an empty payload that would cache a false SAFE result and block
-                // future legitimate email heuristic scans.
+                // BUG-148: After exhaustion, if we have ZERO useful data, we MUST push the payload anyway.
+                // A silent abort leaves the background SW hanging in scanning state, which when suspended
+                // results in a persistent UI 'NO SCAN' bug. The backend's Empty Payload Safeguard catches
+                // this safely and sets status to UNKNOWN instead of SAFE.
                 const hasAnyData = data.length > 0 || senderInfo.email || linkData.rawUrls.length > 0;
                 if (!hasAnyData) {
-                    console.warn('[Hydra Guard] Extraction exhausted with zero useful data — aborting scan to prevent false SAFE caching.');
-                    extractionRetryCount = 0;
-                    return;
+                    console.warn('[Hydra Guard] Extraction exhausted with zero useful data — pushing empty payload to resolve UI state.');
+                } else {
+                    console.warn('[Hydra Guard] SPA delay exhausted — pushing partial payload.');
                 }
-                console.warn('[Hydra Guard] SPA delay exhausted — pushing partial payload.');
             }
         }
 
@@ -147,22 +161,52 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                     rawUrls: linkData.rawUrls
                 }
             }
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.warn('[Hydra Guard] SCAN_CURRENT_TAB failed:', chrome.runtime.lastError.message, '— retrying once in 1s');
+                // BUG-153: Single retry after 1s — gives the SW time to wake up
+                setTimeout(() => {
+                    if (!chrome.runtime?.id) return;
+                    chrome.runtime.sendMessage({
+                        type: MessageTypes.SCAN_CURRENT_TAB,
+                        data: {
+                            forceRefresh: true,
+                            pageContent: {
+                                bodyText: data,
+                                isEmailView: true,
+                                senderName: senderInfo.name,
+                                senderEmail: senderInfo.email,
+                                subject,
+                                headers,
+                                links: linkData.links,
+                                rawUrls: linkData.rawUrls
+                            }
+                        }
+                    }, (retryResponse) => {
+                        if (chrome.runtime.lastError) {
+                            console.error('[Hydra Guard] SCAN_CURRENT_TAB retry also failed:', chrome.runtime.lastError.message);
+                        } else {
+                            console.log('[Hydra Guard] SCAN_CURRENT_TAB retry succeeded');
+                        }
+                    });
+                }, 1000);
+            }
         });
     }
 
-    // Initialize DOM Observer
-    setupEmailObserver(triggerScan);
-
-    // BUG-132: Check if we appear to be in an email "reading" view
-    // before firing the initial scan, otherwise the premature scan exhausts
-    // all retries against the inbox list.
-    // BUG-136: Expanded to cover Gmail spam/search/trash reading panes (.adn.ads)
-    // and URL hash-based detection for direct navigation to foldered emails.
+    // BUG-132: Determines if an email reading view is currently active.
+    // Declared here (above setupEmailObserver) so the reference is valid
+    // when passed as a guard callback to the MutationObserver. (BUG-NEW)
     function isEmailReadingView() {
         // Now provider-agnostic via centralized config
         const client = getMatchingClient(location.href, document.title);
         return isEmailReadingViewForClient(client);
     }
+
+    // Initialize DOM Observer
+    // BUG-NEW: Pass isEmailReadingView so the observer only calls triggerScan
+    // when the user actually has an email open — not when browsing the inbox list.
+    setupEmailObserver(triggerScan, isEmailReadingView);
 
 
     // BUG-127 & BUG-132: Fire an initial scan after a short delay.
@@ -245,6 +289,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
 
             case MessageTypes.SCAN_RESULT:
             case MessageTypes.SCAN_RESULT_UPDATED:
+            case MessageTypes.SHOW_WARNING: // BUG-151: Background sends SHOW_WARNING for HIGH/CRITICAL
                 if (message.data?.result) {
                     const result = message.data.result;
                     if (result.overallThreat || result.overallSeverity !== 'SAFE') {

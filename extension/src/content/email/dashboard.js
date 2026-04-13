@@ -516,7 +516,7 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                                     if (key === 'senderName') selectedData.senderName = emailData.senderName;
                                     if (key === 'senderEmail') selectedData.senderEmail = emailData.senderEmail;
                                     if (key === 'subject') selectedData.subject = emailData.subject;
-                                    if (key === 'body') selectedData.bodyText = emailData.bodyText.substring(0, 500);
+                                    if (key === 'body') selectedData.body_text = emailData.bodyText.substring(0, 500);
                                 }
                             });
 
@@ -531,6 +531,11 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                                     description: 'Manual Hydra Guard Contribution',
                                     metadata: {
                                         ...selectedData,
+                                        // Pass indicators so AI analysis has context on what heuristics fired
+                                        indicators: response.report?.indicators
+                                            || response.checks?.emailScam?.indicators
+                                            || [],
+                                        severity: response.overallSeverity || 'UNKNOWN',
                                         aiVerdict: response.verdict,
                                         aiConfidence: response.confidence,
                                         isManualContribution: true
@@ -608,7 +613,8 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
                             category: _humanizeTitle(finding.title),
                             userReason: reason,
                             userNote: '',
-                            pageUrl: window.location.hostname,
+                            // FIX: use full href so tldts.parse() can extract domain in the edge function
+                            pageUrl: window.location.href,
                             timestamp: Date.now()
                         }
                     }, (resp) => {
@@ -653,7 +659,7 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
         close();
     };
 
-    // "Not a Threat" — user disagrees, whitelist sender
+    // "Not a Threat" — user disagrees: (1) whitelist sender locally, (2) send low-weight FP signal to backend
     shadow.getElementById('sa-safe-btn').onclick = () => {
         const identity = result.metadata?.sender || window.location.hostname;
         const footer = shadow.querySelector('.sa-footer');
@@ -667,13 +673,16 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             `;
         }
 
+        // Primary action: local whitelist (must succeed regardless of backend)
         chrome.runtime.sendMessage({ type: MessageTypes.ADD_TO_WHITELIST, data: { domain: identity } }, (resp) => {
             if (footer) {
                 if (resp && resp.success) {
+                    // BUG-152: Differentiate local-only vs fully synced save
+                    const synced = resp.backendSynced;
                     footer.innerHTML = `
                         <div style="text-align: center; padding: 8px 0;">
-                            <div style="font-size: 14px; font-weight: 700; color: #34d399; margin-bottom: 4px;">Marked as safe</div>
-                            <div style="font-size: 12px; color: #64748b;">We won't flag this sender again.</div>
+                            <div style="font-size: 14px; font-weight: 700; color: #34d399; margin-bottom: 4px;">${synced ? 'Marked as safe' : 'Saved locally'}</div>
+                            <div style="font-size: 12px; color: #64748b;">${synced ? "We won't flag this sender again." : 'Server sync pending — your choice is saved.'}</div>
                         </div>
                     `;
                 } else {
@@ -687,6 +696,22 @@ export function showThreatDashboard(result, { onDismiss } = {}) {
             }
             setTimeout(() => close(), 2000);
         });
+
+        // Secondary action: fire-and-forget FP signal to backend (non-blocking)
+        // Only sends a low-weight aggregate signal — admins see FP count on each report.
+        // This NEVER auto-demotes any pattern by itself; only admins can act on it.
+        try {
+            chrome.runtime.sendMessage({
+                type: MessageTypes.REPORT_FALSE_POSITIVE,
+                data: {
+                    url: window.location.href,
+                    report_direction: 'false_positive',
+                    explanation: `User marked safe: ${identity}`,
+                    flaggedText: result.summary || '',
+                    pageUrl: window.location.href,
+                }
+            });
+        } catch (e) { /* best-effort — never block local whitelist */ }
     };
 
     document.body.appendChild(container);
@@ -998,7 +1023,8 @@ function _showLocateFeedback(el, finding, matchedPhrase, category) {
             userReason,
             userNote,
             finding,
-            pageHost: window.location.hostname
+            // FIX: use full href (not just hostname) — edge fn needs a parseable URL for domain extraction
+            pageHost: window.location.href
         });
     });
 }
