@@ -89,9 +89,23 @@ function _applyHighlight(indicator) {
     const cleanPhrase = phrase.replace(/\s*\(fuzzy\s+match\)/i, '').trim();
     if (!cleanPhrase || cleanPhrase.length <= 3) return;
 
-    const regex = new RegExp(`(${_escapeRegExp(cleanPhrase)})`, 'gi');
+    // Fast path: single-node TreeWalker (existing logic, handles 80%+ of cases)
+    const fastPathMatches = _applyHighlightSingleNode(cleanPhrase);
 
-    // Walk only text nodes — skip scripts, styles, and already-highlighted spans
+    // Slow path: cross-node TextNodeMap fallback (for phrases split by <b>, <span>, etc.)
+    if (fastPathMatches === 0) {
+        _applyHighlightCrossNode(cleanPhrase);
+    }
+}
+
+/**
+ * Fast path: highlights a phrase that exists entirely within a single TextNode.
+ * Returns the number of matches found.
+ */
+function _applyHighlightSingleNode(cleanPhrase) {
+    const regex = new RegExp(`(${_escapeRegExp(cleanPhrase)})`, 'gi');
+    let matchCount = 0;
+
     const walker = document.createTreeWalker(
         document.body,
         NodeFilter.SHOW_TEXT,
@@ -106,7 +120,6 @@ function _applyHighlight(indicator) {
                     ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT'].includes(parent.tagName)
                 ) return NodeFilter.FILTER_REJECT;
 
-                // Reset lastIndex before test (global regex is stateful!)
                 regex.lastIndex = 0;
                 return regex.test(node.nodeValue)
                     ? NodeFilter.FILTER_ACCEPT
@@ -115,7 +128,6 @@ function _applyHighlight(indicator) {
         }
     );
 
-    // Collect first so mutations during replacement don't confuse the walker
     const nodesToProcess = [];
     while (walker.nextNode()) nodesToProcess.push(walker.currentNode);
 
@@ -127,48 +139,146 @@ function _applyHighlight(indicator) {
         const fragment = document.createDocumentFragment();
         let lastIdx = 0;
 
-        // Reset lastIndex for the actual replace pass
         regex.lastIndex = 0;
         text.replace(regex, (match, _p1, offset) => {
-            // Prepend any plain text before the match
             if (offset > lastIdx) {
                 fragment.appendChild(document.createTextNode(text.substring(lastIdx, offset)));
             }
-
-            // Build the highlight element
-            const mark = document.createElement('mark');
-            mark.className = HIGHLIGHT_CLASS;
-            mark.textContent = match; // Safe – no innerHTML
-
-            Object.assign(mark.style, {
-                all: 'unset',
-                display: 'inline',          // `all:unset` removes display — restore it
-                backgroundColor: 'rgba(220, 38, 38, 0.12)', // red-600
-                borderBottom: '2px dashed #dc2626',         // red-600
-                borderRadius: '2px',
-                color: 'inherit',
-                cursor: 'help',
-                position: 'relative',
-                animation: 'sa-pulse 3s ease-in-out 0.5s 2', // Subtle pulse on load
-                transition: 'background-color 0.2s'
-            });
-
-            // Tooltip interaction is handled by tooltip.js event delegation
-            // on `.hydra-guard-highlight` elements — no per-mark listeners needed.
-
-            fragment.appendChild(mark);
+            fragment.appendChild(_createMark(match));
             lastIdx = offset + match.length;
+            matchCount++;
         });
 
-        // Remaining text after the last match
         if (lastIdx < text.length) {
             fragment.appendChild(document.createTextNode(text.substring(lastIdx)));
         }
-
         parent.replaceChild(fragment, node);
     });
+
+    return matchCount;
+}
+
+/**
+ * Slow path: highlights a phrase split across multiple TextNodes (e.g., "Action <b>Required</b>").
+ * Uses TextNodeMap + Text.splitText() — no innerHTML, no outerHTML, XSS-safe.
+ */
+function _applyHighlightCrossNode(cleanPhrase) {
+    // 1. Build a TextNodeMap: collect all visible TextNodes with their character offsets
+    const textNodeMap = []; // { node, start, end }
+    let totalLen = 0;
+    const TEXT_CAP = 500 * 1024; // 500KB cap to prevent memory exhaustion
+
+    const mapWalker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode: (node) => {
+                const parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                if (
+                    parent.closest(`.${HIGHLIGHT_CLASS}`) ||
+                    parent.closest('#hydra-guard-overlay-root') ||
+                    ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT'].includes(parent.tagName)
+                ) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        }
+    );
+
+    const textParts = [];
+    let mapNode;
+    while ((mapNode = mapWalker.nextNode())) {
+        const value = mapNode.nodeValue || '';
+        if (totalLen + value.length > TEXT_CAP) break;
+        textParts.push(value);
+        textNodeMap.push({ node: mapNode, start: totalLen, end: totalLen + value.length });
+        totalLen += value.length;
+    }
+
+    if (textNodeMap.length === 0) return;
+
+    // 2. Run regex over concatenated text
+    const concatenated = textParts.join('');
+    const regex = new RegExp(_escapeRegExp(cleanPhrase), 'gi');
+    let match;
+
+    // Process matches in reverse order so splitText offsets don't shift
+    const matches = [];
+    while ((match = regex.exec(concatenated)) !== null) {
+        matches.push({ start: match.index, end: match.index + match[0].length });
+    }
+
+    // 3. For each match, find spanning TextNodes and wrap in <mark>
+    for (let m = matches.length - 1; m >= 0; m--) {
+        const { start: matchStart, end: matchEnd } = matches[m];
+        _wrapCrossNodeMatch(textNodeMap, matchStart, matchEnd);
+    }
+}
+
+/**
+ * Wraps a match spanning [matchStart, matchEnd) across TextNodes using Text.splitText().
+ * Only uses safe DOM APIs: Text.splitText(), Node.insertBefore(), document.createElement().
+ */
+function _wrapCrossNodeMatch(textNodeMap, matchStart, matchEnd) {
+    for (let i = 0; i < textNodeMap.length; i++) {
+        const entry = textNodeMap[i];
+        // Skip nodes entirely before or after the match
+        if (entry.end <= matchStart || entry.start >= matchEnd) continue;
+
+        const node = entry.node;
+        const parent = node.parentElement;
+        if (!parent) continue;
+
+        // Calculate local offsets within this TextNode
+        const localStart = Math.max(0, matchStart - entry.start);
+        const localEnd = Math.min(node.nodeValue.length, matchEnd - entry.start);
+
+        // Split the text node to isolate the matching portion
+        let targetNode = node;
+
+        // Split off the leading unmatched text
+        if (localStart > 0) {
+            targetNode = targetNode.splitText(localStart);
+        }
+
+        // Split off the trailing unmatched text
+        if (localEnd - localStart < targetNode.nodeValue.length) {
+            targetNode.splitText(localEnd - localStart);
+        }
+
+        // Wrap the isolated text in a <mark>
+        const mark = _createMark(targetNode.nodeValue);
+        parent.insertBefore(mark, targetNode);
+        parent.removeChild(targetNode);
+    }
+}
+
+/**
+ * Creates a styled <mark> element for scam phrase highlighting.
+ * Uses textContent only — no innerHTML (XSS-safe).
+ */
+function _createMark(text) {
+    const mark = document.createElement('mark');
+    mark.className = HIGHLIGHT_CLASS;
+    mark.textContent = text; // Safe – no innerHTML
+
+    Object.assign(mark.style, {
+        all: 'unset',
+        display: 'inline',          // `all:unset` removes display — restore it
+        backgroundColor: 'rgba(220, 38, 38, 0.12)', // red-600
+        borderBottom: '2px dashed #dc2626',         // red-600
+        borderRadius: '2px',
+        color: 'inherit',
+        cursor: 'help',
+        position: 'relative',
+        animation: 'sa-pulse 3s ease-in-out 0.5s 2', // Subtle pulse on load
+        transition: 'background-color 0.2s'
+    });
+
+    return mark;
 }
 
 function _escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+

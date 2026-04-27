@@ -147,7 +147,8 @@ export async function getMergedScamPhrases() {
     ];
 
     const remotePhrases = remotePatterns.map(p => p.phrase);
-    return [...new Set([...localPhrases, ...remotePhrases])];
+    const merged = [...new Set([...localPhrases, ...remotePhrases])];
+    return merged.filter(p => /\s/.test(p.trim()));
 }
 
 /**
@@ -172,7 +173,8 @@ export async function getMergedSuspiciousKeywords() {
  */
 export async function getMergedEmailKeywords() {
     const result = (await chrome.storage.local.get(['remoteScamPatterns'])) || {};
-    const remotePatterns = result.remoteScamPatterns || [];
+    // Ensure all remote patterns used match as multi-word phrases (prevent single-word alerts)
+    const remotePatterns = (result.remoteScamPatterns || []).filter(p => /\s/.test(p.phrase.trim()));
 
     return {
         giftCardKeywords: remotePatterns
@@ -194,6 +196,12 @@ export async function getMergedEmailKeywords() {
         // These map to the email-heuristics.js "Account security or payment lure" check
         securityKeywords: remotePatterns
             .filter(p => p.category === 'securityKeywords')
+            .map(p => p.phrase),
+        // Catch-all: phrases with generic/unknown categories (e.g. 'phrase', 'generic', null)
+        // These feed a standalone check in email-heuristics.js that fires unconditionally.
+        genericPhrases: remotePatterns
+            .filter(p => !['gift_card', 'command', 'finance', 'vague_lure',
+                           'authority_pressure', 'securityKeywords', 'urgency', 'tld'].includes(p.category))
             .map(p => p.phrase),
     };
 }

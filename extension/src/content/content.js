@@ -515,6 +515,12 @@ function collectPageSignals() {
         return null;
     }).filter(Boolean).slice(0, 5);
 
-    return { isHttps, forms, linkMismatches };
+    return {
+        isHttps,
+        forms,
+        linkMismatches,
+        title: document.title || '',
+        bodyText: document.body ? document.body.innerText.substring(0, 5000) : ''
+    };
 }
 

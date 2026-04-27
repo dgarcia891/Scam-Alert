@@ -187,3 +187,66 @@ if (!result10.flagged || !result10.indicators.includes('Account security or paym
     console.log("FAIL: Single DB keyword incorrectly triggered the heuristic!");
 }
 
+// ============================================================
+// TC-CASE-1: Uppercase DB phrase detection (case-sensitivity fix)
+// Validates: Phrases with mixed case from the remote DB are correctly
+// matched against the lowercased email body.
+// ============================================================
+console.log("\n=== TC-CASE-1: Uppercase DB phrase in email (no links) ===");
+
+const caseTestEmail = {
+    isEmailView: true,
+    bodyText: 'IRS has filed a lawsuit against you. Do not discuss this with anyone.',
+    senderEmail: 'agent@fake-irs.gov.com',
+    senderName: 'IRS Agent'
+};
+const caseResult = checkEmailScams(caseTestEmail, {
+    genericPhrases: ['IRS has filed a lawsuit against you', 'do not discuss this with anyone']
+});
+console.log("- Flagged:", caseResult.flagged);
+console.log("- Score:", caseResult.score);
+console.log("- Indicators:", caseResult.indicators?.join(', ') || 'none');
+
+if (caseResult.flagged && caseResult.indicators.includes('Remote scam phrase detected')) {
+    console.log("SUCCESS: Uppercase DB phrases correctly detected via standalone check!");
+} else {
+    console.log("FAIL: Uppercase DB phrases NOT detected. Case-sensitivity or routing bug persists.");
+}
+if (caseResult.score >= 40) {
+    console.log("SUCCESS: Score >= 40 (dual match bonus applied).");
+} else {
+    console.log("FAIL: Score too low (" + caseResult.score + "). Expected >= 40 for 2 generic phrases.");
+}
+
+// ============================================================
+// TC-ROUTE-1: Generic phrases fire WITHOUT external links
+// Validates: The standalone generic phrase check fires unconditionally,
+// NOT gated on hasExternalLinks like vagueLureKeywords.
+// This is the exact scenario the v2 plan would have MISSED.
+// ============================================================
+console.log("\n=== TC-ROUTE-1: Generic phrases fire without external links ===");
+
+const noLinksEmail = {
+    isEmailView: true,
+    bodyText: 'Purchase gift cards to resolve this matter. Scratch the back of the card and send me a picture.',
+    senderEmail: 'boss@gmail.com',
+    senderName: 'CEO'
+};
+const noLinksResult = checkEmailScams(noLinksEmail, {
+    genericPhrases: ['purchase gift cards to resolve', 'scratch the back of the card']
+});
+console.log("- Flagged:", noLinksResult.flagged);
+console.log("- Score:", noLinksResult.score);
+console.log("- Indicators:", noLinksResult.indicators?.join(', ') || 'none');
+
+if (noLinksResult.flagged) {
+    console.log("SUCCESS: Flagged even with zero external links!");
+} else {
+    console.log("FAIL: Not flagged — standalone check is broken or phrases routed to vagueLureKeywords.");
+}
+if (noLinksResult.indicators.includes('Remote scam phrase detected')) {
+    console.log("SUCCESS: 'Remote scam phrase detected' indicator present.");
+} else {
+    console.log("FAIL: Missing 'Remote scam phrase detected' indicator.");
+}
+

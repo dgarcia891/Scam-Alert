@@ -34,10 +34,10 @@ export function checkSuspiciousKeywords(url, isSuspiciousTLD, pageContent = null
     const pageVisibleText = ((pageContent?.title || '') + ' ' + (pageContent?.bodyText || '')).toLowerCase();
 
     // Scan URL
-    const foundInUrl = keywords.filter(keyword => lowerUrl.includes(keyword));
+    const foundInUrl = keywords.filter(keyword => lowerUrl.includes(keyword.toLowerCase()));
 
     // Scan Page Content
-    const foundInPage = keywords.filter(keyword => pageVisibleText.includes(keyword));
+    const foundInPage = keywords.filter(keyword => pageVisibleText.includes(keyword.toLowerCase()));
 
     // Merge unique findings
     const found = [...new Set([...foundInUrl, ...foundInPage])];
@@ -106,7 +106,7 @@ export function checkUrgencySignals(pageContent, customPhrases = null) {
     ];
     const urgencyKeywords = customPhrases || baseUrgency;
     const text = ((pageContent?.title || '') + ' ' + (pageContent?.bodyText || '')).toLowerCase();
-    const found = urgencyKeywords.filter(k => text.includes(k));
+    const found = urgencyKeywords.filter(k => text.includes(k.toLowerCase()));
 
     if (found.length >= 1) {
         return {
@@ -136,7 +136,7 @@ export function analyzePageContent(pageContent, customPhrases = null) {
     ];
     const scamPhrases = customPhrases || basePhrases;
     const text = (title + ' ' + bodyText).toLowerCase();
-    const foundPhrases = scamPhrases.filter(phrase => text.includes(phrase));
+    const foundPhrases = scamPhrases.filter(phrase => text.includes(phrase.toLowerCase()));
     const sensitiveForms = Array.isArray(forms) ? forms.filter(f => (f.hasPassword || f.hasCreditCard)) : [];
     const insecureForms = !isHttps ? sensitiveForms : [];
     const suspiciousLinks = Array.isArray(linkMismatches) ? linkMismatches.slice(0, 5) : [];

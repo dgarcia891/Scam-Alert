@@ -38,8 +38,8 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'do with them', 'let me know',
         ...(dyn.commandWords || [])
     ])];
-    const hasGiftCard = giftCardKeywords.some(k => emailBody.includes(k));
-    const hasCommand = commandWords.some(k => emailBody.includes(k));
+    const hasGiftCard = giftCardKeywords.some(k => emailBody.includes(k.toLowerCase()));
+    const hasCommand = commandWords.some(k => emailBody.includes(k.toLowerCase()));
 
     if (hasGiftCard && hasCommand) { indicators.push('Gift card payment request'); score += 50; }
 
@@ -51,7 +51,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'verification code', 'security code', 'account locked', 'account suspended',
         ...(dyn.securityKeywords || [])
     ])];
-    const hasSecurityLure = securityKeywords.filter(k => emailBody.includes(k));
+    const hasSecurityLure = securityKeywords.filter(k => emailBody.includes(k.toLowerCase()));
     if (hasSecurityLure.length >= 2) {
         indicators.push('Account security or payment lure');
         score += 30;
@@ -220,7 +220,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'invoice', 'wire transfer', 'payment pending', 'unpaid', 'overdue', 'bank details', 'routing number',
         ...(dyn.financeKeywords || [])
     ])];
-    const hasFinance = financeKeywords.filter(k => emailBody.includes(k));
+    const hasFinance = financeKeywords.filter(k => emailBody.includes(k.toLowerCase()));
     if (hasFinance.length >= 2) { indicators.push('Suspicious financial request'); score += 30; }
 
     // 6. Authority Impersonation Body Language (hardcoded + dynamic)
@@ -231,7 +231,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'i need your help with something', 'are you in a good space', 'are you available',
         ...(dyn.authorityPressureSignals || [])
     ])];
-    const authorityFound = authorityPressureSignals.filter(k => emailBody.includes(k));
+    const authorityFound = authorityPressureSignals.filter(k => emailBody.includes(k.toLowerCase()));
     if (authorityFound.length >= 1 && (hasGiftCard || indicators.length > 0)) {
         indicators.push('Authority pressure + secrecy language');
         score += 30;
@@ -246,7 +246,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         'those pics', 'those pictures', 'remember them', 'open this', 'photos',
         ...(dyn.vagueLureKeywords || [])
     ])];
-    const matchedLureKeywords = vagueLureKeywords.filter(k => emailBody.includes(k));
+    const matchedLureKeywords = vagueLureKeywords.filter(k => emailBody.includes(k.toLowerCase()));
     const hasVagueLure = matchedLureKeywords.length > 0;
     const hasExternalLinks = externalLinks.length > 0;
 
@@ -255,23 +255,37 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
         score += 35;
     }
 
+    // 8. Generic Remote Scam Phrases (catch-all for uncategorized DB patterns)
+    // These are high-severity phrases managed centrally that don't fit specific heuristic
+    // categories. They fire unconditionally — no secondary conditions required.
+    const genericPhrases = dyn.genericPhrases || [];
+    const foundGeneric = genericPhrases.filter(k => emailBody.includes(k.toLowerCase()));
+    if (foundGeneric.length >= 1) {
+        indicators.push('Remote scam phrase detected');
+        score += foundGeneric.length >= 2 ? 40 : 25;
+    }
+
     const keywordMatches = [];
+    if (foundGeneric.length >= 1) {
+        keywordMatches.push(...foundGeneric);
+    }
     if (hasGiftCard && hasCommand) {
-        keywordMatches.push(...giftCardKeywords.filter(k => emailBody.includes(k)));
-        keywordMatches.push(...commandWords.filter(k => emailBody.includes(k)));
+        keywordMatches.push(...giftCardKeywords.filter(k => emailBody.includes(k.toLowerCase())));
+        keywordMatches.push(...commandWords.filter(k => emailBody.includes(k.toLowerCase())));
     }
     if (hasFinance.length >= 2) {
-        keywordMatches.push(...financeKeywords.filter(k => emailBody.includes(k)));
+        keywordMatches.push(...financeKeywords.filter(k => emailBody.includes(k.toLowerCase())));
     }
     if (hasVagueLure && hasExternalLinks) {
-        keywordMatches.push(...vagueLureKeywords.filter(k => emailBody.includes(k)));
+        keywordMatches.push(...vagueLureKeywords.filter(k => emailBody.includes(k.toLowerCase())));
     }
     // Unconditionally add security and critical phrases to keywordMatches 
     // so they are highlighted IF the email gets flagged for ANY reason (e.g. sender spoofing).
     if (hasSecurityLure.length >= 1) {
         keywordMatches.push(...hasSecurityLure);
         
-        // Extract individual highlightable words from matched security phrases
+        // TODO: Remove after Phase 3 cross-node highlighter lands.
+        // Extract individual highlightable words from matched security phrases.
         // Gmail fragments text across DOM nodes, so multi-word phrases won't match
         // in the TreeWalker. Individual words will.
         const individualWords = new Set();
@@ -281,7 +295,7 @@ export function checkEmailScams(pageContent, dynamicEmailKeywords = null) {
             });
         });
         individualWords.forEach(word => {
-            if (emailBody.includes(word) && !keywordMatches.includes(word)) {
+            if (emailBody.includes(word.toLowerCase()) && !keywordMatches.includes(word)) {
                 keywordMatches.push(word);
             }
         });

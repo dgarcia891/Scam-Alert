@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.27] - 2026-04-17
+
+### Added
+- **UI Restoration**: "Trust Site" and "Report Scam" buttons are now permanently visible on the main popup screen for flagged sites, removing the need to dig into the details accordion.
+- **Enhanced Developer UX**: Replaced the obscure header "DEV" icon with a clear "Toggle Developer Mode" button in the footer settings panel.
+- **Phrase Enforcement Logic**: Implemented a mandatory whitespace check for all remote heuristics. Any single-word patterns fetched from the database (e.g., "bitcoin", "urgent") are now automatically discarded to prevent false positives, strictly enforcing multi-word phrase detection.
+
+### Changed
+- **Branding Parity**: Standardized all extension metadata to "Hydra Guard" across `package.json` and `manifest.json`.
+- **UI Layout Optimization**: Improved the button grid in the popup to ensure action buttons are prominent and accessible.
+
+### Fixed
+- **Troubleshooting Accessibility**: Fixed the regression where the Developer Mode toggle was non-obvious and difficult to find.
+- **Generic Word False Positives**: Resolved issues where single keywords in emails would trigger high-severity alerts.
+
+## [1.1.26] - 2026-04-16
+
+### Added
+- **Content Extraction Layer**: Navigation-triggered web page scans now extract page `title` and `bodyText` to allow phrase analysis.
+- **Standalone Generic Phrase Check**: Uncategorized remote patterns are correctly scanned unconditionally, enabling multi-word scam phrase detection via email.
+- **Dual-Path Highlighter**: Safely highlights individual phrases and multi-node UI matches without XSS vulnerabilities.
+
+### Fixed
+- **Phrase Engine Case Normalization**: Keyword matching is now case-insensitive, correctly alerting on capitalized DB items like 'IRS'.
+- **Category Match Fix**: Addressed issue where remote DB matches tagged as "phrase" failed to execute due to unhandled tags in the scanner engine.
+
 ## [1.1.12] - 2026-04-02
 
 ### Added

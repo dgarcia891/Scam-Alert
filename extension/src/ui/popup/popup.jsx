@@ -1224,19 +1224,7 @@ const Popup = () => {
                             {repBadge.text} {repBadge.level.replace('_', ' ')}
                         </div>
                     )}
-                    <button
-                        onClick={toggleDevMode}
-                        className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest transition-all border cursor-pointer",
-                            devMode
-                                ? "bg-violet-500/20 text-violet-400 border-violet-500/30"
-                                : "bg-slate-800/60 text-slate-600 border-slate-700/50 hover:text-slate-400"
-                        )}
-                        title="Toggle Developer Mode: View detailed scan logs and raw data"
-                    >
-                        <Bug size={10} />
-                        DEV
-                    </button>
+                    {/* Developer mode icon removed for explicit footer button */}
                     {isPro && (
                         <span className="bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-slate-700 cursor-help" title="Active Pro Subscription">PRO</span>
                     )}
@@ -1332,10 +1320,24 @@ const Popup = () => {
                         <div className="mt-4 px-1 animate-in fade-in slide-in-from-top-2 duration-300">
                             <button
                                 onClick={handleGoBack}
-                                className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-lg active:scale-[0.98]"
+                                className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-lg active:scale-[0.98] mb-2"
                             >
                                 Go back to safety
                             </button>
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <button onClick={isWhitelisted ? null : handleWhitelist} disabled={isWhitelisted} className={cn(
+                                    "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                                    isWhitelisted ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700"
+                                )}>
+                                    {isWhitelisted ? 'Trusted' : 'Trust Site'}
+                                </button>
+                                <button onClick={isAlreadyReported ? null : handleReportScam} disabled={isAlreadyReported} className={cn(
+                                    "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                                    isAlreadyReported ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700"
+                                )}>
+                                    {isAlreadyReported ? 'Reported' : 'Report Scam'}
+                                </button>
+                            </div>
                             <button
                                 onClick={() => setDetailsOpen(true)}
                                 className="w-full mt-2 py-2 text-slate-400 text-xs font-semibold hover:text-white transition-colors"
@@ -1442,23 +1444,7 @@ const Popup = () => {
                                         </div>
                                         <ArrowRight size={14} className="text-slate-600" />
                                     </button>
-                                    <div className="grid grid-cols-2 gap-2 pt-1">
-                                        {(status !== 'secure' || isWhitelisted) && (
-                                            <button onClick={isWhitelisted ? null : handleWhitelist} disabled={isWhitelisted} className={cn(
-                                                "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-                                                isWhitelisted ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700"
-                                            )}>
-                                                {isWhitelisted ? 'Trusted' : 'Trust Site'}
-                                            </button>
-                                        )}
-                                        <button onClick={isAlreadyReported ? null : handleReportScam} disabled={isAlreadyReported} className={cn(
-                                            "flex items-center justify-center gap-2 p-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-                                            isAlreadyReported ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700",
-                                            (status === 'secure' && !isWhitelisted) && "col-span-2"
-                                        )}>
-                                            {isAlreadyReported ? 'Reported' : 'Report Suspicious'}
-                                        </button>
-                                    </div>
+                                    {/* Action buttons removed from here — they are now at the top below 'Go back to safety' */}
 
                                     {/* Inline Report UI */}
                                     {reportOpen && !isAlreadyReported && (
@@ -1567,14 +1553,22 @@ const Popup = () => {
 
                     {/* Footer */}
                     {!detailsOpen && (
-                        <div className="mt-auto pt-6 flex justify-center items-center gap-4">
-                            <button onClick={() => handleOpenTab('dashboard')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2 flex items-center gap-1.5">
-                                <Settings size={12} />
-                                Settings
-                            </button>
-                            <div className="w-px h-3 bg-slate-800" />
-                            <button onClick={() => handleOpenTab('logs')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2">
-                                Activity Log
+                        <div className="mt-auto pt-6 flex flex-col justify-center items-center gap-3">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => handleOpenTab('dashboard')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2 flex items-center gap-1.5">
+                                    <Settings size={12} />
+                                    Settings
+                                </button>
+                                <div className="w-px h-3 bg-slate-800" />
+                                <button onClick={() => handleOpenTab('logs')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2">
+                                    Activity Log
+                                </button>
+                            </div>
+                            <button
+                                onClick={toggleDevMode}
+                                className="text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-wider transition-colors border border-slate-800 rounded px-3 py-1.5"
+                            >
+                                Toggle Developer Mode
                             </button>
                         </div>
                     )}
@@ -1583,14 +1577,22 @@ const Popup = () => {
 
             {/* ── DEV MODE FOOTER ─────────────────────────────────────────────────────────────── */}
             {devMode && (
-                <div className="mt-3 flex justify-center items-center gap-4">
-                    <button onClick={() => handleOpenTab('dashboard')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2 flex items-center gap-1.5">
-                        <Settings size={12} />
-                        Settings
-                    </button>
-                    <div className="w-px h-3 bg-slate-800" />
-                    <button onClick={() => handleOpenTab('logs')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2">
-                        Activity Log
+                <div className="mt-3 flex flex-col justify-center items-center gap-3">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => handleOpenTab('dashboard')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2 flex items-center gap-1.5">
+                            <Settings size={12} />
+                            Settings
+                        </button>
+                        <div className="w-px h-3 bg-slate-800" />
+                        <button onClick={() => handleOpenTab('logs')} className="text-slate-500 hover:text-slate-300 text-[10px] font-medium transition-colors hover:underline underline-offset-2">
+                            Activity Log
+                        </button>
+                    </div>
+                    <button
+                        onClick={toggleDevMode}
+                        className="text-slate-500 hover:text-slate-300 text-[9px] font-bold uppercase tracking-wider transition-colors border border-slate-800 rounded px-3 py-1.5"
+                    >
+                        Exit Developer Mode
                     </button>
                 </div>
             )}
