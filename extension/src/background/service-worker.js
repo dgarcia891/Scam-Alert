@@ -181,6 +181,34 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                             pageContent.extractionFailed = true;
                         }
                     }
+
+                    // Cause 5 Fix: If content script confirms we are in the inbox list (not reading an email),
+                    // short-circuit the full scan pipeline. Running scanUrl() is guaranteed to produce an
+                    // empty payload → UNKNOWN escalation loop. Emit a stable synthetic result instead.
+                    if (pageContent?.isReadingView === false) {
+                        console.log('[Hydra Guard] scanAndHandle: Inbox view confirmed — skipping full scan pipeline.');
+                        result = {
+                            overallSeverity: 'SAFE',
+                            overallThreat: false,
+                            action: 'ALLOW',
+                            checks: {},
+                            signals: { hard: [], soft: [] },
+                            reasons: [{ code: 'INBOX_VIEW', message: 'Inbox list view — no email selected for scanning' }],
+                            metadata: { isReadingView: false }
+                        };
+                        await cacheScan(url, result);
+                        tabStateManager.updateTabState(tabId, { url, scanResults: result, lastScanned: Date.now(), scanInProgress: false });
+                        try {
+                            await chrome.action.setBadgeText({ tabId, text: '' });
+                            await chrome.action.setBadgeBackgroundColor({ tabId, color: [0, 0, 0, 0] });
+                        } catch (e) { /* ignore */ }
+                        try {
+                            chrome.runtime.sendMessage(createMessage(MessageTypes.SCAN_RESULT_UPDATED, { result }), () => {
+                                void chrome.runtime.lastError;
+                            });
+                        } catch { /* popup may be closed */ }
+                        return; // EXIT — do not run scanUrl()
+                    }
                 } catch (err) {
                     console.warn('[Hydra Guard] Page signal collection failed:', err.message);
                 }
@@ -240,7 +268,7 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                                              (pageContent.senderEmail) ||
                                              (pageContent.senderName && pageContent.senderName !== 'Unknown');
                     
-                    if (!hasExtractedData) {
+                    if (!hasExtractedData && pageContent.isReadingView !== false) {
                         console.warn('[Hydra Guard] scanAndHandle: Empty Payload Safeguard triggered. Escalating to UNKNOWN.');
                         result.overallSeverity = 'UNKNOWN';
                         result.action = 'CHECK_INCOMPLETE';
@@ -259,6 +287,9 @@ async function scanAndHandle(tabId, url, scanOptions = {}) {
                     result.metadata.linkCount = (pageContent.rawUrls || pageContent.links || []).length;
                     if (pageContent.senderEmail && !result.metadata.senderEmail) {
                         result.metadata.senderEmail = pageContent.senderEmail;
+                    }
+                    if (pageContent.isReadingView !== undefined) {
+                        result.metadata.isReadingView = pageContent.isReadingView;
                     }
                 }
             }

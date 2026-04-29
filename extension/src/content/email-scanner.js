@@ -153,6 +153,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                 pageContent: {
                     bodyText: data,
                     isEmailView: true,
+                    isReadingView: true,
                     senderName: senderInfo.name,
                     senderEmail: senderInfo.email,
                     subject,
@@ -174,6 +175,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                             pageContent: {
                                 bodyText: data,
                                 isEmailView: true,
+                                isReadingView: true,
                                 senderName: senderInfo.name,
                                 senderEmail: senderInfo.email,
                                 subject,
@@ -270,6 +272,7 @@ import { setupLinkInterceptor } from './email/link-interceptor.js';
                         bodyReady,
                         context: {
                             isEmailView: true,
+                            isReadingView: isEmailReadingView(),
                             bodyText: data,
                             senderName: senderInfo.name || '',
                             senderEmail: senderInfo.email || '',

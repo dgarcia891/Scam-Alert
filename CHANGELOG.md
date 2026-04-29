@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.28] - 2026-04-29
+
+### Fixed
+- **Gmail Inbox Stuck Scanning (5-Cause Fix)**: Resolved a compound bug where opening the Hydra Guard popup while on the Gmail inbox list view (no email selected) caused the popup to display "Scanning email... We couldn't extract the email content yet. Retrying automatically." indefinitely. Root causes addressed:
+  1. Empty Payload Safeguard in service worker now distinguishes inbox list views from failed email extraction, preventing false UNKNOWN escalation.
+  2. Content script now propagates `isReadingView` flag to the background so context is available at all pipeline stages.
+  3. New `inbox` UI state added to popup — displays a neutral "Inbox View" card instead of an amber retry warning.
+  4. Popup auto-rescan loop now guarded to prevent infinite `FORCE_RESCAN` cycles when already confirmed in inbox view.
+  5. `FORCE_RESCAN` pipeline short-circuits for inbox views, emitting a stable synthetic result and bypassing `scanUrl()` which would always escalate to UNKNOWN in this context.
+
 ## [1.1.27] - 2026-04-17
 
 ### Added

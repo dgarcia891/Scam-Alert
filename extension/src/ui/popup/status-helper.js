@@ -16,11 +16,16 @@ export function deriveStatusFromResults(res, scanInProgress, currentUrl) {
 
     // BUG-131: If we are on webmail but have no email content, do NOT return 'secure'.
     // Instead return 'unknown' so the UI shows scanning status and auto-retries.
+    // If the user is in the inbox view (not reading an email), return 'inbox'.
     const isEmailUrl = isKnownEmailClient(currentUrl);
     const hasContentData = !!(res.metadata?.sender || res.metadata?.subject || res.metadata?.bodySnippet || res.metadata?.body_text);
     
-    if (isEmailUrl && !hasContentData) {
-        return 'unknown';
+    if (isEmailUrl) {
+        if (res.metadata?.isReadingView === false) {
+            return 'inbox';
+        } else if (!hasContentData) {
+            return 'unknown';
+        }
     }
 
     // BUG-SYNC: Align with background isAlert logic

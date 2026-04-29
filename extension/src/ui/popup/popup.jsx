@@ -58,6 +58,13 @@ const getStatusConfig = (status, contextType = 'WEB') => {
             titleColor: "text-slate-400", subColor: "text-slate-500",
             accent: "bg-slate-600", icon: Info
         },
+        inbox: {
+            tone: "neutral", dot: "bg-slate-400", ring: "ring-slate-400/30",
+            title: "Inbox View", subtitle: "Open an email to scan its contents.",
+            cardBg: "bg-slate-900/40", cardBorder: "border-slate-800",
+            titleColor: "text-slate-50", subColor: "text-slate-300",
+            accent: "bg-slate-600", icon: Mail
+        },
         unknown: {
             tone: "caution", dot: "bg-amber-400", ring: "ring-amber-400/30",
             title: "Scanning email...", subtitle: "We couldn't extract the email content yet. Retrying automatically.",
@@ -1064,8 +1071,10 @@ const Popup = () => {
                         if (unwrappedRes?.whitelisted) setIsWhitelisted(true);
                         
                         // BUG-131: Auto-rescan if extraction failed but popup was opened.
+                        // Guard: do NOT rescan if we are in the inbox view — rescanning an inbox
+                        // is guaranteed to fail (no email open) and causes an infinite retry loop.
                         // Uses tab.id (local) not currentTabId (stale React state) — fix for stale closure.
-                        if (newStatus === 'unknown') {
+                        if (newStatus === 'unknown' && unwrappedRes?.metadata?.isReadingView !== false) {
                             setIsRescanning(true);
                             chrome.runtime.sendMessage({ type: MessageTypes.FORCE_RESCAN, data: { tabId: tab.id, forceRefresh: true } }, () => {
                                 setTimeout(() => setIsRescanning(false), 8000);

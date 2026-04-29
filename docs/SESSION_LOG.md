@@ -4,6 +4,24 @@ This file is the single source of truth for "what we last worked on" and "what t
 
 ---
 
+## [2026-04-27] v1.1.27 Deployment & Phrase Enforcement
+**Project:** Hydra Guard (Scam Alert)
+**Version:** 1.1.27 (Deployed)
+
+### Summary of Work
+- **Final Handoff:** Completed the `/deploy-global` workflow for v1.1.27.
+- **UI Restoration:** Restored "Trust Site" and "Report Scam" buttons on the main popup.
+- **Phrase Enforcement:** Implemented strict multi-word phrase enforcement to eliminate single-keyword false positives.
+- **Branding:** Standardized to "Hydra Guard" across the codebase.
+- **Dev Mode:** Added explicit "Toggle Developer Mode" button to the popup footer.
+- **Verification:** Built `dist/`, committed, tagged `v1.1.27`, and pushed to `origin/main`. Distilled KIs into the `deployment_report.md` artifact.
+
+### Next Actions
+1. **Production Monitoring:** Monitor telemetry to see if the phrase enforcement reduces false positive reports.
+2. **Mivos.ai Context Switch:** We were reviewing `CONVENTIONS.md` for Mivos.ai to start the System Fixing Phase following the recent audit.
+
+---
+
 ## [2026-04-13] Session Handoff & Versioning
 **Project:** Hydra Guard (Scam Alert)
 **Version:** 1.1.25 (Pushed)
